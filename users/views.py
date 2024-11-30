@@ -7,6 +7,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.models import User
 from .serializers import UserProfileSerializer, SignupSerializer, LoginSerializer
 from .models import UserProfile
+from .scripts import scrapper
 import logging
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,8 @@ def signup_view(request):
         medical_degree = request.data.get('medical_degree')
         license_number = request.data.get('license_number')
         state_council = request.data.get('state_council')
+        year_of_registration = request.data.get('year_of_registration')
+        clinic_name = request.data.get('clinic_name')
         phone_number = request.data.get('phone_number')
         address = request.data.get('address')
         pincode = request.data.get('pincode')
@@ -61,6 +64,7 @@ def signup_view(request):
             'medical_degree': medical_degree,
             'license_number': license_number,
             'state_council': state_council,
+            'clinic_name': clinic_name,
             'phone_number': phone_number,
             'address': address,
             'pincode': pincode
@@ -101,9 +105,11 @@ def signup_view(request):
         profile.medical_degree = medical_degree
         profile.license_number = license_number
         profile.state_council = state_council
+        profile.clinic_name = clinic_name
         profile.phone_number = phone_number
         profile.address = address
         profile.pincode = pincode
+        profile.year_of_registration = year_of_registration
         profile.save()
 
         print(f"Updated profile for user: {username}")  # Debug log
@@ -136,3 +142,49 @@ def get_user_profile(request):
             {"error": "Profile not found"}, 
             status=status.HTTP_404_NOT_FOUND
         )
+@api_view(['POST'])
+def verify_doctor(request):
+    try:
+        logger.info(f"Received verification request with data: {request.data}")
+        
+        # Extract data from request
+        data = request.data
+        name = data.get('name')
+        registration_number = data.get('registration_number')
+        state_council = data.get('state_council')
+
+        # Validate required fields
+        if not all([name, registration_number, state_council]):
+            return Response({
+                'success': False,
+                'error': 'Missing required fields'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        doctor_details = {
+            'name': name,
+            'registration_number': registration_number,
+            'state_council': state_council
+        }
+
+        logger.info(f"Attempting to verify doctor: {doctor_details}")
+        success, result = scrapper.verify_doctor(doctor_details)
+        
+        if success:
+            logger.info(f"Verification successful: {result}")
+            return Response({
+                'success': True,
+                'data': result
+            }, status=status.HTTP_200_OK)
+        else:
+            logger.error(f"Verification failed: {result}")
+            return Response({
+                'success': False,
+                'error': result
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+    except Exception as e:
+        logger.error(f"Error in verify_doctor: {str(e)}")
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST) 
