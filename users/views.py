@@ -5,10 +5,11 @@ from rest_framework import status
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.models import User
-from .serializers import UserProfileSerializer, SignupSerializer, LoginSerializer
-from .models import UserProfile
+from .serializers import UserProfileSerializer, SignupSerializer, LoginSerializer, PatientSerializer, AppointmentSerializer
+from .models import UserProfile, Patient, Appointment
 from .scripts import scrapper
 import logging
+from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
 
@@ -187,4 +188,37 @@ def verify_doctor(request):
         return Response({
             'success': False,
             'error': str(e)
-        }, status=status.HTTP_400_BAD_REQUEST) 
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+def create_patient(request):
+    serializer = PatientSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    else:
+        # Log the errors for debugging
+        print("Serializer errors:", serializer.errors)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+def get_patients(request):
+    patients = Patient.objects.all()
+    serializer = PatientSerializer(patients, many=True)
+    return Response(serializer.data)
+
+class PatientsView(APIView):
+    def post(self, request):
+        serializer = PatientSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class AppointmentView(APIView):
+    def post(self, request):
+        serializer = AppointmentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST) 

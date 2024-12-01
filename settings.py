@@ -134,3 +134,6 @@ REST_FRAMEWORK = {
 }
 CORS_ALLOW_ALL_ORIGINS = True  # For development only
 ALLOWED_HOSTS = ['*']  # For development only
+CSRF_TRUSTED_ORIGINS = ["https://rxbackend.onrender.com"]
+CSRF_ALLOWED_ORIGINS = ["https://rxbackend.onrender.com"]
+CORS_ORIGINS_WHITELIST = ["https://rxbackend.onrender.com"]

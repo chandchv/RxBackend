@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import UserProfile
+from .models import UserProfile, Patient, Appointment
 
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
@@ -22,3 +22,7 @@ class UserProfileAdmin(admin.ModelAdmin):
     list_display = ('user', 'title', 'medical_degree', 'license_number', 'state_council', 'phone_number')
     search_fields = ('user__username', 'user__email', 'license_number')
     list_filter = ('title', 'medical_degree', 'state_council')
+
+admin.site.register(Patient)
+
+admin.site.register(Appointment)
