@@ -93,32 +93,25 @@ def verify_doctor(doctor_details):
 
             if view_link:
                 print("Clicking 'View' link to fetch additional details...")
-            try:
-                # Click the 'View' link
                 driver.execute_script("arguments[0].click();", view_link)
                 time.sleep(3)  # Wait for the detailed view or modal to load
 
-                # Ensure the detailed view is fully loaded
-                wait.until(EC.presence_of_element_located((By.ID, "doctorBiodata")))  # Example element
-                print("Detailed view loaded successfully.")
+                try:
+                    # Example: Adjust element IDs/names based on detailed view structure
+                    detail_dob = wait.until(EC.presence_of_element_located((By.ID, "doctorDOB"))).text.strip()
+                    detail_address = driver.find_element(By.ID, "doctorAddress").text.strip()
 
-                # Scrape additional details
-                detail_dob = driver.find_element(By.ID, "doctorBiodata").text.strip()
-                detail_address = driver.find_element(By.ID, "doctorAddress").text.strip()
+                    formatted_data.update({
+                        'date_of_birth': detail_dob,
+                        'permanent_address': detail_address
+                    })
 
-                formatted_data.update({
-                    'date_of_birth': detail_dob,
-                    'permanent_address': detail_address
-                })
+                    print("Additional details fetched successfully:", formatted_data)
+                    return True, formatted_data
 
-                print("Additional details fetched successfully:", formatted_data)
-                return True, formatted_data
-
-            except Exception as e:
-                print(f"Error fetching additional details: {str(e)}")
-                print("Taking screenshot for debugging...")
-                driver.save_screenshot("error_screenshot.png")  # Save a screenshot of the current state
-                return False, f"Failed to fetch additional details: {str(e)}"
+                except Exception as e:
+                    print(f"Error fetching additional details: {str(e)}")
+                    return False, f"Failed to fetch additional details: {str(e)}"
             else:
                 print("'View' link not found in the result row.")
                 return False, "No 'View' link available to fetch additional details"
@@ -136,35 +129,6 @@ def verify_doctor(doctor_details):
                 driver.quit()
             except Exception as e:
                 print(f"Error closing browser: {str(e)}")
-def format_doctor_details(data):
-    """
-    Formats the scraped doctor details into a structured format.
-    """
-    # Parse the 'date_of_birth' field which contains jumbled text
-    details_lines = data['date_of_birth'].split("\n")
-    parsed_details = {}
-    
-    # Extract key details line by line
-    for line in details_lines:
-        parts = line.split(":")
-        if len(parts) == 2:  # Handle lines that have a key-value pair
-            key, value = parts[0].strip(), parts[1].strip()
-            parsed_details[key] = value
-
-    # Update structured fields with parsed details
-    return {
-        "Name": data.get('name', ''),
-        "Father/Husband Name": data.get('father_name', ''),
-        "Date of Birth": parsed_details.get('Date of Birth', ''),
-        "Year of Registration": data.get('year_of_registration', ''),
-        "Registration Number": data.get('registration_number', ''),
-        "Date of Registration": parsed_details.get('Date of Reg.', ''),
-        "State Medical Council": data.get('state_council', ''),
-        "Qualification": data.get('qualification', ''),
-        "Qualification Year": parsed_details.get('Qualification Year', ''),
-        "University": parsed_details.get('University Name', ''),
-        "Permanent Address": parsed_details.get('Permanent Address', '')
-    }
 
 if __name__ == "__main__":
     test_doctors = [
@@ -180,12 +144,6 @@ if __name__ == "__main__":
         success, result = verify_doctor(doctor)
         if success:
             print("Verification successful!")
-            
-            # Format the results for better readability
-            formatted_result = format_doctor_details(result)
-            for key, value in formatted_result.items():
-                print(f"{key}: {value}")
+            print("Verified details:", result)
         else:
             print("Verification failed:", result)
-
-

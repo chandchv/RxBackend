@@ -27,3 +27,27 @@ def create_user_profile(sender, instance, created, **kwargs):
 def save_user_profile(sender, instance, **kwargs):
     if not hasattr(instance, 'userprofile'):
         UserProfile.objects.create(user=instance)
+
+class Patient(models.Model):
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    date_of_birth = models.DateField()
+    gender = models.CharField(max_length=10)
+    phone_number = models.CharField(max_length=15)
+    email = models.EmailField()
+    address = models.TextField()
+    pincode = models.CharField(max_length=10)
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name}"
+
+class Appointment(models.Model):
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE)
+    doctor = models.CharField(max_length=100)
+    appointment_date = models.DateTimeField()
+    symptoms = models.TextField()
+    diagnosis = models.TextField()
+    medications = models.TextField()
+
+    def __str__(self):
+        return f"Appointment for {self.patient} with {self.doctor} on {self.appointment_date}"
