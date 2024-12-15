@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block title %}Doctor Profile{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-md p-8">
+        <h1 class="text-2xl font-bold mb-6">Doctor Profile</h1>
+
+        <div class="grid grid-cols-2 gap-8">
+            <!-- Profile Information -->
+            <div>
+                <h2 class="text-xl font-semibold mb-4">Personal Information</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Name</label>
+                        <p class="text-gray-900">Dr. {{ profile.user.first_name }} {{ profile.user.last_name }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Medical Degree</label>
+                        <p class="text-gray-900">{{ profile.medical_degree }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">License Number</label>
+                        <p class="text-gray-900">{{ profile.license_number }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">State Council</label>
+                        <p class="text-gray-900">{{ profile.state_council }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <div>
+                <h2 class="text-xl font-semibold mb-4">Contact Information</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Email</label>
+                        <p class="text-gray-900">{{ profile.user.email }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Phone Number</label>
+                        <p class="text-gray-900">{{ profile.phone_number }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Address</label>
+                        <p class="text-gray-900">{{ profile.address }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Pincode</label>
+                        <p class="text-gray-900">{{ profile.pincode }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8 flex justify-end">
+            <button class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                    hx-get="{% url 'users:profile_edit' %}"
+                    hx-target="#modal"
+                    hx-trigger="click">
+                Edit Profile
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal for editing profile -->
+    <div id="modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+        <!-- Modal content will be loaded here -->
+    </div>
+</div>
+{% endblock %} 
