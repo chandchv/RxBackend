@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+
+{% block title %}Verify Doctor{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-8">
+    <h2 class="text-2xl font-bold mb-6 text-center">Doctor Verification</h2>
+
+    {% if messages %}
+    <div class="mb-4">
+        {% for message in messages %}
+        <div class="{% if message.tags == 'success' %}bg-green-100 border-green-400 text-green-700{% else %}bg-red-100 border-red-400 text-red-700{% endif %} border px-4 py-3 rounded relative mb-2" role="alert">
+            <span class="block sm:inline">{{ message }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="POST" class="space-y-4" id="verificationForm">
+        {% csrf_token %}
+        <div>
+            <label class="block text-gray-700 text-sm font-bold mb-2" for="name">
+                Full Name (as registered)
+            </label>
+            <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                   id="name" type="text" name="name" required>
+        </div>
+
+        <div>
+            <label class="block text-gray-700 text-sm font-bold mb-2" for="registration_number">
+                Registration Number
+            </label>
+            <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                   id="registration_number" type="text" name="registration_number" required>
+        </div>
+
+        <div>
+            <label class="block text-gray-700 text-sm font-bold mb-2" for="state_council">
+                State Medical Council
+            </label>
+            <select class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                    id="state_council" name="state_council" required>
+                <option value="">Select Medical Council</option>
+                {% for council in medical_councils %}
+                <option value="{{ council }}">{{ council }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="submit" 
+                class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                id="verifyButton">
+            Verify Doctor
+        </button>
+    </form>
+
+    {% if verified_details %}
+    <div class="mt-8 p-4 border rounded-lg bg-gray-50">
+        <h3 class="text-lg font-semibold mb-4">Verified Doctor Details</h3>
+        <div class="grid grid-cols-2 gap-4">
+            <div class="col-span-2">
+                <p class="font-semibold">Name:</p>
+                <p>{{ verified_details.name }}</p>
+            </div>
+            <div>
+                <p class="font-semibold">Registration Number:</p>
+                <p>{{ verified_details.registration_number }}</p>
+            </div>
+            <div>
+                <p class="font-semibold">Registration Date:</p>
+                <p>{{ verified_details.registration_date }}</p>
+            </div>
+            <div>
+                <p class="font-semibold">State Council:</p>
+                <p>{{ verified_details.state_council }}</p>
+            </div>
+            <div>
+                <p class="font-semibold">Qualification:</p>
+                <p>{{ verified_details.qualification }}</p>
+            </div>
+            <div class="col-span-2">
+                <form method="POST" action="{% url 'users:save_doctor' %}" id="saveDoctorForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="verified_data" id="verifiedDataInput">
+                    <button type="submit" 
+                            class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                        Save and Continue
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% block extra_scripts %}
+<script>
+document.getElementById('verificationForm').addEventListener('submit', function(e) {
+    const button = document.getElementById('verifyButton');
+    button.disabled = true;
+    button.innerHTML = 'Verifying...';
+});
+
+{% if verified_details %}
+// Convert the Python dictionary to a JavaScript object
+const verifiedData = {
+    name: "{{ verified_details.name|escapejs }}",
+    registration_number: "{{ verified_details.registration_number|escapejs }}",
+    registration_date: "{{ verified_details.registration_date|escapejs }}",
+    state_council: "{{ verified_details.state_council|escapejs }}",
+    qualification: "{{ verified_details.qualification|escapejs }}"
+};
+
+// Set the JSON string in the hidden input
+document.getElementById('verifiedDataInput').value = JSON.stringify(verifiedData);
+{% endif %}
+</script>
+{% endblock %}
+{% endblock %} 

@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+
+{% block title %}Doctor Verification{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-8">
+    <div class="bg-white shadow-lg rounded-lg">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h1 class="text-2xl font-bold text-gray-900">Doctor Verification</h1>
+        </div>
+
+        <div class="p-6 space-y-6">
+            {% if messages %}
+            <div class="mb-4">
+                {% for message in messages %}
+                <div class="{% if message.tags == 'success' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %} p-4 rounded">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Doctor Information -->
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <div class="flex items-center space-x-4">
+                    {% if doctor.profile_picture %}
+                    <img src="{{ doctor.profile_picture.url }}" alt="{{ doctor.name }}" 
+                         class="h-20 w-20 rounded-full object-cover">
+                    {% endif %}
+                    <div>
+                        <h2 class="text-xl font-semibold">Dr. {{ doctor.name }}</h2>
+                        <p class="text-gray-600">{{ doctor.specialization }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Verification Details -->
+            <div class="space-y-4">
+                <div class="border-b pb-4">
+                    <h3 class="text-lg font-semibold mb-2">License Information</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-sm text-gray-600">License Number</p>
+                            <p class="font-medium">{{ doctor.license_number }}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Medical Council</p>
+                            <p class="font-medium">{{ doctor.medical_council }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Verification Status -->
+                <div class="bg-yellow-50 p-4 rounded-lg">
+                    <h3 class="text-lg font-semibold mb-2">Verification Status</h3>
+                    <p class="text-sm mb-4">
+                        {% if doctor.verified %}
+                        <span class="text-green-600">✓ Verified</span>
+                        {% else %}
+                        <span class="text-yellow-600">⚠ Pending Verification</span>
+                        {% endif %}
+                    </p>
+                    
+                    {% if not doctor.verified %}
+                    <button onclick="verifyDoctor('{{ doctor.id }}')"
+                            class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+                        Verify Doctor
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_scripts %}
+<script>
+function verifyDoctor(doctorId) {
+    if (confirm('Are you sure you want to verify this doctor?')) {
+        fetch(`/users/doctors/${doctorId}/verify/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert('Error verifying doctor: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error verifying doctor');
+        });
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}
+{% endblock %} 
