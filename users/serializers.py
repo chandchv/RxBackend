@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
-from users.models import UserProfile, Patient, Appointment
+from users.models import UserProfile, Patient, Appointment, Prescription, Doctor
 
 class SignupSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, validators=[validate_password])
@@ -46,4 +46,14 @@ class PatientSerializer(serializers.ModelSerializer):
 class AppointmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Appointment
-        fields = ['patient', 'doctor', 'appointment_date', 'symptoms', 'diagnosis', 'medications']
+        fields = ['id', 'patient_name', 'date', 'status']
+
+class PrescriptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Prescription
+        fields = ['patient', 'doctor', 'date', 'medication', 'dosage', 'instructions']
+
+class DoctorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Doctor
+        fields = ['license_number', 'medical_council', 'specialization']
