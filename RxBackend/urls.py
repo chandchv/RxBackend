@@ -17,9 +17,26 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.authtoken.views import obtain_auth_token
+from users import views
+from django.shortcuts import redirect
+from django.conf import settings
+from django.conf.urls.static import static
+
+def redirect_to_dashboard(request):
+    return redirect('users:dashboard' if request.user.is_authenticated else 'users:login')
+
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path('api/users/', include('users.urls')),
+    path("", include(('users.urls', 'users'), namespace='users')),
     path("api/token-auth/", obtain_auth_token, name="api_token_auth"),
-]
+    path("users/", include('users.urls')),
+    path('dashboard/', views.dashboard_view, name='dashboard'),
+    path('', redirect_to_dashboard, name='root'),  # Add this line for root URL
+    
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Add static and media URL patterns
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
