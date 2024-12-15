@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-8">
+    <h2 class="text-2xl font-bold mb-6 text-center">Create Appointment</h2>
+    <form id="appointment-form" 
+          hx-post="{% url 'users:create_appointment' %}" 
+          hx-target="#form-response"
+          hx-swap="innerHTML"
+          class="space-y-4">
+        {% csrf_token %}
+        <div class="space-y-4">
+            <!-- Add your appointment form fields here -->
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="patient">Patient</label>
+                <select name="patient" id="patient" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    <option value="">Select Patient</option>
+                    {% for patient in patients %}
+                    <option value="{{ patient.id }}">{{ patient.first_name }} {{ patient.last_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="appointment_date">Appointment Date</label>
+                <input type="datetime-local" name="appointment_date" id="appointment_date" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            <!-- Add other appointment fields as needed -->
+        </div>
+        <div class="mt-4">
+            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                Create Appointment
+            </button>
+        </div>
+    </form>
+    <div id="form-response"></div>
+</div>
+{% endblock %} 

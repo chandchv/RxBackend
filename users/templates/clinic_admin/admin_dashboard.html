@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block title %}Clinic Administration{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="bg-white shadow-lg rounded-lg">
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h1 class="text-2xl font-bold text-gray-900">Clinic Administration</h1>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">
+            <div class="bg-blue-50 p-4 rounded-lg">
+                <h3 class="text-blue-800 font-semibold">Total Doctors</h3>
+                <p class="text-2xl font-bold text-blue-600">{{ doctors_count }}</p>
+            </div>
+            <div class="bg-green-50 p-4 rounded-lg">
+                <h3 class="text-green-800 font-semibold">Total Staff</h3>
+                <p class="text-2xl font-bold text-green-600">{{ staff_count }}</p>
+            </div>
+            {% comment %}
+            <!-- Comment out these sections until the models are created -->
+            <div class="bg-purple-50 p-4 rounded-lg">
+                <h3 class="text-purple-800 font-semibold">Total Patients</h3>
+                <p class="text-2xl font-bold text-purple-600">{{ patients_count }}</p>
+            </div>
+            <div class="bg-yellow-50 p-4 rounded-lg">
+                <h3 class="text-yellow-800 font-semibold">Today's Appointments</h3>
+                <p class="text-2xl font-bold text-yellow-600">{{ todays_appointments }}</p>
+            </div>
+            {% endcomment %}
+        </div>
+
+        <!-- Admin Navigation Cards -->
+        <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Clinic Management -->
+            <div class="border rounded-lg p-4">
+                <h2 class="text-xl font-semibold mb-4">Clinic Management</h2>
+                <div class="space-y-2">
+                    <a href="{% url 'users:clinic_profile' %}" 
+                       class="block w-full text-center bg-blue-500 hover:bg-blue-600 text-white py-2 rounded">
+                        Update Clinic Profile
+                    </a>
+                </div>
+            </div>
+
+            <!-- Doctor Management -->
+            <div class="border rounded-lg p-4">
+                <h2 class="text-xl font-semibold mb-4">Doctor Management</h2>
+                <div class="space-y-2">
+                    <a href="{% url 'users:add_doctor' %}" 
+                       class="block w-full text-center bg-green-500 hover:bg-green-600 text-white py-2 rounded">
+                        Add New Doctor
+                    </a>
+                    <a href="{% url 'users:doctors_list' %}" 
+                       class="block w-full text-center bg-green-600 hover:bg-green-700 text-white py-2 rounded">
+                        Manage Doctors
+                    </a>
+                </div>
+            </div>
+
+            <!-- Staff Management -->
+            <div class="border rounded-lg p-4">
+                <h2 class="text-xl font-semibold mb-4">Staff Management</h2>
+                <div class="space-y-2">
+                    <a href="{% url 'users:add_staff' %}" 
+                       class="block w-full text-center bg-purple-500 hover:bg-purple-600 text-white py-2 rounded">
+                        Add New Staff
+                    </a>
+                    <a href="{% url 'users:staff_list' %}" 
+                       class="block w-full text-center bg-purple-600 hover:bg-purple-700 text-white py-2 rounded">
+                        Manage Staff
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

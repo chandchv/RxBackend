@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Admin Access Card -->
+        {% if user.is_staff %}
+        <div class="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Clinic Administration</h2>
+            <p class="text-gray-600 mb-4">Manage your clinic, doctors, and staff members.</p>
+            <a href="{% url 'users:clinic_admin_dashboard' %}" 
+               class="inline-block bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+                Access Admin Panel
+            </a>
+        </div>
+        {% endif %}
+
+        <!-- Other dashboard cards -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Appointments</h2>
+            <p class="text-gray-600 mb-4">View and manage your appointments.</p>
+            <a href="{% url 'users:appointments' %}" 
+               class="inline-block bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+                View Appointments
+            </a>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Patients</h2>
+            <p class="text-gray-600 mb-4">Manage your patient records.</p>
+            <a href="{% url 'users:patients_list' %}" 
+               class="inline-block bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded">
+                View Patients
+            </a>
+        </div>
+
+        <!-- Add more dashboard cards as needed -->
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Doctor Portal{% endblock %}</title>
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-100">
+    <nav class="bg-white shadow-lg">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex justify-between">
+                <div class="flex space-x-7">
+                    <div>
+                        <a href="{% url 'users:dashboard' %}" class="flex items-center py-4 px-2">
+                           
+                            <img src="https://klaxonit.in/wp-content/uploads/2024/12/Logo.png" alt="Logo" class="w-10 h-10" style="width: 100px; height: 100px;">
+                        </a>
+                    </div>
+                </div>
+               
+                <div class="flex items-center space-x-3">
+                    <a href="{% url 'users:profile' %}" class="py-2 px-4 text-gray-500 hover:text-gray-700">Profile</a>
+                    <a href="{% url 'users:logout' %}" class="py-2 px-4 bg-red-500 text-white rounded hover:bg-red-600">Logout</a>
+                </div>
+               
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto px-4 py-8">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html> 

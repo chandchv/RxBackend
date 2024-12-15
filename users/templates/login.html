@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto bg-white rounded-lg shadow-md p-8">
+    <h2 class="text-2xl font-bold mb-6 text-center">Login</h2>
+    
+    <form method="POST" action="{% url 'users:login' %}">
+        {% csrf_token %}
+        
+        {% if error_message %}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+            <span class="block sm:inline">{{ error_message }}</span>
+        </div>
+        {% endif %}
+        
+        <div class="space-y-4">
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="username">
+                    Username
+                </label>
+                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                       id="username" type="text" name="username" required>
+            </div>
+            
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="password">
+                    Password
+                </label>
+                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                       id="password" type="password" name="password" required>
+            </div>
+
+            <input type="hidden" name="next" value="{{ next }}">
+            
+            <button type="submit" 
+                    class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                Login
+            </button>
+        </div>
+    </form>
+
+    <!-- Sign Up Link -->
+    <div class="pt-4 text-center">
+        <p>Don't have an account? <a href="{% url 'users:signup' %}" class="text-blue-500">Sign Up</a></p>
+    </div>
+</div>
+{% endblock %} 

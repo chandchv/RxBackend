@@ -1,0 +1,99 @@
+from django.urls import path, include
+from . import views
+from .views import (
+     # Template views
+    login_view,
+    signup_view,
+    dashboard_view,
+    appointments_view,
+    appointments_list,
+    appointment_detail,
+    appointment_delete,
+    profile_view,
+    profile_edit_view,
+    logout_view,
+    patients_view,
+    patient_detail,
+    patient_edit,
+    patient_form,
+    create_patient,
+    dashboard_views,
+    
+    # API views
+    login_api,
+    signup_api,
+    get_user_profile,
+    verify_doctor_api,
+    get_patients,
+    PatientsView,
+    AppointmentView,
+    AppointmentListView,
+    AppointmentCreateView,
+    DoctorCreateView,
+    DoctorListView,
+    get_csrf_token,
+    prescription_views,
+    pdf_views,
+    doctor_views,
+    appointment_views,
+    patient_views,
+)
+from .views.doctor_views import DoctorDetailView, verify_doctor_view, save_doctor
+from django.views.generic import TemplateView
+
+app_name = 'users'
+
+# API URLs
+api_urlpatterns = [
+    path('login/', login_api, name='login_api'),
+    path('signup/', signup_api, name='signup_api'),
+    path('verify-doctor/', verify_doctor_api, name='verify_doctor_api'),
+    path('profile/', get_user_profile, name='profile_api'),
+    path('patients/', create_patient, name='create_patient_api'),
+    path('patients/all/', views.get_patients, name='get_patients_api'),
+    path('appointments/', AppointmentListView.as_view(), name='appointment-list'),
+    path('appointments/create/', AppointmentCreateView.as_view(), name='create_appointment'),
+    path('doctors/create/', DoctorCreateView.as_view(), name='doctor-create'),
+    path('doctors/', DoctorListView.as_view(), name='doctor-list'),
+    path('doctors/me/', DoctorDetailView.as_view(), name='doctor-detail'),
+    path('csrf-token/', get_csrf_token, name='get_csrf_token'),
+    path('doctors/list/', doctor_views.get_doctors_list, name='get_doctors_list'),
+    path('appointments/', appointment_views.AppointmentView.as_view(), name='appointments_api'),
+    path('appointments/list/', appointment_views.AppointmentListView.as_view(), name='appointments_list_api'),
+    path('appointments/create/', appointment_views.AppointmentCreateView.as_view(), name='appointment_create_api'),
+]
+
+# Template URLs
+urlpatterns = [
+    path('', dashboard_view, name='dashboard'),
+    path('login/', login_view, name='login'),
+    path('signup/', signup_view, name='signup'),
+    path('logout/', logout_view, name='logout'),
+    path('profile/', profile_view, name='profile'),
+    path('profile/edit/', profile_edit_view, name='profile_edit'),
+     # Patient URLs
+    path('patients/create/', patient_views.create_patient, name='create_patient'),
+    path('patients_list/', patient_views.get_patients, name='patients_list'),
+    path('patients/form/', TemplateView.as_view(template_name='patient_form.html'), name='patient_form'),
+    path('patients/<int:pk>/', patient_detail, name='patient_detail'),
+    path('patients/<int:pk>/edit/', patient_edit, name='patient_edit'),
+ 
+    # Include API URLs under /api/users/
+    path('api/', include((api_urlpatterns, 'api'))),
+    # Prescription URLs
+    path('api/prescriptions/create/', prescription_views.create_prescription, name='create_prescription'),
+    path('api/prescriptions/<int:patient_id>/', prescription_views.get_prescriptions, name='get_prescriptions'),
+    path('api/prescriptions/pdf/<int:prescription_id>/', pdf_views.generate_prescription_pdf, name='generate_prescription_pdf'),
+     # Doctor URLs
+    path('verify-doctor/', verify_doctor_view, name='verify_doctor'),
+    path('save-doctor/', save_doctor, name='save_doctor'),
+
+    # Appointment URLs
+    path('appointments/', appointments_view, name='appointments'),
+    path('appointments/list/', appointments_list, name='appointments_list'),
+    path('appointments/<int:pk>/', appointment_detail, name='appointment_detail'),
+    path('appointments/<int:pk>/delete/', appointment_delete, name='appointment_delete'),
+    path('appointments/', AppointmentListView.as_view(), name='appointments_list'),
+    path('appointments/create/', AppointmentCreateView.as_view(), name='create_appointment'),
+    path('appointments/form/', TemplateView.as_view(template_name='appointment_form.html'), name='appointment_form'),
+]
