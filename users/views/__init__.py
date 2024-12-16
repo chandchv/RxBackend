@@ -7,7 +7,9 @@ from .auth_views import (
 
 from .patient_views import (
     create_patient,
-    get_patients,
+    patients_list,
+    
+    
 )
 
 from .appointment_views import (
@@ -15,6 +17,9 @@ from .appointment_views import (
     AppointmentView,
     AppointmentListView,
     AppointmentCreateView,
+    appointments_view,
+    appointment_detail,
+    appointment_delete,
 )
 
 from .template_views import (
@@ -31,7 +36,7 @@ from .template_views import (
     patients_view,
     patient_detail,
     patient_edit,
-    patient_form,
+    
 )
 
 from .utils import (
@@ -45,6 +50,7 @@ from .doctor_views import (
     save_doctor,
     get_doctors_list,
     dashboard_view,
+    doctor_dashboard,
 )
 
 __all__ = [

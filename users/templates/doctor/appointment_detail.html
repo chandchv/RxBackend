@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}Appointment Detail{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-gray-900">Appointment Details</h1>
+                <div class="space-x-2">
+                    <a href="{% url 'users:doctor_appointments' %}" 
+                       class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        Back to Appointments
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="px-6 py-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-4">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500">Date & Time</h3>
+                        <p class="mt-1 text-lg text-gray-900">
+                            {{ appointment.appointment_date|date:"F j, Y" }} at 
+                            {{ appointment.appointment_date|time:"g:i A" }}
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500">Status</h3>
+                        <p class="mt-1">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                {% if appointment.status == 'scheduled' %}bg-yellow-100 text-yellow-800
+                                {% elif appointment.status == 'completed' %}bg-green-100 text-green-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ appointment.status|title }}
+                            </span>
+                        </p>
+                    </div>
+
+                    {% if appointment.reason %}
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500">Reason</h3>
+                        <p class="mt-1 text-gray-900">{{ appointment.reason }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500">Patient Information</h3>
+                        <div class="mt-1 space-y-2">
+                            <p class="text-lg font-medium text-gray-900">
+                                {{ patient.get_full_name }}
+                            </p>
+                            <p class="text-gray-600">{{ patient.email }}</p>
+                            <p class="text-gray-600">{{ patient.phone_number }}</p>
+                        </div>
+                    </div>
+
+                    <div class="pt-4">
+                        <a href="{% url 'users:patient_detail' patient.id %}"
+                           class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                            View Patient Details
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            {% if appointment.status == 'scheduled' %}
+            <div class="mt-6 flex space-x-4">
+                <button onclick="updateAppointmentStatus('{{ appointment.id }}', 'completed')"
+                        class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
+                    Mark as Completed
+                </button>
+                <button onclick="updateAppointmentStatus('{{ appointment.id }}', 'cancelled')"
+                        class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    Cancel Appointment
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

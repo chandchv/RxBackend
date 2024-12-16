@@ -2,16 +2,18 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.models import User
 from ..serializers import UserProfileSerializer, SignupSerializer
-from ..models import UserProfile
+from ..models import UserProfile, Doctor, Patient
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.shortcuts import render, redirect
 import json
 from ..scripts import scrapeGpt01 as scrapper
 from django.db import transaction, IntegrityError
+from django.contrib import messages
+from rest_framework.authtoken.models import Token
 
 @ensure_csrf_cookie
 def login_view(request):
@@ -22,14 +24,34 @@ def login_view(request):
         
         if user is not None:
             login(request, user)
-            next_url = request.POST.get('next', 'users:dashboard')
-            return redirect(next_url)
+            
+            # Create or get token for API authentication
+            token, _ = Token.objects.get_or_create(user=user)
+            request.session['auth_token'] = token.key
+
+            try:
+                # Check if the user is a doctor
+                if Doctor.objects.filter(user=user).exists():
+                    print("User is a doctor, redirecting to doctor dashboard")  # Debug print
+                    return redirect('users:doctor_dashboard')
+                
+                # Check if the user is a patient
+                elif Patient.objects.filter(user=user).exists():
+                    print("User is a patient, redirecting to patient dashboard")  # Debug print
+                    return redirect('users:patient_dashboard')
+                
+                else:
+                    print("User has no specific role, redirecting to default dashboard")  # Debug print
+                    return redirect('users:dashboard')
+
+            except Exception as e:
+                print(f"Error during login redirection: {str(e)}")  # Debug print
+                messages.error(request, 'Error during login. Please try again.')
+                return redirect('users:login')
         else:
-            return render(request, 'login.html', {
-                'error_message': 'Invalid username or password'
-            })
+            messages.error(request, 'Invalid username or password.')
     
-    return render(request, 'login.html')
+    return render(request, 'auth/login.html')
 
 @csrf_exempt
 @api_view(['POST'])
@@ -247,3 +269,14 @@ def verify_doctor_api(request):
             'success': False,
             'error': f'Server error: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+def logout_view(request):
+    logout(request)
+    messages.success(request, 'You have been logged out successfully.')
+    return redirect('users:login')
+
+def register_view(request):
+    if request.method == 'POST':
+        # Add your registration logic here
+        pass
+    return render(request, 'auth/register.html')
