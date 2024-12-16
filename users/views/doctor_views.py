@@ -2,16 +2,19 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from ..models import Doctor, Appointment
+from ..models import Doctor, Appointment, Patient
 from ..serializers import DoctorSerializer
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from ..scripts.scrapeGpt01 import verify_doctor as verify_doctor_api
 import json
 from django.db.models import Q
-from datetime import date
+from datetime import date, timedelta
+from django.utils import timezone
+from django.db.models import Count
+from ..forms import AppointmentForm
 
 class DoctorCreateView(APIView):
     permission_classes = [IsAuthenticated]
@@ -190,3 +193,137 @@ def dashboard_view(request):
     }
     
     return render(request, 'dashboard.html', context)
+
+@login_required
+def doctor_appointments(request):
+    try:
+        # Get the doctor's appointments
+        doctor = Doctor.objects.get(user=request.user)
+        appointments = Appointment.objects.filter(doctor=doctor).order_by('appointment_date')
+        
+        return render(request, 'doctor/appointments.html', {
+            'appointments': appointments
+        })
+    except Doctor.DoesNotExist:
+        messages.error(request, 'Doctor profile not found')
+        return redirect('users:dashboard')
+    except Exception as e:
+        print(f"Error fetching appointments: {str(e)}")
+        messages.error(request, 'Error accessing appointments')
+        return redirect('users:dashboard')
+
+@login_required
+def create_appointment(request):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        
+        if request.method == 'POST':
+            form = AppointmentForm(request.POST)
+            if form.is_valid():
+                appointment = form.save(commit=False)
+                appointment.doctor = doctor
+                appointment.save()
+                messages.success(request, 'Appointment scheduled successfully')
+                return redirect('users:doctor_appointments')
+        else:
+            form = AppointmentForm()
+            
+        return render(request, 'doctor/create_appointment.html', {
+            'form': form,
+            'patients': Patient.objects.filter(clinic=doctor.clinic)
+        })
+        
+    except Doctor.DoesNotExist:
+        messages.error(request, 'Doctor profile not found')
+        return redirect('users:dashboard')
+    except Exception as e:
+        print(f"Error creating appointment: {str(e)}")
+        messages.error(request, 'Error scheduling appointment')
+        return redirect('users:doctor_appointments')
+
+@login_required
+def doctor_dashboard(request):
+    try:
+        # Get the doctor's profile
+        doctor = Doctor.objects.get(user=request.user)
+        today = timezone.now().date()
+        
+        # Get today's appointments
+        todays_appointments = Appointment.objects.filter(
+            doctor=doctor,
+            appointment_date__date=today,
+            status='scheduled'
+        ).order_by('appointment_date')
+        
+        # Get upcoming appointments for the next 30 days
+        upcoming_appointments = Appointment.objects.filter(
+            doctor=doctor,
+            appointment_date__date__gt=today,
+            appointment_date__date__lte=today + timedelta(days=7)
+        ).order_by('appointment_date')
+        
+        # Get monthly calendar data
+        current_month = today.month
+        current_year = today.year
+        
+        # Get all appointments for the current month
+        month_appointments = Appointment.objects.filter(
+            doctor=doctor,
+            appointment_date__year=current_year,
+            appointment_date__month=current_month
+        ).values('appointment_date__date').annotate(
+            count=Count('id')
+        )
+        
+        # Create appointment calendar data
+        appointment_days = {
+            app['appointment_date__date']: app['count'] 
+            for app in month_appointments
+        }
+        
+        # Statistics
+        total_patients_today = todays_appointments.count()
+        completed_today = Appointment.objects.filter(
+            doctor=doctor,
+            appointment_date__date=today,
+            status='completed'
+        ).count()
+        
+        context = {
+            'doctor': doctor,
+            'todays_appointments': todays_appointments,
+            'upcoming_appointments': upcoming_appointments,
+            'total_patients_today': total_patients_today,
+            'completed_today': completed_today,
+            'appointment_days': appointment_days,
+            'current_month': today.strftime('%B %Y'),
+        }
+        
+        return render(request, 'doctor/dashboard.html', context)
+        
+    except Doctor.DoesNotExist:
+        messages.error(request, 'Doctor profile not found')
+        return redirect('users:login')
+    except Exception as e:
+        print(f"Error in doctor dashboard: {str(e)}")
+        messages.error(request, 'Error accessing dashboard')
+        return redirect('users:login')
+
+@login_required
+def appointment_detail(request, appointment_id):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        appointment = get_object_or_404(Appointment, id=appointment_id, doctor=doctor)
+        
+        context = {
+            'appointment': appointment,
+            'patient': appointment.patient,
+        }
+        return render(request, 'doctor/appointment_detail.html', context)
+        
+    except Doctor.DoesNotExist:
+        messages.error(request, 'Doctor profile not found')
+        return redirect('users:dashboard')
+    except Appointment.DoesNotExist:
+        messages.error(request, 'Appointment not found')
+        return redirect('users:doctor_appointments')

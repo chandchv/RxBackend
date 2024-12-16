@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Prescription{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h1 class="text-2xl font-bold">Create Prescription</h1>
+            <p class="text-gray-600">Patient: {{ patient.get_full_name }}</p>
+            <p class="text-gray-600">Date: {% now "F j, Y" %}</p>
+        </div>
+
+        <form method="POST" class="p-6 space-y-6">
+            {% csrf_token %}
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Diagnosis</label>
+                    <textarea name="diagnosis" rows="2" required
+                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                </div>
+
+                <div id="medications" class="space-y-4">
+                    <h3 class="text-lg font-medium">Medications</h3>
+                    <div class="medication-item border p-4 rounded">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Medicine Name</label>
+                                <input type="text" name="medicines[]" required
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Dosage</label>
+                                <input type="text" name="dosages[]" required
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Frequency</label>
+                                <input type="text" name="frequencies[]" required
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Duration</label>
+                                <input type="text" name="durations[]" required
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <label class="block text-sm font-medium text-gray-700">Instructions</label>
+                            <textarea name="instructions[]" rows="2"
+                                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" onclick="addMedication()"
+                        class="mt-2 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    Add Another Medication
+                </button>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Additional Notes</label>
+                    <textarea name="notes" rows="3"
+                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-4">
+                <a href="{% url 'users:patient_detail' patient.id %}"
+                   class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    Cancel
+                </a>
+                <button type="submit"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
+                    Save Prescription
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function addMedication() {
+    const medicationsDiv = document.getElementById('medications');
+    const newMedication = document.querySelector('.medication-item').cloneNode(true);
+    
+    // Clear the input values
+    newMedication.querySelectorAll('input, textarea').forEach(input => {
+        input.value = '';
+    });
+    
+    medicationsDiv.appendChild(newMedication);
+}
+</script>
+{% endblock %} 

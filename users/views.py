@@ -16,6 +16,8 @@ from .views.patient_views import (
     create_patient,
     get_patients,
     PatientsView,
+    patient_detail,
+    patient_edit,
 )
 
 from .views.appointment_views import (
@@ -75,4 +77,7 @@ __all__ = [
     # Doctor views
     'DoctorCreateView',
     'DoctorListView',
+    'doctor_dashboard',
+    'patient_detail',
+    'patient_edit',
 ]

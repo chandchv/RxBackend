@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 class Clinic(models.Model):
     name = models.CharField(max_length=255)
@@ -62,13 +63,8 @@ class Staff(models.Model):
         return f"{self.user.get_full_name()} - {self.get_role_display()}"
 
 class Doctor(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)
-    clinic = models.ForeignKey(
-        Clinic, 
-        on_delete=models.CASCADE, 
-        null=True,  # Allow null temporarily for migration
-        blank=True
-    )
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    clinic = models.ForeignKey('Clinic', on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     specialization = models.CharField(max_length=255, blank=True)
     license_number = models.CharField(max_length=50)
@@ -87,45 +83,82 @@ class Doctor(models.Model):
         ordering = ['name']
 
 class Patient(models.Model):
-    patient_id = models.CharField(max_length=11, default='unknown')
+    patient_id = models.CharField(max_length=50, unique=True)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     date_of_birth = models.DateField()
-    gender = models.CharField(max_length=10)
+    gender = models.CharField(max_length=1, choices=[('M', 'Male'), ('F', 'Female'), ('O', 'Other')])
     phone_number = models.CharField(max_length=15)
-    email = models.EmailField()
-    address = models.TextField()
-    pincode = models.CharField(max_length=10)
+    email = models.EmailField(blank=True, null=True)
+    address = models.TextField(blank=True)
+    pincode = models.CharField(max_length=10, blank=True)
+    clinic = models.ForeignKey(
+        'Clinic', 
+        on_delete=models.CASCADE
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
 
+    def get_full_name(self):
+        return f"{self.first_name} {self.last_name}"
+
+    def save(self, *args, **kwargs):
+        if not self.patient_id:
+            # Generate patient ID if not provided
+            last_patient = Patient.objects.order_by('-id').first()
+            last_id = int(last_patient.patient_id[3:]) if last_patient else 0
+            self.patient_id = f'PAT{str(last_id + 1).zfill(6)}'
+        super().save(*args, **kwargs)
+
 class Appointment(models.Model):
-    STATUS_CHOICES = (
-        ('SCHEDULED', 'Scheduled'),
-        ('COMPLETED', 'Completed'),
-        ('CANCELLED', 'Cancelled'),
-    )
-    
-    patient = models.ForeignKey('Patient', on_delete=models.CASCADE)
-    doctor = models.ForeignKey('Doctor', on_delete=models.CASCADE)
-    appointment_date = models.DateTimeField()
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='SCHEDULED')
-    # Add reason field if needed:
-    # reason = models.TextField(blank=True, null=True)
+    STATUS_CHOICES = [
+        ('scheduled', 'Scheduled'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled')
+    ]
 
-    class Meta:
-        db_table = 'users_appointment'
-
-class Prescription(models.Model):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE)
-    date = models.DateField(auto_now_add=True)
-    medication = models.TextField()
-    dosage = models.TextField()
-    instructions = models.TextField()
+    appointment_date = models.DateTimeField()
+    reason = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='scheduled'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Prescription for {self.patient.name} by {self.doctor.user.get_full_name()}"
+        return f"Appointment for {self.patient.get_full_name()} with Dr. {self.doctor.name}"
+
+class Prescription(models.Model):
+    patient = models.ForeignKey('Patient', on_delete=models.CASCADE)
+    doctor = models.ForeignKey('Doctor', on_delete=models.CASCADE)
+    diagnosis = models.TextField()
+    date = models.DateField(default=timezone.now)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Prescription for {self.patient.get_full_name()} by Dr. {self.doctor.name}"
+
+
+class PrescriptionItem(models.Model):
+    prescription = models.ForeignKey(Prescription, related_name='items', on_delete=models.CASCADE)
+    medicine = models.CharField(max_length=200)
+    dosage = models.CharField(max_length=100)
+    frequency = models.CharField(max_length=100)
+    duration = models.CharField(max_length=100)
+    instructions = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.medicine} - {self.dosage}"
+
+
 class Meta:
     db_table = 'users_userprofile'

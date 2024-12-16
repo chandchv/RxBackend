@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+
+{% block title %}Patients List{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+    <div class="bg-white shadow-lg rounded-lg p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold">Patients List</h2>
+            <a href="{% url 'users:create_patient' %}" 
+               class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+                Add New Patient
+            </a>
+        </div>
+
+        {% if patients %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Patient ID
+                        </th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Name
+                        </th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Contact
+                        </th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Age/Gender
+                        </th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for patient in patients %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ patient.patient_id }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">
+                                {{ patient.get_full_name }}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ patient.phone_number }}</div>
+                            <div class="text-sm text-gray-500">{{ patient.email }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">
+                                {% now "Y" as current_year %}
+                                {{ patient.date_of_birth|timesince }} old
+                            </div>
+                            <div class="text-sm text-gray-500">{{ patient.get_gender_display }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <a href="{% url 'users:patient_detail' patient.id %}" 
+                               class="text-indigo-600 hover:text-indigo-900 mr-3">View</a>  
+                               
+                            <a href="{% url 'users:patient_edit' patient.id %}" 
+                               class="text-blue-600 hover:text-blue-900">Edit</a>
+                            <button onclick="confirmDelete('{{ patient.id }}')"
+                               class="text-red-600 hover:text-red-900">Delete</button>   
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-gray-500 text-center py-4">No patients found.</p>
+        {% endif %}
+    </div>
+</div>
+{% block extra_scripts %}
+<script>
+function confirmDelete(patientId) {
+    if (confirm('Are you sure you want to delete this patient?')) {
+        fetch(`/users/patients/${patientId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+        })
+        .then(response => {
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Error deleting patient');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting patient');
+        });
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}
+{% endblock %} 

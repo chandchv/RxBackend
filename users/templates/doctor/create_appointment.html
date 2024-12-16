@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}Schedule Appointment{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-8">
+    <div class="bg-white shadow-lg rounded-lg p-6">
+        <h2 class="text-2xl font-bold mb-6">Schedule New Appointment</h2>
+
+        <form method="POST" class="space-y-4">
+            {% csrf_token %}
+            
+            {% if form.errors %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                Please correct the errors below.
+            </div>
+            {% endif %}
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Patient *</label>
+                    {{ form.patient }}
+                    {% if form.patient.errors %}
+                    <p class="text-red-500 text-xs mt-1">{{ form.patient.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Date *</label>
+                        {{ form.appointment_date }}
+                        {% if form.appointment_date.errors %}
+                        <p class="text-red-500 text-xs mt-1">{{ form.appointment_date.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Time *</label>
+                        {{ form.appointment_time }}
+                        {% if form.appointment_time.errors %}
+                        <p class="text-red-500 text-xs mt-1">{{ form.appointment_time.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Reason</label>
+                    {{ form.reason }}
+                    {% if form.reason.errors %}
+                    <p class="text-red-500 text-xs mt-1">{{ form.reason.errors.0 }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-4 mt-6">
+                <a href="{% url 'users:doctor_appointments' %}" 
+                   class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </a>
+                <button type="submit" 
+                        class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
+                    Schedule Appointment
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %} 

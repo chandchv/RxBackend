@@ -2,13 +2,15 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from ..models import Appointment, Patient
+from ..models import Appointment, Patient, Doctor
 from ..serializers import AppointmentSerializer
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpResponse
-from django.shortcuts import render, redirect
+from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib.auth.decorators import login_required
 from users.forms import AppointmentForm
+from django.contrib import messages
+from datetime import datetime
 
 class AppointmentView(APIView):
     permission_classes = [IsAuthenticated]
@@ -66,14 +68,48 @@ class AppointmentCreateView(APIView):
                 '<div class="alert alert-danger">Error creating appointment</div>'
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+@login_required
+def appointments_view(request):
+    appointments = Appointment.objects.all()
+   
+    patients = Patient.objects.all()
+
+    return render(request, 'appointments.html', {'appointments': appointments, 'patients': patients})
 
 @login_required
 def create_appointment(request):
+    clinic = request.user.userprofile.clinic
+    patients = Patient.objects.filter(clinic=clinic)
+    
     if request.method == 'POST':
-        form = AppointmentForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('users:appointments_list')
-    else:
-        form = AppointmentForm()
-    return render(request, 'appointments/create_appointment.html', {'form': form}) 
+        try:
+            appointment = Appointment.objects.create(
+                patient_id=request.POST['patient'],
+                doctor=request.user.doctor,
+                appointment_date=datetime.strptime(
+                    f"{request.POST['appointment_date']} {request.POST['appointment_time']}", 
+                    "%Y-%m-%d %H:%M"
+                ),
+                reason=request.POST.get('reason', ''),
+                status='scheduled'
+            )
+            messages.success(request, 'Appointment scheduled successfully!')
+            return redirect('users:appointments')
+        except Exception as e:
+            messages.error(request, f'Error scheduling appointment: {str(e)}')
+    
+    return render(request, 'appointments/create_appointment.html', {
+        'patients': patients
+    }) 
+
+@login_required
+def appointment_detail(request, appointment_id):
+    appointment = get_object_or_404(Appointment, id=appointment_id)
+    return render(request, 'appointments/appointment_detail.html', {'appointment': appointment})
+
+@login_required
+def appointment_delete(request, appointment_id):
+    appointment = get_object_or_404(Appointment, id=appointment_id)
+    appointment.delete()
+    return redirect('users:appointments')
