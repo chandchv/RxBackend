@@ -3,11 +3,12 @@ from django.shortcuts import render, redirect, get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from ..models import Patient, Doctor, Appointment
-from ..forms import PatientForm
+from ..models import Patient, Doctor, Appointment, Prescription
+from ..forms import AppointmentForm, PatientForm, AppointmentForm_patient
 from ..serializers import PatientSerializer
 from django.contrib import messages
 from ..models import Patient, UserProfile
+from django.utils import timezone
 
 @login_required
 def create_patient(request):
@@ -72,20 +73,25 @@ def patient_detail(request, patient_id):
         doctor = Doctor.objects.get(user=request.user)
         patient = get_object_or_404(Patient, id=patient_id)
         
-        # Get patient's appointments
+        # Get all appointments for this patient with this doctor
         appointments = Appointment.objects.filter(
             doctor=doctor,
             patient=patient
         ).order_by('-appointment_date')
         
-        # Get patient's prescriptions if you have prescription model
-        prescriptions = []  # Replace with actual prescription query if available
+        # Get all prescriptions for this patient from this doctor
+        prescriptions = Prescription.objects.filter(
+            doctor=doctor,
+            patient=patient
+        ).order_by('-date')
         
         context = {
             'patient': patient,
             'appointments': appointments,
             'prescriptions': prescriptions,
-            'doctor': doctor
+            'doctor': doctor,
+            'total_appointments': appointments.count(),
+            'total_prescriptions': prescriptions.count(),
         }
         
         return render(request, 'doctor/patient_detail.html', context)
@@ -134,4 +140,140 @@ def patient_edit(request, patient_id):
         print(f"Error editing patient: {str(e)}")
         messages.error(request, 'Error updating patient information')
         return redirect('users:patients_list')
+
+@login_required
+def doctor_create_appointment(request):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        
+        if request.method == 'POST':
+            form = AppointmentForm(request.POST)
+            if form.is_valid():
+                appointment = form.save(commit=False)
+                appointment.doctor = doctor
+                appointment.status = 'scheduled'
+                
+                # Check if the selected time slot is available
+                if Appointment.objects.filter(
+                    doctor=doctor,
+                    appointment_date=appointment.appointment_date
+                ).exists():
+                    messages.error(request, 'This time slot is already booked. Please select another time.')
+                else:
+                    appointment.save()
+                    messages.success(request, 'Appointment scheduled successfully!')
+                    return redirect('users:doctor_appointments')
+        else:
+            form = AppointmentForm(initial={'doctor': doctor})
+
+        context = {
+            'form': form,
+            'doctor': doctor,
+            'min_date': timezone.now().date().isoformat(),
+        }
+        
+        return render(request, 'doctor/create_appointment.html', context)
+
+    except Doctor.DoesNotExist:
+        messages.error(request, 'Doctor profile not found')
+        return redirect('users:dashboard')
+    except Exception as e:
+        messages.error(request, f'Error creating appointment: {str(e)}')
+        return redirect('users:dashboard')
+
+@login_required
+def patient_create_appointment(request):
+    try:
+        patient = Patient.objects.get(patient_id=request.user.id)
+        
+        if request.method == 'POST':
+            form = AppointmentForm(request.POST)
+            if form.is_valid():
+                appointment = form.save(commit=False)
+                appointment.patient = patient
+                appointment.status = 'scheduled'
+                
+                # Check if the selected time slot is available
+                if Appointment.objects.filter(
+                    doctor=appointment.doctor,
+                    appointment_date=appointment.appointment_date
+                ).exists():
+                    messages.error(request, 'This time slot is already booked. Please select another time.')
+                else:
+                    appointment.save()
+                    messages.success(request, 'Appointment scheduled successfully!')
+                    return redirect('users:patient_appointments')
+        else:
+            form = AppointmentForm()
+
+        context = {
+            'form': form,
+            'patient': patient,
+            'doctors': Doctor.objects.all(),
+            'min_date': timezone.now().date().isoformat(),
+        }
+        
+        return render(request, 'patient/create_appointment.html', context)
+
+    except Patient.DoesNotExist:
+        messages.error(request, 'Patient profile not found')
+        return redirect('users:dashboard')
+    except Exception as e:
+        messages.error(request, f'Error creating appointment: {str(e)}')
+        return redirect('users:dashboard')
+
+@login_required
+def patient_dashboard(request):
+    try:
+        patient = Patient.objects.get(user=request.user)
+        
+        # Get upcoming appointments
+        upcoming_appointments = Appointment.objects.filter(
+            patient=patient,
+            appointment_date__gte=timezone.now(),
+            status='scheduled'
+        ).order_by('appointment_date')
+
+        # Get past appointments
+        past_appointments = Appointment.objects.filter(
+            patient=patient,
+            appointment_date__lt=timezone.now()
+        ).order_by('-appointment_date')
+
+        # Get recent prescriptions
+        recent_prescriptions = Prescription.objects.filter(
+            patient=patient
+        ).order_by('-date')[:5]
+
+        context = {
+            'patient': patient,
+            'upcoming_appointments': upcoming_appointments,
+            'past_appointments': past_appointments,
+            'recent_prescriptions': recent_prescriptions,
+            'total_appointments': upcoming_appointments.count(),
+            'total_prescriptions': recent_prescriptions.count(),
+        }
+        
+        return render(request, 'patient/dashboard.html', context)
+        
+    except Patient.DoesNotExist:
+        messages.error(request, 'Patient profile not found')
+        return redirect('users:login')
+
+@login_required
+def patient_prescriptions(request):
+    try:
+        patient = Patient.objects.get(user=request.user)
+        prescriptions = Prescription.objects.filter(patient=patient).order_by('-date')
+        
+        context = {
+            'patient': patient,
+            'prescriptions': prescriptions,
+        }
+        
+        return render(request, 'patient/prescriptions.html', context)
+        
+    except Patient.DoesNotExist:
+        messages.error(request, 'Patient profile not found')
+        return redirect('users:login')
 
