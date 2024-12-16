@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}Patient Details - {{ patient.get_full_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8">
+    <!-- Patient Info -->
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden mb-8">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-gray-900">{{ patient.get_full_name }}</h1>
+                <div class="space-x-2">
+                    <a href="{% url 'users:create_prescription' patient.id %}" 
+                       class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                        New Prescription
+                    </a>
+                    <a href="{% url 'users:create_appointment' %}?patient={{ patient.id }}" 
+                       class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        Schedule Appointment
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="px-6 py-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Personal Information</h3>
+                    <dl class="grid grid-cols-1 gap-2">
+                        <div class="flex justify-between">
+                            <dt class="text-sm font-medium text-gray-500">Email</dt>
+                            <dd class="text-sm text-gray-900">{{ patient.email }}</dd>
+                        </div>
+                        <div class="flex justify-between">
+                            <dt class="text-sm font-medium text-gray-500">Phone</dt>
+                            <dd class="text-sm text-gray-900">{{ patient.phone_number }}</dd>
+                        </div>
+                        <div class="flex justify-between">
+                            <dt class="text-sm font-medium text-gray-500">Date of Birth</dt>
+                            <dd class="text-sm text-gray-900">{{ patient.date_of_birth|date:"F j, Y" }}</dd>
+                        </div>
+                        <div class="flex justify-between">
+                            <dt class="text-sm font-medium text-gray-500">Gender</dt>
+                            <dd class="text-sm text-gray-900">{{ patient.get_gender_display }}</dd>
+                        </div>
+                    </dl>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Medical History</h3>
+                    <!-- Add medical history information here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Appointments -->
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden mb-8">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">Recent Appointments</h2>
+        </div>
+        <div class="px-6 py-4">
+            {% if appointments %}
+            <div class="space-y-4">
+                {% for appointment in appointments %}
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                        <p class="font-medium">{{ appointment.appointment_date|date:"F j, Y" }}</p>
+                        <p class="text-sm text-gray-600">{{ appointment.appointment_date|time:"g:i A" }}</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            {% if appointment.status == 'scheduled' %}bg-yellow-100 text-yellow-800
+                            {% elif appointment.status == 'completed' %}bg-green-100 text-green-800
+                            {% else %}bg-red-100 text-red-800{% endif %}">
+                            {{ appointment.status|title }}
+                        </span>
+                        <a href="{% url 'users:appointment_detail' appointment.id %}"
+                           class="text-blue-600 hover:text-blue-800">View Details</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-center py-4">No appointments found.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Prescriptions -->
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">Prescriptions</h2>
+        </div>
+        <div class="px-6 py-4">
+            {% if prescriptions %}
+            <div class="space-y-4">
+                {% for prescription in prescriptions %}
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                        <p class="font-medium">{{ prescription.date|date:"F j, Y" }}</p>
+                        <p class="text-sm text-gray-600">{{ prescription.diagnosis|truncatechars:100 }}</p>
+                    </div>
+                    <a href="{% url 'users:prescription_detail' prescription.id %}"
+                       class="text-blue-600 hover:text-blue-800">View Details</a>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-center py-4">No prescriptions found.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}  

@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block title %}Prescription Details{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-gray-900">Prescription Details</h1>
+                <div class="space-x-2">
+                    <a href="{% url 'users:patient_detail' prescription.patient.id %}" 
+                       class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        Back to Patient
+                    </a>
+                    <button onclick="printPrescription()" 
+                            class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                        Print Prescription
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="px-6 py-4">
+            <!-- Prescription Header -->
+            <div class="mb-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500">Patient</h3>
+                        <p class="mt-1 text-lg text-gray-900">{{ prescription.patient.get_full_name }}</p>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500">Date</h3>
+                        <p class="mt-1 text-lg text-gray-900">{{ prescription.date|date:"F j, Y" }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Diagnosis -->
+            <div class="mb-6">
+                <h3 class="text-sm font-medium text-gray-500">Diagnosis</h3>
+                <p class="mt-1 text-gray-900">{{ prescription.diagnosis }}</p>
+            </div>
+
+            <!-- Medications -->
+            <div class="mb-6">
+                <h3 class="text-sm font-medium text-gray-500 mb-2">Prescribed Medications</h3>
+                <div class="space-y-4">
+                    {% for medication in prescription.medications.all %}
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="font-medium">{{ medication.medicine }}</p>
+                                <p class="text-sm text-gray-600">{{ medication.dosage }}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600">{{ medication.instructions }}</p>
+                                <p class="text-sm text-gray-600">Duration: {{ medication.duration }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Additional Instructions -->
+            {% if prescription.instructions %}
+            <div class="mb-6">
+                <h3 class="text-sm font-medium text-gray-500">Additional Instructions</h3>
+                <p class="mt-1 text-gray-900">{{ prescription.instructions }}</p>
+            </div>
+            {% endif %}
+
+            <!-- Doctor Information -->
+            <div class="mt-8 pt-6 border-t border-gray-200">
+                <div class="flex justify-between items-end">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500">Prescribed by</h3>
+                        <p class="mt-1 text-lg font-medium text-gray-900">Dr. {{ prescription.doctor.name }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm text-gray-500">Digital Signature</p>
+                        <p class="mt-1 text-sm text-gray-900">{{ prescription.doctor.name }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function printPrescription() {
+    window.print();
+}
+</script>
+
+<style>
+@media print {
+    .no-print {
+        display: none;
+    }
+    body {
+        padding: 20px;
+    }
+}
+</style>
+{% endblock %}
