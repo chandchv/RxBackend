@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+
+{% block title %}Patient Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8">
+    <!-- Welcome Section -->
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+        <h1 class="text-2xl font-bold text-gray-900">Welcome, {{ patient.get_full_name }}</h1>
+        <p class="text-gray-600">{{ today|date:"l, F j, Y" }}</p>
+    </div>
+
+    <!-- Stats Overview -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-medium text-gray-900">Upcoming Appointments</h3>
+            <p class="text-3xl font-bold text-blue-600">{{ total_appointments }}</p>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-medium text-gray-900">Recent Prescriptions</h3>
+            <p class="text-3xl font-bold text-green-600">{{ total_prescriptions }}</p>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-medium text-gray-900">Quick Actions</h3>
+            <div class="mt-4 space-y-2">
+                <a href="{% url 'users:create_appointment' %}" 
+                   class="block text-blue-600 hover:text-blue-800">
+                    + Schedule New Appointment
+                </a>
+                <a href="{% url 'users:patient_prescriptions' %}" 
+                   class="block text-blue-600 hover:text-blue-800">
+                    View All Prescriptions
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upcoming Appointments -->
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+        <h2 class="text-xl font-bold mb-4">Upcoming Appointments</h2>
+        {% if upcoming_appointments %}
+        <div class="space-y-4">
+            {% for appointment in upcoming_appointments %}
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div>
+                    <p class="font-medium">Dr. {{ appointment.doctor.name }}</p>
+                    <p class="text-sm text-gray-600">{{ appointment.appointment_date|date:"F j, Y" }} at {{ appointment.appointment_date|time:"g:i A" }}</p>
+                    <p class="text-sm text-gray-600">Reason: {{ appointment.reason|truncatechars:100 }}</p>
+                </div>
+                <div class="flex space-x-2">
+                    <a href="{% url 'users:appointment_detail' pk=appointment.id %}" 
+                       class="text-blue-600 hover:text-blue-800">
+                        View Details
+                    </a>
+                    {% if appointment.status == 'scheduled' %}
+                    <button onclick="cancelAppointment('{{ appointment.id }}')"
+                            class="text-red-600 hover:text-red-800">
+                        Cancel
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-center text-gray-500">No upcoming appointments</p>
+        {% endif %}
+    </div>
+
+    <!-- Recent Prescriptions -->
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-xl font-bold mb-4">Recent Prescriptions</h2>
+        {% if recent_prescriptions %}
+        <div class="space-y-4">
+            {% for prescription in recent_prescriptions %}
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div>
+                    <p class="font-medium">Dr. {{ prescription.doctor.name }}</p>
+                    <p class="text-sm text-gray-600">{{ prescription.date|date:"F j, Y" }}</p>
+                    <p class="text-sm text-gray-600">Diagnosis: {{ prescription.diagnosis|truncatechars:100 }}</p>
+                </div>
+                <div>
+                    <a href="{% url 'users:prescription_detail' pk=prescription.id %}" 
+                       class="text-blue-600 hover:text-blue-800">
+                        View Details
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-center text-gray-500">No recent prescriptions</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function cancelAppointment(appointmentId) {
+    if (confirm('Are you sure you want to cancel this appointment?')) {
+        fetch(`/api/appointments/${appointmentId}/cancel/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert('Error canceling appointment');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error canceling appointment');
+        });
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %} 

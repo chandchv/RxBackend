@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+
+{% block title %}Schedule Appointment{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-8">
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h1 class="text-2xl font-bold text-gray-900">Schedule New Appointment</h1>
+        </div>
+
+        <div class="px-6 py-4">
+            <form method="POST" class="space-y-6">
+                {% csrf_token %}
+                
+                {% if messages %}
+                <div class="mb-4">
+                    {% for message in messages %}
+                    <div class="p-4 {% if message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %} rounded-lg">
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Doctor Selection -->
+                <div>
+                    <label for="id_doctor" class="block text-sm font-medium text-gray-700">Select Doctor</label>
+                    <select name="doctor" id="id_doctor" required
+                            class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                        <option value="">Select a doctor</option>
+                        {% for doctor in doctors %}
+                        <option value="{{ doctor.id }}">Dr. {{ doctor.name }} - {{ doctor.specialization }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Date and Time -->
+                <div>
+                    <label for="id_appointment_date" class="block text-sm font-medium text-gray-700">
+                        Preferred Date and Time
+                    </label>
+                    <input type="datetime-local" 
+                           name="appointment_date" 
+                           id="id_appointment_date"
+                           min="{{ min_date }}T00:00"
+                           required
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </div>
+
+                <!-- Reason for Visit -->
+                <div>
+                    <label for="id_reason" class="block text-sm font-medium text-gray-700">
+                        Reason for Visit
+                    </label>
+                    <textarea name="reason" 
+                              id="id_reason" 
+                              rows="3" 
+                              required
+                              class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                              placeholder="Please describe your reason for visit"></textarea>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="flex justify-end">
+                    <button type="submit"
+                            class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Schedule Appointment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Available Time Slots -->
+    <div class="mt-8 bg-white shadow-lg rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">Available Time Slots</h2>
+        </div>
+        <div class="px-6 py-4">
+            <div id="availableSlots" class="grid grid-cols-3 gap-4">
+                <!-- Time slots will be populated via JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('id_doctor').addEventListener('change', function() {
+    const doctorId = this.value;
+    const dateInput = document.getElementById('id_appointment_date');
+    if (doctorId && dateInput.value) {
+        fetchAvailableSlots(doctorId, dateInput.value);
+    }
+});
+
+document.getElementById('id_appointment_date').addEventListener('change', function() {
+    const doctorId = document.getElementById('id_doctor').value;
+    if (doctorId) {
+        fetchAvailableSlots(doctorId, this.value);
+    }
+});
+
+function fetchAvailableSlots(doctorId, date) {
+    fetch(`/api/available-slots/${doctorId}/${date}/`)
+        .then(response => response.json())
+        .then(data => {
+            const slotsContainer = document.getElementById('availableSlots');
+            slotsContainer.innerHTML = '';
+            
+            data.slots.forEach(slot => {
+                const slotElement = document.createElement('div');
+                slotElement.className = 'p-2 text-center border rounded cursor-pointer hover:bg-blue-50';
+                slotElement.textContent = slot;
+                slotElement.onclick = () => selectTimeSlot(slot);
+                slotsContainer.appendChild(slotElement);
+            });
+        })
+        .catch(error => console.error('Error fetching available slots:', error));
+}
+
+function selectTimeSlot(slot) {
+    const dateInput = document.getElementById('id_appointment_date');
+    const [date] = dateInput.value.split('T');
+    dateInput.value = `${date}T${slot}`;
+}
+</script>
+{% endblock %} 

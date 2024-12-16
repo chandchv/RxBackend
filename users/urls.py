@@ -59,6 +59,7 @@ from .views.prescription_views import (
     prescription_detail,
     patient_prescriptions,
     prescriptions_view,
+    generate_prescription_pdf,
 )
 
 from .views.clinic_admin_views import (
@@ -169,7 +170,7 @@ urlpatterns = [
 
     # Doctor URLs
     path('doctor/appointments/', doctor_views.doctor_appointments, name='doctor_appointments'),
-    path('doctor/appointments/create/', doctor_views.create_appointment, name='create_appointment'),
+    path('doctor/appointments/create/', doctor_views.create_appointment, name='doctor_create_appointment'),
     
     # Patient URLs
     path('doctor/patients/', patient_views.patients_list, name='patients_list'),
@@ -182,12 +183,15 @@ urlpatterns = [
     path('doctor/patients/<int:patient_id>/prescriptions/create/', 
          prescription_views.create_prescription, name='create_prescription'),
     path('doctor/prescriptions/<int:pk>/', 
-         prescription_views.prescription_detail, name='prescription_detail'),
+            prescription_views.prescription_detail, 
+            name='prescription_detail'),
     path('doctor/patients/<int:patient_id>/prescriptions/', 
          prescription_views.patient_prescriptions, name='patient_prescriptions'),
     path('doctor/dashboard/', doctor_views.doctor_dashboard, name='doctor_dashboard'),
     path('doctor/patients/<int:patient_id>/', patient_views.patient_detail, name='patient_detail'),
-
+    path('doctor/prescriptions/<int:pk>/pdf/', 
+        prescription_views.generate_prescription_pdf, 
+        name='generate_prescription_pdf'),
     # Authentication URLs
     path('login/', login_view, name='login'),
     path('logout/', logout_view, name='logout'),
@@ -199,5 +203,11 @@ urlpatterns = [
     
     # Default dashboard
     path('dashboard/', doctor_views.doctor_dashboard, name='dashboard'),
+    
+    # Add to your urlpatterns
+    path('patient/appointments/create/', patient_views.patient_create_appointment, name='patient_create_appointment'),
+    path('patient/dashboard/', patient_views.patient_dashboard, name='patient_dashboard'),
+    path('patient/prescriptions/', patient_views.patient_prescriptions, name='patient_prescriptions'),
+    path('api/appointments/<int:appointment_id>/cancel/', api_views.cancel_appointment, name='cancel_appointment'),
     
 ]
