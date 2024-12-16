@@ -40,6 +40,13 @@ from .views.utils import (
     log_error,
 )
 
+from .views.prescription_views import (
+    prescription_detail,
+    generate_prescription_pdf,
+    create_prescription,
+    patient_prescriptions,
+    prescriptions_view,
+)
 
 
 # Make dashboard directly available at the module level
@@ -80,4 +87,11 @@ __all__ = [
     'doctor_dashboard',
     'patient_detail',
     'patient_edit',
+
+    # Prescription views
+    'prescription_detail',
+    'generate_prescription_pdf',
+    'create_prescription',
+    'patient_prescriptions',
+    'prescriptions_view',
 ]

@@ -10,6 +10,11 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from ..models import Prescription, PrescriptionItem, Patient, Doctor
 from django.utils import timezone
+from django.http import HttpResponse
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+from io import BytesIO
+import os
 
 @login_required
 def create_prescription(request, patient_id):
@@ -60,10 +65,53 @@ def create_prescription(request, patient_id):
 
 @login_required
 def prescription_detail(request, pk):
-    prescription = get_object_or_404(Prescription, pk=pk)
-    return render(request, 'doctor/prescription_detail.html', {
-        'prescription': prescription
-    })
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        prescription = get_object_or_404(Prescription, id=pk, doctor=doctor)
+        
+        context = {
+            'prescription': prescription,
+            'doctor': doctor
+        }
+        
+        return render(request, 'doctor/prescription_detail.html', context)
+        
+    except Doctor.DoesNotExist:
+        messages.error(request, 'Doctor profile not found')
+        return redirect('users:dashboard')
+    except Prescription.DoesNotExist:
+        messages.error(request, 'Prescription not found')
+        return redirect('users:doctor_dashboard')
+
+@login_required
+def generate_prescription_pdf(request, pk):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        prescription = get_object_or_404(Prescription, id=pk, doctor=doctor)
+        
+        template = get_template('doctor/prescription_pdf.html')
+        context = {
+            'prescription': prescription,
+            'doctor': doctor
+        }
+        
+        html = template.render(context)
+        result = BytesIO()
+        
+        # Create PDF
+        pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result)
+        if not pdf.err:
+            # Generate filename
+            filename = f"prescription_{prescription.id}_{prescription.patient.last_name}.pdf"
+            response = HttpResponse(result.getvalue(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+            
+        return HttpResponse('Error generating PDF', status=400)
+        
+    except Exception as e:
+        messages.error(request, f'Error generating PDF: {str(e)}')
+        return redirect('users:prescription_detail', pk=pk)
 
 @login_required
 def patient_prescriptions(request, patient_id):
