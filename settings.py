@@ -155,7 +155,9 @@ REST_FRAMEWORK = {
 }
 
  # For development only
-ALLOWED_HOSTS = ['*']  # For development only
+ALLOWED_HOSTS = ['192.168.51.6', 'localhost', '127.0.0.1']
+
+
 
 LOGIN_URL = 'users:login'  # URL where users will be redirected if login is required
 LOGIN_REDIRECT_URL = 'users:dashboard'  # URL to redirect after successful login

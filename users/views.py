@@ -47,8 +47,9 @@ from .views.prescription_views import (
     patient_prescriptions,
     prescriptions_view,
 )
-
-
+from .views.drugs_views import (
+    drug_suggestions,
+)
 # Make dashboard directly available at the module level
 Dashboard = Dashboard.as_view()
 
@@ -94,4 +95,9 @@ __all__ = [
     'create_prescription',
     'patient_prescriptions',
     'prescriptions_view',
+    'prescription_pdf',
+    
+    # Admin views
+    'admin_dashboard',
+    'drug_suggestions',
 ]

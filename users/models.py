@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
+from django.db.models import Q
 
 class Clinic(models.Model):
     name = models.CharField(max_length=255)
@@ -138,27 +139,82 @@ class Appointment(models.Model):
 class Prescription(models.Model):
     patient = models.ForeignKey('Patient', on_delete=models.CASCADE)
     doctor = models.ForeignKey('Doctor', on_delete=models.CASCADE)
-    diagnosis = models.TextField()
+    vitals = models.OneToOneField('PatientVitals', on_delete=models.SET_NULL, null=True, blank=True, related_name='prescription')
+    chief_complaints = models.TextField(null=True, blank=True)
+    clinical_findings = models.TextField(null=True, blank=True)
+    diagnosis = models.TextField(null=True, blank=True)
+    advice = models.TextField(null=True, blank=True)
     date = models.DateField(default=timezone.now)
-    notes = models.TextField(blank=True)
+    follow_up_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"Prescription for {self.patient.get_full_name()} by Dr. {self.doctor.name}"
 
-
+    
 class PrescriptionItem(models.Model):
     prescription = models.ForeignKey(Prescription, related_name='items', on_delete=models.CASCADE)
     medicine = models.CharField(max_length=200)
     dosage = models.CharField(max_length=100)
-    frequency = models.CharField(max_length=100)
+    #frequency = models.CharField(max_length=100)
     duration = models.CharField(max_length=100)
+    duration_unit = models.CharField(max_length=100, null=True, blank=True)
     instructions = models.TextField(blank=True)
 
     def __str__(self):
         return f"{self.medicine} - {self.dosage}"
 
+class Drug(models.Model):
+
+    ##clinic = models.ForeignKey('Clinic', on_delete=models.CASCADE)
+   # doctor = models.ForeignKey('Doctor', on_delete=models.CASCADE)
+   # patient = models.ForeignKey('Patient', on_delete=models.CASCADE)
+    sub_category = models.CharField(max_length=255)
+    product_name = models.CharField(max_length=255)
+    salt_composition = models.CharField(max_length=255)
+    product_price = models.DecimalField(max_digits=10, decimal_places=2)
+    product_manufactured = models.CharField(max_length=255)
+    medicine_desc = models.TextField()
+    side_effects = models.TextField()
+    drug_interactions = models.JSONField()
+    
+
+    def __str__(self):
+        return self.product_name
+    
+    @classmethod
+    def search_suggestions(cls, query, limit=10):
+        if not query:
+            return []
+            
+        return cls.objects.filter(
+            Q(product_name__icontains=query) |
+            Q(salt_composition__icontains=query)
+        ).values('product_name', 'salt_composition')[:limit]
 
 class Meta:
     db_table = 'users_userprofile'
+
+class PatientVitals(models.Model):
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='vitals')
+    weight = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)  # in kg
+    height = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)  # in cm
+    bmi = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    temperature = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    heart_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    oxygen_saturation = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    blood_pressure = models.CharField(max_length=15, null=True, blank=True)  # Format: "120/80"
+    recorded_at = models.DateTimeField(auto_now_add=True)
+    recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+
+    def calculate_bmi(self):
+        if self.weight and self.height:
+            height_in_meters = self.height / 100
+            return round(self.weight / (height_in_meters ** 2), 2)
+        return None
+
+    def save(self, *args, **kwargs):
+        if self.weight and self.height:
+            self.bmi = self.calculate_bmi()
+        super().save(*args, **kwargs)

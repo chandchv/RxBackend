@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Clinic, Doctor, Staff, UserProfile, Patient, Appointment, Prescription
+from .models import Clinic, Doctor, Staff, UserProfile, Patient, Appointment, Prescription, PrescriptionItem
 
 # First unregister if models are already registered
 try:
@@ -76,8 +76,19 @@ class AppointmentAdmin(admin.ModelAdmin):
     list_filter = ('status', 'appointment_date')
     search_fields = ('patient__first_name', 'doctor__name')
 
+class PrescriptionItemInline(admin.TabularInline):
+    model = PrescriptionItem
+    extra = 1  # Number of empty forms to display
+
 @admin.register(Prescription)
 class PrescriptionAdmin(admin.ModelAdmin):
-    list_display = ('patient', 'doctor', 'date')
-    list_filter = ('date',)
-    search_fields = ('patient__first_name', 'doctor__name')
+    inlines = [PrescriptionItemInline]
+    list_display = ('patient', 'doctor', 'date', 'created_at')
+    search_fields = ('patient__first_name', 'patient__last_name', 'doctor__name')
+    list_filter = ('date', 'doctor')
+
+@admin.register(PrescriptionItem)
+class PrescriptionItemAdmin(admin.ModelAdmin):
+    list_display = ('medicine', 'dosage', 'duration', 'duration_unit')
+    search_fields = ('medicine', 'prescription__patient__first_name')
+    list_filter = ('prescription__date',)

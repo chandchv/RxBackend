@@ -3,66 +3,165 @@
 {% block title %}Create Prescription{% endblock %}
 
 {% block content %}
+
 <div class="max-w-4xl mx-auto px-4 py-8">
     <div class="bg-white shadow-lg rounded-lg overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <h1 class="text-2xl font-bold">Create Prescription</h1>
-            <p class="text-gray-600">Patient: {{ patient.get_full_name }}</p>
-            <p class="text-gray-600">Date: {% now "F j, Y" %}</p>
+        <!-- Header -->
+        <div class="border-b p-6">
+            <div class="flex justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold">{{ doctor.name }}</h1>
+                    <p>{{ doctor.specialization }}</p>
+                    <p>Reg. No: {{ doctor.license_number }}</p>
+                </div>
+                <div class="text-right">
+                    <h2 class="text-xl text-blue-600">{{ doctor.clinic.name }}</h2>
+                    <p>{{ doctor.clinic.address }}</p>
+                    <p>Ph: {{ doctor.clinic.phone_number }}</p>
+                </div>
+            </div>
         </div>
+        <!-- Patient Details -->
+       <div class="p-6 border-b">
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <p><strong>ID:</strong> {{ patient.patient_id }}</p>
+                <p><strong>Name:</strong> {{ patient.get_full_name }}</p>
+                <p><strong>Address:</strong> {{ patient.address }}</p>
+            </div>
+            <div>
+                <p><strong>Date:</strong> {% now "d-M-Y" %}</p>
+                <p><strong>Mobile:</strong> {{ patient.phone_number }}</p>
+            </div>
+        </div>
+         <!-- Vitals -->
+       
+    </div>
 
         <form method="POST" class="p-6 space-y-6">
             {% csrf_token %}
-            
+            <!-- Chief Complaints & Clinical Findings -->
+            <div class="mt-4 p-4 bg-gray-50 rounded">
+                <h3 class="font-semibold mb-2">Vitals</h3>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Weight (kg)</label>
+                        <input type="number" 
+                               step="0.1" 
+                               name="weight" 
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               value="{{ vitals.weight|default:'' }}"
+                               min="0"
+                               max="500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Height (cm)</label>
+                        <input type="number" 
+                               step="0.1" 
+                               name="height" 
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               value="{{ vitals.height|default:'' }}"
+                               min="0"
+                               max="300">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Blood Pressure</label>
+                        <input type="text" 
+                               name="blood_pressure" 
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               value="{{ vitals.blood_pressure|default:'' }}"
+                               placeholder="120/80">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Temperature (°C)</label>
+                        <input type="number" 
+                               step="0.1" 
+                               name="temperature" 
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               value="{{ vitals.temperature|default:'' }}"
+                               min="35"
+                               max="43">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Heart Rate (bpm)</label>
+                        <input type="number" 
+                               step="1" 
+                               name="heart_rate" 
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               value="{{ vitals.heart_rate|default:'' }}"
+                               min="0"
+                               max="250">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Oxygen Saturation (%)</label>
+                        <input type="number" 
+                               step="0.1" 
+                               name="oxygen_saturation" 
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               value="{{ vitals.oxygen_saturation|default:'' }}"
+                               min="0"
+                               max="100">
+                    </div>
+                </div>
+            </div>
+           <div class="grid grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label class="block font-semibold mb-2">Chief Complaints</label>
+                    <textarea name="chief_complaints" rows="4" class="form-textarea w-full" required></textarea>
+                </div>
+                <div>
+                    <label class="block font-semibold mb-2">Clinical Findings</label>
+                    <textarea name="clinical_findings" rows="4" class="form-textarea w-full"></textarea>
+                </div>
+            </div>
+         <!-- Diagnosis -->
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Diagnosis</label>
+                    <label class="block font-semibold mb-2">Diagnosis</label>
                     <textarea name="diagnosis" rows="2" required
-                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                              class="mt-1 block bg-gray-100 w-full rounded-md border-gray-500 shadow-sm"></textarea>
                 </div>
-
-                <div id="medications" class="space-y-4">
-                    <h3 class="text-lg font-medium">Medications</h3>
-                    <div class="medication-item border p-4 rounded">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Medicine Name</label>
-                                <input type="text" name="medicines[]" required
-                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Dosage</label>
-                                <input type="text" name="dosages[]" required
-                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Frequency</label>
-                                <input type="text" name="frequencies[]" required
-                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Duration</label>
-                                <input type="text" name="durations[]" required
-                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                            </div>
+                <div class="medicine-section">
+                    <h3 class="font-semibold mb-2">Add Medicines</h3>
+                    <div class="medicine-search">
+                        <div class="search-container">
+                            <input type="text" id="drug-search" placeholder="Search medicines...">
+                            <ul id="suggestions-list"></ul>
                         </div>
-                        <div class="mt-2">
-                            <label class="block text-sm font-medium text-gray-700">Instructions</label>
-                            <textarea name="instructions[]" rows="2"
-                                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                        
+                        <!-- Selected medicines will appear here -->
+                        <div id="selected-medicines">
+                            <table id="prescription-medicines">
+                                <thead>
+                                    <tr>
+                                        <th>Medicine</th>
+                                        <th>Dosage</th>
+                                        <th>Duration</th>
+                                        <th>Instructions</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
+             
 
-                <button type="button" onclick="addMedication()"
-                        class="mt-2 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                    Add Another Medication
-                </button>
+                <text  class="mt-2 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    To Add Another Medication search medicines
+                </text>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Additional Notes</label>
-                    <textarea name="notes" rows="3"
-                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                 <!-- Advice -->
+                <div class="mb-6">
+                    <label class="block font-semibold mb-2">Advice</label>
+                    <textarea name="advice" rows="3" class="form-textarea w-full"></textarea>
+                </div>
+                <!-- Follow Up -->
+                <div class="mb-6">
+                    <label class="block font-semibold mb-2">Follow Up Date</label>
+                    <input type="date" name="follow_up_date" class="form-input">
                 </div>
             </div>
 
@@ -71,13 +170,14 @@
                    class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                     Cancel
                 </a>
+                <button type="button" onclick="history.back()" class="btn btn-secondary">Cancel</button>
                 <button type="submit"
                         class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
                     Save Prescription
                 </button>
             </div>
         </form>
-    </div>
+    
 </div>
 
 <script>
@@ -93,4 +193,188 @@ function addMedication() {
     medicationsDiv.appendChild(newMedication);
 }
 </script>
+<script>
+    const searchInput = document.getElementById('drug-search');
+    const suggestionsList = document.getElementById('suggestions-list');
+    const prescriptionTable = document.querySelector('#prescription-medicines tbody');
+    let selectedMedicines = [];
+    
+    // Debounce function (if not already defined)
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+    
+    // Handle medicine search
+    searchInput.addEventListener('input', debounce(async (e) => {
+        const query = e.target.value;
+        if (query.length < 2) {
+            suggestionsList.innerHTML = '';
+            return;
+        }
+    
+        try {
+            const response = await fetch(`/api/drug-suggestions/?query=${encodeURIComponent(query)}`);
+            const suggestions = await response.json();
+            
+            suggestionsList.innerHTML = suggestions.map(drug => `
+                <li onclick="addMedicineToPrescription('${drug.product_name}', '${drug.salt_composition}')">
+                    <strong>${drug.product_name}</strong>
+                    <br>
+                    <small>${drug.salt_composition}</small>
+                </li>
+            `).join('');
+        } catch (error) {
+            console.error('Error fetching suggestions:', error);
+        }
+    }, 300));
+    
+    // Add medicine to prescription
+    function addMedicineToPrescription(productName, saltComposition) {
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td>
+                <strong>${productName}</strong>
+                <br>
+                <small>${saltComposition}</small>
+                <input type="hidden" name="medicines[]" value="${productName}">
+            </td>
+            <td>
+                <select name="dosage[]" required>
+                    <option value="1-0-0">Once daily (Morning)</option>
+                    <option value="1-0-1">Twice daily (Morning-Night)</option>
+                    <option value="1-1-1">Thrice daily</option>
+                    <option value="0-0-1">Once daily (Night)</option>
+                     <option value="0-1-0">Once daily (Afternoon)</option>
+                    <option value="SOS">As needed (SOS)</option>
+                </select>
+            </td>
+            <td>
+                <input type="number" name="duration[]" min="1" required>
+                <select name="duration_unit[]">
+                    <option value="days">Days</option>
+                    <option value="weeks">Weeks</option>
+                    <option value="months">Months</option>
+                </select>
+            </td>
+            <td>
+                <input type="text" name="instructions[]" placeholder="After food, etc.">
+            </td>
+            <td>
+                <button type="button" onclick="removeMedicine(this)" class="remove-btn">Remove</button>
+            </td>
+        `;
+        prescriptionTable.appendChild(newRow);
+        searchInput.value = '';
+        suggestionsList.innerHTML = '';
+    }
+    
+    // Remove medicine from prescription
+    function removeMedicine(button) {
+        button.closest('tr').remove();
+    }
+    
+    // Add this to your form submit handler
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const medicines = [];
+        const rows = prescriptionTable.querySelectorAll('tr');
+        
+        rows.forEach(row => {
+            medicines.push({
+                name: row.querySelector('input[name="medicines[]"]').value,
+                dosage: row.querySelector('select[name="dosage[]"]').value,
+                duration: row.querySelector('input[name="duration[]"]').value,
+                duration_unit: row.querySelector('select[name="duration_unit[]"]').value,
+                instructions: row.querySelector('input[name="instructions[]"]').value
+            });
+        });
+    
+        // Add to your form data before submission
+        const medicinesInput = document.createElement('input');
+        medicinesInput.type = 'hidden';
+        medicinesInput.name = 'prescription_medicines';
+        medicinesInput.value = JSON.stringify(medicines);
+        this.appendChild(medicinesInput);
+    });
+    </script>
+    
+    <style>
+    .medicine-section {
+        margin: 20px 0;
+    }
+    
+    .search-container {
+        position: relative;
+        margin-bottom: 20px;
+    }
+    
+    #drug-search {
+        width: 100%;
+        padding: 10px;
+        font-size: 16px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    
+    #suggestions-list {
+        position: absolute;
+        width: 100%;
+        max-height: 300px;
+        overflow-y: auto;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        border: 1px solid #ddd;
+        border-top: none;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        z-index: 1000;
+    }
+    
+    #suggestions-list li {
+        padding: 10px;
+        cursor: pointer;
+    }
+    
+    #suggestions-list li:hover {
+        background-color: #f5f5f5;
+    }
+    
+    #prescription-medicines {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+    
+    #prescription-medicines th,
+    #prescription-medicines td {
+        padding: 10px;
+        border: 1px solid #ddd;
+        text-align: left;
+    }
+    
+    #prescription-medicines th {
+        background-color: #f5f5f5;
+    }
+    
+    .remove-btn {
+        background-color: #ff4444;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 3px;
+        cursor: pointer;
+    }
+    
+    .remove-btn:hover {
+        background-color: #cc0000;
+    }
+    </style>
 {% endblock %} 

@@ -3,15 +3,15 @@
 {% block title %}Clinic Administration{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
     <div class="bg-white shadow-lg rounded-lg">
         <!-- Header -->
-        <div class="px-6 py-4 border-b border-gray-200">
-            <h1 class="text-2xl font-bold text-gray-900">Clinic Administration</h1>
+        <div class="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
+            <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Clinic Administration</h1>
         </div>
 
         <!-- Quick Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 p-4 sm:p-6">
             <div class="bg-blue-50 p-4 rounded-lg">
                 <h3 class="text-blue-800 font-semibold">Total Doctors</h3>
                 <p class="text-2xl font-bold text-blue-600">{{ doctors_count }}</p>
@@ -20,21 +20,20 @@
                 <h3 class="text-green-800 font-semibold">Total Staff</h3>
                 <p class="text-2xl font-bold text-green-600">{{ staff_count }}</p>
             </div>
-            {% comment %}
-            <!-- Comment out these sections until the models are created -->
             <div class="bg-purple-50 p-4 rounded-lg">
                 <h3 class="text-purple-800 font-semibold">Total Patients</h3>
                 <p class="text-2xl font-bold text-purple-600">{{ patients_count }}</p>
+                <a href="{% url 'users:patients_list' %}" class="inline-block align-right px-4 py-2 text-sm text-center bg-purple-500 hover:bg-purple-600 text-white rounded">Manage Patients</a>
             </div>
             <div class="bg-yellow-50 p-4 rounded-lg">
                 <h3 class="text-yellow-800 font-semibold">Today's Appointments</h3>
                 <p class="text-2xl font-bold text-yellow-600">{{ todays_appointments }}</p>
+                <a href="{% url 'users:appointments' %}" class="inline-block align-right px-4 py-2 text-sm text-center bg-yellow-500 hover:bg-yellow-600 text-white rounded">Manage Appointments</a>
             </div>
-            {% endcomment %}
         </div>
 
         <!-- Admin Navigation Cards -->
-        <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             <!-- Clinic Management -->
             <div class="border rounded-lg p-4">
                 <h2 class="text-xl font-semibold mb-4">Clinic Management</h2>

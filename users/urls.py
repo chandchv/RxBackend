@@ -17,8 +17,14 @@ from .views import (
     prescription_views,
     auth_views,
     api_views,
-    
+    admin_views,
+    pdf_views,
 )
+
+from .views.drugs_views import (
+    drug_suggestions,
+)
+
 from .views.template_views import (
     signup_view,
     login_view,
@@ -59,7 +65,6 @@ from .views.prescription_views import (
     prescription_detail,
     patient_prescriptions,
     prescriptions_view,
-    generate_prescription_pdf,
 )
 
 from .views.clinic_admin_views import (
@@ -189,9 +194,7 @@ urlpatterns = [
          prescription_views.patient_prescriptions, name='patient_prescriptions'),
     path('doctor/dashboard/', doctor_views.doctor_dashboard, name='doctor_dashboard'),
     path('doctor/patients/<int:patient_id>/', patient_views.patient_detail, name='patient_detail'),
-    path('doctor/prescriptions/<int:pk>/pdf/', 
-        prescription_views.generate_prescription_pdf, 
-        name='generate_prescription_pdf'),
+    path('doctor/prescriptions/<int:pk>/pdf/', pdf_views.generate_prescription_pdf, name='prescription_pdf'),
     # Authentication URLs
     path('login/', login_view, name='login'),
     path('logout/', logout_view, name='logout'),
@@ -210,4 +213,6 @@ urlpatterns = [
     path('patient/prescriptions/', patient_views.patient_prescriptions, name='patient_prescriptions'),
     path('api/appointments/<int:appointment_id>/cancel/', api_views.cancel_appointment, name='cancel_appointment'),
     
+    path('admin/dashboard/', admin_views.admin_dashboard, name='admin_dashboard'),
+    path('api/drug-suggestions/', drug_suggestions, name='drug_suggestions'),
 ]
