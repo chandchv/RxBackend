@@ -20,7 +20,13 @@
 
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-medium text-gray-900">Total Patients</h3>
-            <p class="text-3xl font-bold text-green-600">{{ total_patients }}</p>
+            <p class="text-3xl font-bold text-green-600">{{ patients }}</p>
+            
+            
+            <a href="{% url 'users:patients_list' %}" 
+            class="block text-blue-600 hover:text-blue-800">
+                View All Patients
+            </a>
         </div>
 
         <div class="bg-white rounded-lg shadow p-6">
@@ -29,6 +35,10 @@
                 <a href="{% url 'users:doctor_create_appointment' %}" 
                    class="block text-blue-600 hover:text-blue-800">
                     + New Appointment
+                </a>
+                <a href="{% url 'users:patients_list' %}" 
+                   class="block text-blue-600 hover:text-blue-800">
+                    View All Patients
                 </a>
                 <a href="{% url 'users:create_patient' %}" 
                    class="block text-blue-600 hover:text-blue-800">
@@ -95,6 +105,17 @@
 </div>
 
 <script>
+async function patients_list() {
+    const response = await fetch('/api/patients/', {
+        headers: {
+            'Authorization': `Bearer ${getToken()}`,
+            'Content-Type': 'application/json',
+        }
+    });
+    const patients = await response.json();
+    console.log(patients);
+    return patients;
+}
 async function fetchAppointments() {
     try {
         const response = await fetch('/api/appointments/', {

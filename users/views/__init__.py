@@ -96,4 +96,12 @@ __all__ = [
     'save_doctor',
     'get_doctors_list',
     'dashboard_view',
+    'generate_prescription_pdf',
+    'prescription_detail',
+    'prescription_pdf',
+    'prescription_list',
+    'prescription_delete',
+    'prescription_create',
+    'prescription_update',
+    'prescription_delete',
 ] 

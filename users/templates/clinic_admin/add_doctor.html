@@ -1,8 +1,8 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto px-4 py-8">
-    <div class="bg-white shadow-lg rounded-lg p-6">
+<div class="max-w-3xl mx-auto px-4 py-8" style="background-color: #f9f9fa;">
+    <div class="bg-gray-150 shadow-lg rounded-lg p-6">
         <h2 class="text-2xl font-bold mb-6">Add New Doctor</h2>
 
         <!-- Verification Form -->
@@ -11,15 +11,15 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Doctor Name</label>
-                    <input type="text" id="verifyName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <input type="text" id="verifyName" class="mt-1 block w-full rounded-md bg-gray-200 border-gray-500 shadow-sm">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Registration Number</label>
-                    <input type="text" id="verifyRegNumber" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <input type="text" id="verifyRegNumber" class="mt-1 block w-full rounded-md bg-gray-200 border-gray-300 shadow-sm">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Medical Council</label>
-                    <select id="verifyCouncil" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <select id="verifyCouncil" class="mt-1 block w-full rounded-md bg-gray-200 border-gray-300 shadow-sm">
                         {% for council in medical_councils %}
                             <option value="{{ council }}">{{ council }}</option>
                         {% endfor %}

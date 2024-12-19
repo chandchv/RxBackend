@@ -13,9 +13,9 @@ from django.utils import timezone
 @login_required
 def create_patient(request):
     try:
-        # Get the clinic from the logged-in user's profile
-        user_profile = UserProfile.objects.get(user=request.user)
-        clinic = user_profile.clinic
+        # Get the doctor and their associated clinic
+        doctor = Doctor.objects.get(user=request.user)
+        clinic = doctor.clinic
         
         if request.method == 'POST':
             try:
@@ -28,7 +28,7 @@ def create_patient(request):
                     email=request.POST.get('email', ''),
                     address=request.POST.get('address', ''),
                     pincode=request.POST.get('pincode', ''),
-                    clinic=clinic
+                    clinic=clinic  # Set the clinic from the doctor's clinic
                 )
                 messages.success(request, 'Patient added successfully!')
                 return redirect('users:patients_list')
@@ -38,8 +38,8 @@ def create_patient(request):
         
         return render(request, 'doctor/create_patient.html')
     
-    except UserProfile.DoesNotExist:
-        messages.error(request, 'User profile not found')
+    except Doctor.DoesNotExist:
+        messages.error(request, 'Doctor profile not found')
         return redirect('users:dashboard')
     except Exception as e:
         print(f"Error in create_patient view: {str(e)}")
@@ -49,23 +49,41 @@ def create_patient(request):
 @login_required
 def patients_list(request):
     try:
-        # Get the clinic from the logged-in user's profile
-        user_profile = UserProfile.objects.get(user=request.user)
-        clinic = user_profile.clinic
+        # Check if user is admin/staff
+        if request.user.is_staff or request.user.is_superuser:
+            # Staff can see all patients
+            patients = Patient.objects.all().order_by('-created_at')
+            context = {
+                'patients': patients,
+                'total_patients': patients.count(),
+                'is_staff': True
+            }
+        else:
+            # Regular doctor sees only their clinic's patients
+            doctor = Doctor.objects.get(user=request.user)
+            patients = Patient.objects.filter(clinic=doctor.clinic).order_by('-created_at')
+            context = {
+                'patients': patients,
+                'doctor': doctor,
+                'total_patients': patients.count(),
+                'is_staff': False
+            }
         
-        # Get all patients for this clinic
-        patients = Patient.objects.filter(clinic=clinic).order_by('-created_at')
+        return render(request, 'doctor/patients_list.html', context)
         
-        return render(request, 'doctor/patients.html', {
-            'patients': patients
-        })
-    except UserProfile.DoesNotExist:
-        messages.error(request, 'User profile not found')
-        return redirect('users:dashboard')
-    except Exception as e:
-        print(f"Error fetching patients: {str(e)}")
-        messages.error(request, 'Error fetching patients list')
-        return redirect('users:dashboard')
+    except Doctor.DoesNotExist:
+        if request.user.is_staff or request.user.is_superuser:
+            # If staff user doesn't have a doctor profile, still show all patients
+            patients = Patient.objects.all().order_by('-created_at')
+            context = {
+                'patients': patients,
+                'total_patients': patients.count(),
+                'is_staff': True
+            }
+            return render(request, 'doctor/patients_list.html', context)
+        else:
+            messages.error(request, 'Doctor profile not found')
+            return redirect('users:dashboard')
 
 @login_required
 def patient_detail(request, patient_id):

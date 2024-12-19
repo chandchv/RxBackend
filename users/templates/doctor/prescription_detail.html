@@ -5,6 +5,7 @@
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 py-8">
     <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <!-- Action Buttons -->
         <div class="px-6 py-4 border-b border-gray-200 no-print">
             <div class="flex justify-between items-center">
                 <h1 class="text-2xl font-bold text-gray-900">Prescription Details</h1>
@@ -21,7 +22,7 @@
                         </svg>
                         Print
                     </button>
-                    <a href="{% url 'users:generate_prescription_pdf' pk=prescription.id %}" 
+                    <a href="{% url 'users:prescription_pdf' prescription.id %}" 
                        class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 no-print">
                         Download PDF
                     </a>
@@ -34,7 +35,7 @@
         </div>
 
         <div class="px-6 py-4 printable-content">
-            <!-- Clinic Header for Print -->
+            <!-- Clinic Header -->
             <div class="text-center mb-6 print-only" style="display: none;">
                 <h2 class="text-xl font-bold">{{ prescription.doctor.clinic.name }}</h2>
                 <p>{{ prescription.doctor.clinic.address }}</p>
@@ -42,17 +43,63 @@
                 <div class="border-b-2 border-gray-300 my-4"></div>
             </div>
 
-            <!-- Prescription Header -->
+            <!-- Patient Details & Vitals -->
             <div class="mb-6">
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <h3 class="text-sm font-medium text-gray-500">Patient</h3>
                         <p class="mt-1 text-lg text-gray-900">{{ prescription.patient.get_full_name }}</p>
-                        <p class="text-sm text-gray-600">Age: {{ prescription.patient.age }} years</p>
+                        <p class="text-sm text-gray-600">ID: {{ prescription.patient.patient_id }}</p>
+                        <p class="text-sm text-gray-600">Mobile: {{ prescription.patient.phone_number }}</p>
                     </div>
                     <div>
                         <h3 class="text-sm font-medium text-gray-500">Date</h3>
-                        <p class="mt-1 text-lg text-gray-900">{{ prescription.date|date:"F j, Y" }}</p>
+                        <p class="mt-1 text-lg text-gray-900">{{ prescription.created_at|date:"F j, Y" }}</p>
+                    </div>
+                </div>
+
+                <!-- Vitals Section -->
+                <div class="mt-4 bg-gray-50 p-4 rounded-lg">
+                    <h3 class="text-sm font-medium text-gray-500 mb-2">Patient Vitals</h3>
+                    <div class="grid grid-cols-4 gap-4">
+                        <div>
+                            <p class="text-sm text-gray-600">Weight: {{ vitals.weight|default:'-' }} kg</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Height: {{ vitals.height|default:'-' }} cm</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">BMI: {{ vitals.bmi|default:'-' }}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">BP: {{ vitals.blood_pressure|default:'-' }}</p>
+                        </div>
+                    </div>
+                    <div class="border-b-2 border-gray-300 my-4"></div>
+                    <div class="grid grid-cols-4 gap-4">
+                        <div>
+                            <p class="text-sm text-gray-600">Temperature: {{ vitals.temperature|default:'-' }} °C</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Heart Rate: {{ vitals.heart_rate|default:'-' }} bpm</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">SpO2: {{ vitals.oxygen_saturation|default:'-' }} %</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clinical Information -->
+            <div class="mb-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500">Chief Complaints</h3>
+                        <p class="mt-1 text-gray-900">{{ prescription.chief_complaints }}</p>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500">Clinical Findings</h3>
+                        <p class="mt-1 text-gray-900">{{ prescription.clinical_findings }}</p>
                     </div>
                 </div>
             </div>
@@ -67,16 +114,16 @@
             <div class="mb-6">
                 <h3 class="text-sm font-medium text-gray-500 mb-2">Prescribed Medications</h3>
                 <div class="space-y-4">
-                    {% for medication in prescription.medications.all %}
+                    {% for item in prescription.items.all %}
                     <div class="bg-gray-50 p-4 rounded-lg">
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <p class="font-medium">{{ medication.medicine }}</p>
-                                <p class="text-sm text-gray-600">{{ medication.dosage }}</p>
+                                <p class="font-medium">{{ item.medicine }}</p>
+                                <p class="text-sm text-gray-600">{{ item.dosage }}</p>
                             </div>
                             <div>
-                                <p class="text-sm text-gray-600">{{ medication.instructions }}</p>
-                                <p class="text-sm text-gray-600">Duration: {{ medication.duration }}</p>
+                                <p class="text-sm text-gray-600">{{ item.instructions }}</p>
+                                <p class="text-sm text-gray-600">Duration: {{ item.duration }} {{ item.duration_unit }}</p>
                             </div>
                         </div>
                     </div>
@@ -84,11 +131,19 @@
                 </div>
             </div>
 
-            <!-- Additional Instructions -->
-            {% if prescription.instructions %}
+            <!-- Advice -->
+            {% if prescription.advice %}
             <div class="mb-6">
-                <h3 class="text-sm font-medium text-gray-500">Additional Instructions</h3>
-                <p class="mt-1 text-gray-900">{{ prescription.instructions }}</p>
+                <h3 class="text-sm font-medium text-gray-500">Advice</h3>
+                <p class="mt-1 text-gray-900">{{ prescription.advice }}</p>
+            </div>
+            {% endif %}
+
+            <!-- Follow Up -->
+            {% if prescription.follow_up_date %}
+            <div class="mb-6">
+                <h3 class="text-sm font-medium text-gray-500">Follow Up Date</h3>
+                <p class="mt-1 text-gray-900">{{ prescription.follow_up_date|date:"F j, Y" }}</p>
             </div>
             {% endif %}
 
@@ -99,7 +154,7 @@
                         <h3 class="text-sm font-medium text-gray-500">Prescribed by</h3>
                         <p class="mt-1 text-lg font-medium text-gray-900">Dr. {{ prescription.doctor.name }}</p>
                         <p class="text-sm text-gray-600">{{ prescription.doctor.qualifications }}</p>
-                        <p class="text-sm text-gray-600">Reg. No: {{ prescription.doctor.registration_number }}</p>
+                        <p class="text-sm text-gray-600">Reg. No: {{ prescription.doctor.license_number }}</p>
                     </div>
                     <div class="text-right">
                         <p class="text-sm text-gray-500">Digital Signature</p>
@@ -111,84 +166,82 @@
     </div>
 </div>
 
+<!-- Keep the existing script and style sections -->
 <script>
-function printPrescription() {
-    window.print();
-}
-
-async function sharePrescription(prescriptionId) {
-    try {
-        const response = await fetch(`/doctor/prescriptions/${prescriptionId}/pdf/`);
-        const blob = await response.blob();
-        const file = new File([blob], `prescription_${prescriptionId}.pdf`, { type: 'application/pdf' });
-
-        if (navigator.share) {
-            await navigator.share({
-                files: [file],
-                title: 'Medical Prescription',
-                text: 'Here is your prescription'
-            });
-        } else {
-            // Fallback for browsers that don't support sharing
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `prescription_${prescriptionId}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-        }
-    } catch (error) {
-        console.error('Error sharing prescription:', error);
-        alert('Error sharing prescription. Please try downloading instead.');
+    function printPrescription() {
+        window.print();
     }
-}
+    
+    async function sharePrescription(prescriptionId) {
+        try {
+            const response = await fetch(`/doctor/prescriptions/${prescriptionId}/pdf/`);
+            const blob = await response.blob();
+            const file = new File([blob], `prescription_${prescriptionId}.pdf`, { type: 'application/pdf' });
+    
+            if (navigator.share) {
+                await navigator.share({
+                    files: [file],
+                    title: 'Medical Prescription',
+                    text: 'Here is your prescription'
+                });
+            } else {
+                // Fallback for browsers that don't support sharing
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `prescription_${prescriptionId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }
+        } catch (error) {
+            console.error('Error sharing prescription:', error);
+            alert('Error sharing prescription. Please try downloading instead.');
+        }
+    }
 </script>
 
 <style>
-@media print {
-    body {
-        padding: 20px;
-        background: white;
-    }
-    
-    .no-print {
-        display: none !important;
+    @media print {
+        body {
+            padding: 20px;
+            background: white;
+        }
+        
+        .no-print {
+            display: none !important;
+        }
+        
+        .print-only {
+            display: block !important;
+        }
+        
+        .printable-content {
+            padding: 20px;
+        }
+        
+        .bg-gray-50 {
+            background-color: white !important;
+            border: 1px solid #eee;
+        }
+        
+        @page {
+            margin: 2cm;
+        }
+        
+        .bg-white {
+            background-color: white !important;
+            box-shadow: none !important;
+        }
+        
+        * {
+            color: black !important;
+        }
     }
     
     .print-only {
-        display: block !important;
+        display: none;
     }
-    
-    .printable-content {
-        padding: 20px;
-    }
-    
-    .bg-gray-50 {
-        background-color: white !important;
-        border: 1px solid #eee;
-    }
-    
-    @page {
-        margin: 2cm;
-    }
-    
-    /* Reset background colors and shadows for printing */
-    .bg-white {
-        background-color: white !important;
-        box-shadow: none !important;
-    }
-    
-    /* Ensure text is black for printing */
-    * {
-        color: black !important;
-    }
-}
-
-/* Hide print-only elements when not printing */
-.print-only {
-    display: none;
-}
 </style>
 {% endblock %}

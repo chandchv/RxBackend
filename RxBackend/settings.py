@@ -70,6 +70,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                'users.context_processors.doctor_info',
             ],
         },
     },
@@ -152,3 +153,11 @@ CORS_ALLOW_CREDENTIALS = True
 #     "http://localhost:3000",
 #     "http://127.0.0.1:3000",
 # ]
+
+# Media files configuration
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Add specific path for clinic logos
+CLINIC_LOGOS_URL = '/media/clinic_logos/'
+CLINIC_LOGOS_ROOT = os.path.join(MEDIA_ROOT, 'clinic_logos')
