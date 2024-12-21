@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}My Prescriptions{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8">
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-900">My Prescriptions</h1>
+            <a href="{% url 'users:patient_dashboard' %}" 
+               class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                Back to Dashboard
+            </a>
+        </div>
+
+        {% if prescriptions %}
+        <div class="space-y-4">
+            {% for prescription in prescriptions %}
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                <div>
+                    <p class="font-medium">Dr. {{ prescription.doctor.user.get_full_name }}</p>
+                    <p class="text-sm text-gray-600">Date: {{ prescription.created_at|date:"F j, Y" }}</p>
+                    <p class="text-sm text-gray-600">Diagnosis: {{ prescription.diagnosis|truncatechars:100 }}</p>
+                </div>
+                <div class="flex space-x-2">
+                    <a href="{% url 'users:prescription_detail' pk=prescription.id %}" 
+                       class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                        View Details
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8">
+            <p class="text-gray-500">No prescriptions found.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

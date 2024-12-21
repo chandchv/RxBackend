@@ -1,6 +1,38 @@
 from django import forms
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.models import User
 from .models import Patient, Appointment, Doctor
 from django.utils import timezone
+
+class PatientSignupForm(UserCreationForm):
+   first_name = forms.CharField(max_length=30, required=True)
+   last_name = forms.CharField(max_length=30, required=True)
+   email = forms.EmailField(max_length=254, required=True)
+   phone_number = forms.CharField(max_length=15, required=True)
+   date_of_birth = forms.DateField(
+       widget=forms.DateInput(attrs={'type': 'date'}),
+       required=True
+   )
+   gender = forms.ChoiceField(
+       choices=[('M', 'Male'), ('F', 'Female'), ('O', 'Other')],
+       required=True
+   )
+   address = forms.CharField(
+       widget=forms.Textarea(attrs={'rows': 3}),
+       required=True
+   )
+   blood_group = forms.ChoiceField(
+       choices=[
+           ('A+', 'A+'), ('A-', 'A-'),
+           ('B+', 'B+'), ('B-', 'B-'),
+           ('O+', 'O+'), ('O-', 'O-'),
+           ('AB+', 'AB+'), ('AB-', 'AB-'),
+       ],
+       required=False
+   )
+class Meta:
+       model = User
+       fields = ('username', 'first_name', 'last_name', 'email', 'password1', 'password2')
 
 class PatientForm(forms.ModelForm):
     class Meta:
@@ -103,3 +135,23 @@ class DoctorForm(forms.ModelForm):
     class Meta:
         model = Doctor
         fields = ['name', 'clinic']
+
+class DoctorSignupForm(UserCreationForm):
+    first_name = forms.CharField(max_length=30, required=True)
+    last_name = forms.CharField(max_length=30, required=True)
+    email = forms.EmailField(max_length=254, required=True)
+    phone_number = forms.CharField(max_length=15, required=True)
+    
+    # Doctor specific fields
+    title = forms.CharField(max_length=50, required=True)
+    medical_degree = forms.CharField(max_length=100, required=True)
+    license_number = forms.CharField(max_length=50, required=True)
+    state_council = forms.CharField(max_length=100, required=True)
+    clinic_name = forms.CharField(max_length=100, required=True)
+    clinic_address = forms.CharField(widget=forms.Textarea(attrs={'rows': 3}), required=True)
+    clinic_phone = forms.CharField(max_length=15, required=True)
+    specialization = forms.CharField(max_length=100, required=True)
+
+    class Meta:
+        model = User
+        fields = ('username', 'first_name', 'last_name', 'email', 'password1', 'password2')

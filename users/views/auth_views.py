@@ -6,7 +6,7 @@ from django.contrib.auth import authenticate, login, logout
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.models import User
 from ..serializers import UserProfileSerializer, SignupSerializer
-from ..models import UserProfile, Doctor, Patient
+from ..models import UserProfile, Doctor, Patient, Clinic
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.shortcuts import render, redirect
 import json
@@ -14,6 +14,8 @@ from ..scripts import scrapeGpt01 as scrapper
 from django.db import transaction, IntegrityError
 from django.contrib import messages
 from rest_framework.authtoken.models import Token
+from ..forms import PatientSignupForm, DoctorSignupForm
+from django.db.models import Max
 
 @ensure_csrf_cookie
 def login_view(request):
@@ -280,3 +282,256 @@ def register_view(request):
         # Add your registration logic here
         pass
     return render(request, 'auth/register.html')
+
+def generate_patient_id():
+    """Generate a unique patient ID in the format PAT000001"""
+    # Get the last patient ID
+    last_patient = Patient.objects.all().order_by('-patient_id').first()
+    
+    if not last_patient or not last_patient.patient_id:
+        # If no patients exist or last patient has no ID, start with PAT000001
+        return 'PAT000001'
+    
+    try:
+        # Extract the number from the last ID and increment it
+        last_number = int(last_patient.patient_id[3:])
+        new_number = last_number + 1
+        # Create new ID with leading zeros
+        new_id = f'PAT{new_number:06d}'
+        return new_id
+    except ValueError:
+        # If there's any error, start with PAT000001
+        return 'PAT000001'
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def patient_signup_api(request):
+    try:
+        print("Received patient signup data:", request.data)
+        
+        # Validate clinic
+        clinic_id = request.data.get('clinic')
+        try:
+            clinic = Clinic.objects.get(id=clinic_id)
+        except Clinic.DoesNotExist:
+            return Response(
+                {"error": "Invalid or inactive clinic selected"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if username or email already exists
+        if User.objects.filter(username=request.data.get('username')).exists():
+            return Response(
+                {"error": "Username already exists"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if User.objects.filter(email=request.data.get('email')).exists():
+            return Response(
+                {"error": "Email already exists"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        with transaction.atomic():
+            # Generate patient ID
+            patient_id = generate_patient_id()
+            
+            # Create user
+            user = User.objects.create_user(
+                username=request.data.get('username'),
+                email=request.data.get('email'),
+                password=request.data.get('password'),
+                first_name=request.data.get('first_name'),
+                last_name=request.data.get('last_name')
+            )
+            
+            # Create patient profile with selected clinic and patient ID
+            patient = Patient.objects.create(
+                user=user,
+                patient_id=patient_id,  # Add the generated ID
+                clinic=clinic,
+                phone_number=request.data.get('phone_number'),
+                date_of_birth=request.data.get('date_of_birth'),
+                gender=request.data.get('gender'),
+                address=request.data.get('address'),
+                blood_group=request.data.get('blood_group', '')
+            )
+            
+            # Generate tokens
+            refresh = RefreshToken.for_user(user)
+            
+            return Response({
+                "message": "Patient signup successful!",
+                "user": {
+                    "username": user.username,
+                    "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                },
+                "patient": {
+                    "patient_id": patient.patient_id,  # Include patient ID in response
+                    "phone_number": patient.phone_number,
+                    "gender": patient.gender,
+                    "date_of_birth": patient.date_of_birth,
+                    "clinic": clinic.name
+                },
+                "access": str(refresh.access_token),
+                "refresh": str(refresh)
+            }, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        print("Exception during patient signup:", str(e))
+        if 'user' in locals():
+            try:
+                user.delete()
+            except:
+                pass
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+def patient_signup_view(request):
+    """View function for patient signup page"""
+    clinics = Clinic.objects.all()
+    if request.method == 'GET':
+        form = PatientSignupForm()
+        return render(request, 'patient/patient_signup.html', {'form': form, 'clinics': clinics})
+    
+    elif request.method == 'POST':
+        form = PatientSignupForm(request.POST)
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    user = form.save()
+                    # Get the selected clinic
+                    clinic_id = request.POST.get('clinic')
+                    clinic = Clinic.objects.get(id=clinic_id)
+                    
+                    # Generate patient ID
+                    patient_id = generate_patient_id()
+                    
+                    patient = Patient.objects.create(
+                        user=user,
+                        patient_id=patient_id,  # Add the generated ID
+                        clinic=clinic,
+                        phone_number=form.cleaned_data['phone_number'],
+                        date_of_birth=form.cleaned_data['date_of_birth'],
+                        gender=form.cleaned_data['gender'],
+                        address=form.cleaned_data['address'],
+                        blood_group=form.cleaned_data['blood_group']
+                    )
+                    messages.success(request, f'Registration successful! Your Patient ID is {patient_id}. Please login.')
+                    return redirect('users:login')
+            except Exception as e:
+                messages.error(request, f'Error during registration: {str(e)}')
+    else:
+        form = PatientSignupForm()
+    
+    context = {
+        'form': form,
+        'clinics': clinics,
+    }
+    
+    return render(request, 'patient/patient_signup.html', context)
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def doctor_signup_api(request):
+    try:
+        print("Received doctor signup data:", request.data)
+        
+        # Check if username or email already exists
+        if User.objects.filter(username=request.data.get('username')).exists():
+            return Response(
+                {"error": "Username already exists"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if User.objects.filter(email=request.data.get('email')).exists():
+            return Response(
+                {"error": "Email already exists"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        with transaction.atomic():
+            # Create user
+            user = User.objects.create_user(
+                username=request.data.get('username'),
+                email=request.data.get('email'),
+                password=request.data.get('password'),
+                first_name=request.data.get('first_name'),
+                last_name=request.data.get('last_name')
+            )
+            
+            # Create doctor profile
+            doctor = Doctor.objects.create(
+                user=user,
+                title=request.data.get('title'),
+                medical_degree=request.data.get('medical_degree'),
+                license_number=request.data.get('license_number'),
+                state_council=request.data.get('state_council'),
+                clinic_name=request.data.get('clinic_name'),
+                phone_number=request.data.get('phone_number'),
+                clinic_address=request.data.get('clinic_address'),
+                specialization=request.data.get('specialization')
+            )
+            
+            # Generate tokens
+            refresh = RefreshToken.for_user(user)
+            
+            return Response({
+                "message": "Doctor signup successful!",
+                "user": {
+                    "username": user.username,
+                    "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                },
+                "doctor": {
+                    "title": doctor.title,
+                    "medical_degree": doctor.medical_degree,
+                    "license_number": doctor.license_number,
+                },
+                "access": str(refresh.access_token),
+                "refresh": str(refresh)
+            }, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        print("Exception during doctor signup:", str(e))
+        if 'user' in locals():
+            user.delete()
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+def doctor_signup_view(request):
+    """View function for doctor signup page"""
+    if request.method == 'POST':
+        form = DoctorSignupForm(request.POST)
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    user = form.save()
+                    doctor = Doctor.objects.create(
+                        user=user,
+                        title=form.cleaned_data['title'],
+                        medical_degree=form.cleaned_data['medical_degree'],
+                        license_number=form.cleaned_data['license_number'],
+                        state_council=form.cleaned_data['state_council'],
+                        clinic_name=form.cleaned_data['clinic_name'],
+                        phone_number=form.cleaned_data['phone_number'],
+                        clinic_address=form.cleaned_data['clinic_address'],
+                        specialization=form.cleaned_data['specialization']
+                    )
+                    messages.success(request, 'Doctor registration successful! Please login.')
+                    return redirect('users:login')
+            except Exception as e:
+                messages.error(request, f'Error during registration: {str(e)}')
+    else:
+        form = DoctorSignupForm()
+    
+    return render(request, 'doctor/doctor_signup.html', {'form': form})

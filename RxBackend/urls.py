@@ -28,12 +28,12 @@ def redirect_to_dashboard(request):
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("", include('users.urls')),
+    path("", include(('users.urls', 'users'), namespace='users')),
     path("api/token-auth/", obtain_auth_token, name="api_token_auth"),
     #path("users/", include('users.urls')),
     path('dashboard/', views.dashboard_view, name='dashboard'),
     path('', redirect_to_dashboard, name='root'),  # Add this line for root URL
-    
+    path('api/', include(('users.urls', 'users_api'), namespace='users_api')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 # Add static and media URL patterns

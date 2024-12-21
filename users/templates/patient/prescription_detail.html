@@ -11,9 +11,9 @@
             <div class="flex justify-between items-center">
                 <h1 class="text-2xl font-bold text-gray-900">Prescription Details</h1>
                 <div class="space-x-2">
-                    <a href="{% url 'users:patient_detail' prescription.patient.id %}" 
+                    <a href="{% url 'users:patient_dashboard' %}" 
                        class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 no-print">
-                        Back to Patient
+                        Back to Dashboard
                     </a>
                     <button onclick="printPrescription()" 
                             class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 no-print">
@@ -23,10 +23,6 @@
                         </svg>
                         Print
                     </button>
-                    <a href="{% url 'users:prescription_pdf' prescription.id %}" 
-                       class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 no-print">
-                        Download PDF
-                    </a>
                     <button onclick="sharePrescription('{{ prescription.id }}')" 
                             class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 no-print">
                         Share
@@ -34,7 +30,6 @@
                 </div>
             </div>
         </div>
-
         <div class="px-6 py-4 printable-content">
             <!-- Clinic Header -->
             <div class="text-center mb-6 print-only" style="display: none;">
@@ -169,96 +164,22 @@
                 </div>
             </div>
         </div>
+        
     </div>
 </div>
 
-<!-- Keep the existing script and style sections -->
 <script>
-    function calculatePatientAge(patientBirthdate) {
-        const today = new Date();
-        const birthDate = new Date(patientBirthdate);
-        let age = today.getFullYear() - birthDate.getFullYear();
-        const monthDiff = today.getMonth() - birthDate.getMonth();
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-            age--;
-        }
-        return age;
-    }
-
     function printPrescription() {
         window.print();
-    }
-    
-    async function sharePrescription(prescriptionId) {
-        try {
-            const response = await fetch(`/doctor/prescriptions/${prescriptionId}/pdf/`);
-            const blob = await response.blob();
-            const file = new File([blob], `prescription_${prescriptionId}.pdf`, { type: 'application/pdf' });
-    
-            if (navigator.share) {
-                await navigator.share({
-                    files: [file],
-                    title: 'Medical Prescription',
-                    text: 'Here is your prescription'
-                });
-            } else {
-                // Fallback for browsers that don't support sharing
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `prescription_${prescriptionId}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-            }
-        } catch (error) {
-            console.error('Error sharing prescription:', error);
-            alert('Error sharing prescription. Please try downloading instead.');
-        }
     }
 </script>
 
 <style>
     @media print {
-        body {
-            padding: 20px;
-            background: white;
-        }
-        
         .no-print {
             display: none !important;
         }
-        
-        .print-only {
-            display: block !important;
-        }
-        
-        .printable-content {
-            padding: 20px;
-        }
-        
-        .bg-gray-50 {
-            background-color: white !important;
-            border: 1px solid #eee;
-        }
-        
-        @page {
-            margin: 2cm;
-        }
-        
-        .bg-white {
-            background-color: white !important;
-            box-shadow: none !important;
-        }
-        
-        * {
-            color: black !important;
-        }
-    }
-    
-    .print-only {
-        display: none;
+        /* ... other print styles ... */
     }
 </style>
-{% endblock %}
+{% endblock %} 

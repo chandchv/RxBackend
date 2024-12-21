@@ -84,11 +84,29 @@ class Doctor(models.Model):
         ordering = ['name']
 
 class Patient(models.Model):
+    GENDER_CHOICES = [
+       ('M', 'Male'),
+       ('F', 'Female'),
+       ('O', 'Other'),
+    ]
+   
+    BLOOD_GROUP_CHOICES = [
+       ('A+', 'A+'), 
+       ('A-', 'A-'),
+       ('B+', 'B+'), 
+       ('B-', 'B-'),
+       ('O+', 'O+'), 
+       ('O-', 'O-'),
+       ('AB+', 'AB+'), 
+       ('AB-', 'AB-'),
+    ]
     patient_id = models.CharField(max_length=50, unique=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, default=None, null=True, blank=True)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     date_of_birth = models.DateField()
-    gender = models.CharField(max_length=1, choices=[('M', 'Male'), ('F', 'Female'), ('O', 'Other')])
+    gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
+    blood_group = models.CharField(max_length=3, choices=BLOOD_GROUP_CHOICES, blank=True, null=True)
     phone_number = models.CharField(max_length=15)
     email = models.EmailField(blank=True, null=True)
     address = models.TextField(blank=True)
