@@ -15,7 +15,6 @@ from .views import (
     doctor_views,
     patient_views,
     prescription_views,
-    auth_views,
     api_views,
     admin_views,
     pdf_views,
@@ -59,6 +58,11 @@ from .views.patient_views import (
     patients_list,
     patient_detail,
     patient_edit,
+    patient_prescriptions,
+    patient_dashboard,
+    patient_create_appointment,
+    prescription_detail,
+    
 )
 from .views.prescription_views import (
     create_prescription,
@@ -82,6 +86,7 @@ from .views.clinic_admin_views import (
 )
 
 from .views import auth_views
+
 
 app_name = 'users'
 
@@ -176,13 +181,22 @@ urlpatterns = [
     # Doctor URLs
     path('doctor/appointments/', doctor_views.doctor_appointments, name='doctor_appointments'),
     path('doctor/appointments/create/', doctor_views.create_appointment, name='doctor_create_appointment'),
-    
-    # Patient URLs
+    path('doctor/signup/', auth_views.doctor_signup_view, name='doctor_signup'),
+    path('doctor/signup/api/', auth_views.doctor_signup_api, name='doctor_signup_api'),
     path('doctor/patients/', patient_views.patients_list, name='patients_list'),
     path('doctor/patients/create/', patient_views.create_patient, name='create_patient'),
     path('doctor/patients/<int:patient_id>/', patient_views.patient_detail, name='patient_detail'),
     path('doctor/patients/<int:patient_id>/edit/', patient_views.patient_edit, name='patient_edit'),
-    #path('patient/dashboard/', patient_views.patient_dashboard, name='patient_dashboard'),
+    
+    # Patient URLs
+    path('patient/signup/', auth_views.patient_signup_view, name='patient_signup'),
+    path('patient/signup/api/', auth_views.patient_signup_api, name='patient_signup_api'),
+    path('patient/dashboard/', patient_dashboard, name='patient_dashboard'),
+    path('patient/prescriptions/', patient_prescriptions, name='patient_prescriptions'),  
+    path('patient/prescriptions/<int:pk>/', prescription_detail, name='prescription_detail'),
+    path('patient/appointments/create/', patient_views.patient_create_appointment, name='patient_create_appointment'),
+   
+    
     
     # Prescription URLs
     path('doctor/patients/<int:patient_id>/prescriptions/create/', 
@@ -209,10 +223,10 @@ urlpatterns = [
     
     # Add to your urlpatterns
     path('patient/appointments/create/', patient_views.patient_create_appointment, name='patient_create_appointment'),
-    path('patient/dashboard/', patient_views.patient_dashboard, name='patient_dashboard'),
-    path('patient/prescriptions/', patient_views.patient_prescriptions, name='patient_prescriptions'),
+    
     path('api/appointments/<int:appointment_id>/cancel/', api_views.cancel_appointment, name='cancel_appointment'),
     
     path('admin/dashboard/', admin_views.admin_dashboard, name='admin_dashboard'),
     path('api/drug-suggestions/', drug_suggestions, name='drug_suggestions'),
+   
 ]

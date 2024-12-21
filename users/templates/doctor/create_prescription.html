@@ -25,13 +25,15 @@
        <div class="p-6 border-b">
         <div class="grid grid-cols-2 gap-4">
             <div>
-                <p><strong>ID:</strong> {{ patient.patient_id }}</p>
-                <p><strong>Name:</strong> {{ patient.get_full_name }}</p>
+                {% load custom_filters %}
+                <p><strong>ID:</strong> {{ patient.patient_id }} </p>
+                <p><strong>Name:</strong> {{ patient.get_full_name }} <strong>  Age:</strong> {{ patient.date_of_birth|calculate_age}} years</p>
                 <p><strong>Address:</strong> {{ patient.address }}</p>
+                <p><strong>Gender:</strong> {{ patient.gender }}</p>
             </div>
             <div>
-                <p><strong>Date:</strong> {% now "d-M-Y" %}</p>
-                <p><strong>Mobile:</strong> {{ patient.phone_number }}</p>
+                <p class="mt-1" align="right"><strong>Date:</strong> {% now "d-M-Y" %}</p>
+                <p class="mt-1" align="right"><strong>Mobile:</strong> {{ patient.phone_number }}</p>
             </div>
         </div>
          <!-- Vitals -->
@@ -41,7 +43,7 @@
         <form method="POST" class="p-6 space-y-6">
             {% csrf_token %}
             <!-- Chief Complaints & Clinical Findings -->
-            <div class="mt-4 p-4 bg-gray-50 rounded">
+            <div class="mt-4 p-4 bg-gray-50 rounded" style="border: 1px solid #e0e0e0; padding-top: 2px;">
                 <h3 class="font-semibold mb-2">Vitals</h3>
                 <div class="grid grid-cols-3 gap-4">
                     <div>
@@ -73,14 +75,15 @@
                                placeholder="120/80">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Temperature (°C)</label>
+                        <label class="block text-sm font-medium text-gray-700">Temperature (°F)</label>
                         <input type="number" 
                                step="0.1" 
                                name="temperature" 
                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                value="{{ vitals.temperature|default:'' }}"
-                               min="35"
-                               max="43">
+                               min="95"
+                               max="109"
+                               placeholder="Enter temperature in Fahrenheit">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700">Heart Rate (bpm)</label>

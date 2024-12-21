@@ -113,48 +113,131 @@ def create_prescription(request, patient_id):
 
 @login_required
 def prescription_detail(request, pk):
+    """View for showing prescription details"""
     try:
-        doctor = Doctor.objects.get(user=request.user)
-        prescription = get_object_or_404(Prescription, id=pk)
+        prescription = get_object_or_404(
+            Prescription.objects.select_related(
+                'doctor',
+                'doctor__user',
+                'doctor__clinic',
+                'patient',
+                'patient__user'
+            ).prefetch_related('items'),
+            id=pk
+        )
         
-        # Get vitals recorded at or before the prescription creation time
+        # Check authorization
+        if hasattr(request.user, 'doctor'):
+            if prescription.doctor != request.user.doctor:
+                messages.error(request, 'You are not authorized to view this prescription.')
+                return redirect('users:doctor_dashboard')
+            template = 'doctor/prescription_detail.html'
+        
+        elif hasattr(request.user, 'patient'):
+            if prescription.patient != request.user.patient:
+                messages.error(request, 'You are not authorized to view this prescription.')
+                return redirect('users:patient_dashboard')
+            template = 'patient/prescription_detail.html'
+        
+        else:
+            messages.error(request, 'Access denied.')
+            return redirect('users:login')
+        
+        # Get patient vitals
         vitals = PatientVitals.objects.filter(
-            patient=prescription.patient,
-            recorded_at__lte=prescription.created_at
+            patient=prescription.patient
         ).order_by('-recorded_at').first()
-        if not vitals:
-           # If no vitals found before prescription, get the closest ones after
-           vitals = PatientVitals.objects.filter(
-               patient=prescription.patient
-           ).order_by('recorded_at').first()
+        
         context = {
             'prescription': prescription,
-            'doctor': doctor,
-            'vitals': vitals  # Make sure we're using 'vitals' as the context variable
+            'vitals': vitals,
+            'patient': prescription.patient,
+            'today': timezone.now(),
+            'is_doctor': hasattr(request.user, 'doctor')
         }
         
-        return render(request, 'doctor/prescription_detail.html', context)
-        
-    except Doctor.DoesNotExist:
-        messages.error(request, 'Doctor profile not found')
-        return redirect('users:dashboard')
-    except Prescription.DoesNotExist:
-        messages.error(request, 'Prescription not found')
-        return redirect('users:doctor_dashboard')
+        return render(request, template, context)
 
+    except Exception as e:
+        print(f"Error in prescription_detail: {str(e)}")
+        messages.error(request, f'Error accessing prescription: {str(e)}')
+        if hasattr(request.user, 'doctor'):
+            return redirect('users:doctor_dashboard')
+        return redirect('users:patient_dashboard')
 
 @login_required
-def patient_prescriptions(request, patient_id):
-    patient = get_object_or_404(Patient, id=patient_id)
-    prescriptions = Prescription.objects.filter(patient=patient).order_by('-date')
-    return render(request, 'doctor/patient_prescriptions.html', {
-        'patient': patient,
-        'prescriptions': prescriptions
-    })
+def patient_prescriptions(request, patient_id=None):
+    """View for listing prescriptions - handles both doctor and patient views"""
+    try:
+        if hasattr(request.user, 'doctor'):
+            # Doctor viewing a specific patient's prescriptions
+            if patient_id:
+                patient = get_object_or_404(Patient, id=patient_id)
+                prescriptions = Prescription.objects.filter(
+                    patient=patient,
+                    doctor=request.user.doctor
+                ).order_by('-created_at')
+                template = 'doctor/patient_prescriptions.html'
+            else:
+                # Doctor viewing all their prescriptions
+                prescriptions = Prescription.objects.filter(
+                    doctor=request.user.doctor
+                ).order_by('-created_at')
+                template = 'doctor/prescriptions.html'
+                patient = None
+        
+        elif hasattr(request.user, 'patient'):
+            # Patient viewing their own prescriptions
+            patient = request.user.patient
+            prescriptions = Prescription.objects.filter(
+                patient=patient
+            ).order_by('-created_at')
+            template = 'patient/prescriptions.html'
+        
+        else:
+            messages.error(request, 'Access denied.')
+            return redirect('users:login')
+
+        context = {
+            'prescriptions': prescriptions,
+            'patient': patient,
+            'today': timezone.now()
+        }
+        
+        return render(request, template, context)
+
+    except Exception as e:
+        print(f"Error in patient_prescriptions: {str(e)}")
+        messages.error(request, f'Error accessing prescriptions: {str(e)}')
+        if hasattr(request.user, 'doctor'):
+            return redirect('users:doctor_dashboard')
+        return redirect('users:patient_dashboard')
 
 @login_required
 def prescriptions_view(request):
-    prescriptions = Prescription.objects.all().order_by('-date')
-    return render(request, 'doctor/prescriptions.html', {
-        'prescriptions': prescriptions
-    })
+    """View for listing all prescriptions (doctor only)"""
+    try:
+        if not hasattr(request.user, 'doctor'):
+            messages.error(request, 'Access denied. Doctor privileges required.')
+            return redirect('users:dashboard')
+
+        doctor = request.user.doctor
+        prescriptions = Prescription.objects.filter(
+            doctor=doctor
+        ).select_related(
+            'patient',
+            'patient__user'
+        ).order_by('-created_at')
+
+        context = {
+            'prescriptions': prescriptions,
+            'doctor': doctor,
+            'today': timezone.now()
+        }
+        
+        return render(request, 'doctor/prescriptions.html', context)
+
+    except Exception as e:
+        print(f"Error in prescriptions_view: {str(e)}")
+        messages.error(request, f'Error accessing prescriptions: {str(e)}')
+        return redirect('users:doctor_dashboard')

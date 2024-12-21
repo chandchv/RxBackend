@@ -40,6 +40,20 @@
                         <option value="O">Other</option>
                     </select>
                 </div>
+                <div></div>
+                    <label class="block text-sm font-medium text-gray-700">Blood Group</label>
+                    <select name="blood_group" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                        <option value="">Select Blood Group</option>
+                        {% for group in blood_groups %}
+                        <option value="{{ group }}">{{ group }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Username</label>
+                    <input type="text" name="user" required
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                </div>
                 
                 <!-- Contact Information -->
                 <div>

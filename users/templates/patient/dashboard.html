@@ -6,7 +6,7 @@
 <div class="max-w-7xl mx-auto px-4 py-8">
     <!-- Welcome Section -->
     <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
-        <h1 class="text-2xl font-bold text-gray-900">Welcome, {{ patient.get_full_name }}</h1>
+        <h1 class="text-2xl font-bold text-gray-900">Welcome, {{ user.patient.first_name }} {{ user.patient.last_name }}</h1>
         <p class="text-gray-600">{{ today|date:"l, F j, Y" }}</p>
     </div>
 
@@ -25,7 +25,7 @@
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-medium text-gray-900">Quick Actions</h3>
             <div class="mt-4 space-y-2">
-                <a href="{% url 'users:create_appointment' %}" 
+                <a href="{% url 'users:patient_create_appointment' %}" 
                    class="block text-blue-600 hover:text-blue-800">
                     + Schedule New Appointment
                 </a>
@@ -50,7 +50,7 @@
                     <p class="text-sm text-gray-600">Reason: {{ appointment.reason|truncatechars:100 }}</p>
                 </div>
                 <div class="flex space-x-2">
-                    <a href="{% url 'users:appointment_detail' pk=appointment.id %}" 
+                        <a href="{% url 'users:appointment_detail' pk=appointment.id %}" 
                        class="text-blue-600 hover:text-blue-800">
                         View Details
                     </a>
@@ -77,8 +77,8 @@
             {% for prescription in recent_prescriptions %}
             <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div>
-                    <p class="font-medium">Dr. {{ prescription.doctor.name }}</p>
-                    <p class="text-sm text-gray-600">{{ prescription.date|date:"F j, Y" }}</p>
+                    <p class="font-medium">Dr. {{ prescription.doctor.user.get_full_name }}</p>
+                    <p class="text-sm text-gray-600">{{ prescription.created_at|date:"F j, Y" }}</p>
                     <p class="text-sm text-gray-600">Diagnosis: {{ prescription.diagnosis|truncatechars:100 }}</p>
                 </div>
                 <div>

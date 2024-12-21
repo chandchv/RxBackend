@@ -67,6 +67,7 @@ __all__ = [
     'patient_detail',
     'patient_edit',
     'patient_form',
+    'patient_signup',
     
     # Appointment views
     'create_appointment',
@@ -104,4 +105,5 @@ __all__ = [
     'prescription_create',
     'prescription_update',
     'prescription_delete',
+
 ] 

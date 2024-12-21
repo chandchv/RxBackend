@@ -3,7 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from ..models import Patient, Doctor, Appointment, Prescription
+from ..models import Patient, Doctor, Appointment, Prescription, PatientVitals
 from ..forms import AppointmentForm, PatientForm, AppointmentForm_patient
 from ..serializers import PatientSerializer
 from django.contrib import messages
@@ -159,53 +159,15 @@ def patient_edit(request, patient_id):
         messages.error(request, 'Error updating patient information')
         return redirect('users:patients_list')
 
-@login_required
-def doctor_create_appointment(request):
-    try:
-        doctor = Doctor.objects.get(user=request.user)
-        
-        if request.method == 'POST':
-            form = AppointmentForm(request.POST)
-            if form.is_valid():
-                appointment = form.save(commit=False)
-                appointment.doctor = doctor
-                appointment.status = 'scheduled'
-                
-                # Check if the selected time slot is available
-                if Appointment.objects.filter(
-                    doctor=doctor,
-                    appointment_date=appointment.appointment_date
-                ).exists():
-                    messages.error(request, 'This time slot is already booked. Please select another time.')
-                else:
-                    appointment.save()
-                    messages.success(request, 'Appointment scheduled successfully!')
-                    return redirect('users:doctor_appointments')
-        else:
-            form = AppointmentForm(initial={'doctor': doctor})
-
-        context = {
-            'form': form,
-            'doctor': doctor,
-            'min_date': timezone.now().date().isoformat(),
-        }
-        
-        return render(request, 'doctor/create_appointment.html', context)
-
-    except Doctor.DoesNotExist:
-        messages.error(request, 'Doctor profile not found')
-        return redirect('users:dashboard')
-    except Exception as e:
-        messages.error(request, f'Error creating appointment: {str(e)}')
-        return redirect('users:dashboard')
 
 @login_required
 def patient_create_appointment(request):
     try:
-        patient = Patient.objects.get(patient_id=request.user.id)
+        # Verify the user is a patient
+        patient = Patient.objects.get(user=request.user)
         
         if request.method == 'POST':
-            form = AppointmentForm(request.POST)
+            form = AppointmentForm_patient(request.POST)
             if form.is_valid():
                 appointment = form.save(commit=False)
                 appointment.patient = patient
@@ -214,29 +176,33 @@ def patient_create_appointment(request):
                 # Check if the selected time slot is available
                 if Appointment.objects.filter(
                     doctor=appointment.doctor,
-                    appointment_date=appointment.appointment_date
+                    appointment_date=appointment.appointment_date,
+                    status='scheduled'
                 ).exists():
                     messages.error(request, 'This time slot is already booked. Please select another time.')
                 else:
                     appointment.save()
                     messages.success(request, 'Appointment scheduled successfully!')
                     return redirect('users:patient_appointments')
+            else:
+                messages.error(request, 'Invalid form submission. Please check the data.')
         else:
-            form = AppointmentForm()
+            form = AppointmentForm_patient()
 
         context = {
             'form': form,
             'patient': patient,
-            'doctors': Doctor.objects.all(),
+            'doctors': Doctor.objects.filter(clinic=patient.clinic),
             'min_date': timezone.now().date().isoformat(),
         }
         
         return render(request, 'patient/create_appointment.html', context)
 
     except Patient.DoesNotExist:
-        messages.error(request, 'Patient profile not found')
+        messages.error(request, 'Access denied. Patient profile not found.')
         return redirect('users:dashboard')
     except Exception as e:
+        print(f"Error in patient_create_appointment: {str(e)}")
         messages.error(request, f'Error creating appointment: {str(e)}')
         return redirect('users:dashboard')
 
@@ -280,9 +246,15 @@ def patient_dashboard(request):
 
 @login_required
 def patient_prescriptions(request):
+    """View for listing all prescriptions of a patient"""
     try:
+        # Get the patient associated with the logged-in user
         patient = Patient.objects.get(user=request.user)
-        prescriptions = Prescription.objects.filter(patient=patient).order_by('-date')
+        
+        # Get all prescriptions for this patient, ordered by date
+        prescriptions = Prescription.objects.filter(
+            patient=patient
+        ).order_by('-created_at')
         
         context = {
             'patient': patient,
@@ -294,4 +266,70 @@ def patient_prescriptions(request):
     except Patient.DoesNotExist:
         messages.error(request, 'Patient profile not found')
         return redirect('users:login')
+    except Exception as e:
+        print(f"Error in patient_prescriptions: {str(e)}")
+        messages.error(request, 'Error accessing prescriptions')
+        return redirect('users:patient_dashboard')
+
+@login_required
+def prescription_detail(request, pk):
+    """View for showing details of a specific prescription"""
+    try:
+        # Get the prescription first
+        prescription = get_object_or_404(
+            Prescription.objects.select_related(
+                'doctor',
+                'doctor__user',
+                'doctor__clinic',
+                'patient',
+                'patient__user'
+            ).prefetch_related('items'),
+            id=pk
+        )
+        
+        # Check if user is authorized to view this prescription
+        if hasattr(request.user, 'patient'):
+            # User is a patient
+            patient = request.user.patient
+            if prescription.patient != patient:
+                messages.error(request, 'You are not authorized to view this prescription.')
+                return redirect('users:patient_dashboard')
+        elif hasattr(request.user, 'doctor'):
+            # User is a doctor
+            doctor = request.user.doctor
+            if prescription.doctor != doctor:
+                messages.error(request, 'You are not authorized to view this prescription.')
+                return redirect('users:doctor_dashboard')
+        else:
+            messages.error(request, 'Access denied.')
+            return redirect('users:login')
+        
+        # Get the latest vitals for this patient
+        vitals = PatientVitals.objects.filter(
+            patient=prescription.patient
+        ).order_by('-recorded_at').first()
+        
+        context = {
+            'prescription': prescription,
+            'vitals': vitals,
+            'patient': prescription.patient,
+            'today': timezone.now(),
+            'is_doctor': hasattr(request.user, 'doctor')
+        }
+        
+        # Use different templates for doctors and patients
+        template_name = 'doctor/prescription_detail.html' if hasattr(request.user, 'doctor') else 'patient/prescription_detail.html'
+        return render(request, template_name, context)
+        
+    except Prescription.DoesNotExist:
+        messages.error(request, 'Prescription not found.')
+        if hasattr(request.user, 'doctor'):
+            return redirect('users:doctor_dashboard')
+        return redirect('users:patient_dashboard')
+    except Exception as e:
+        print(f"Error in prescription_detail: {str(e)}")
+        messages.error(request, f'Error accessing prescription: {str(e)}')
+        if hasattr(request.user, 'doctor'):
+            return redirect('users:doctor_dashboard')
+        return redirect('users:patient_dashboard')
 
