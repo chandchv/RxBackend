@@ -23,6 +23,21 @@
                 </div>
                 {% endif %}
 
+                <!-- Display form errors -->
+                {% if form.errors %}
+                <div class="mb-4">
+                    <div class="p-4 bg-red-100 text-red-700 rounded-lg">
+                        <ul>
+                            {% for field in form %}
+                                {% for error in field.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                {% endif %}
+
                 <!-- Patient Selection (only for doctors) -->
                 <div>
                     <label for="id_patient" class="block text-sm font-medium text-gray-700">Select Patient</label>
@@ -46,13 +61,21 @@
                 </div>
 
                 <!-- Submit Button -->
-                <div class="flex justify-end">
+                <div class="flex justify-left">
                     <button type="submit"
                             class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                         Schedule Appointment
                     </button>
+                    
                 </div>
+              
             </form>
+            <div class="flex justify-left">
+                <button type="Back"
+                          class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                         <a href="{% url 'users:doctor_dashboard' %}">Back</a>
+                      </button>
+              </div>
         </div>
     </div>
 </div>

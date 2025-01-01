@@ -19,15 +19,17 @@ def create_patient(request):
         
         if request.method == 'POST':
             try:
+                # Create patient with the data from the form
                 patient = Patient.objects.create(
                     first_name=request.POST['first_name'],
                     last_name=request.POST['last_name'],
                     date_of_birth=request.POST['date_of_birth'],
                     gender=request.POST['gender'],
+                    blood_group=request.POST.get('blood_group'),  # Optional field
                     phone_number=request.POST['phone_number'],
-                    email=request.POST.get('email', ''),
-                    address=request.POST.get('address', ''),
-                    pincode=request.POST.get('pincode', ''),
+                    email=request.POST.get('email', ''),  # Optional field
+                    address=request.POST.get('address', ''),  # Optional field
+                    pincode=request.POST.get('pincode', ''),  # Optional field
                     clinic=clinic  # Set the clinic from the doctor's clinic
                 )
                 messages.success(request, 'Patient added successfully!')

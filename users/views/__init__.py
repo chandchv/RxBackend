@@ -25,11 +25,7 @@ from .appointment_views import (
 from .template_views import (
     login_view,
     signup_view,
-    dashboard_view,
-    appointments_view,
-    appointments_list,
-    appointment_detail,
-    appointment_delete,
+    dashboard_view,   
     profile_view,
     profile_edit_view,
     logout_view,

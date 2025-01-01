@@ -71,11 +71,14 @@ class AppointmentCreateView(APIView):
     
 @login_required
 def appointments_view(request):
-    appointments = Appointment.objects.all()
-   
-    patients = Patient.objects.all()
-
-    return render(request, 'appointments.html', {'appointments': appointments, 'patients': patients})
+    """Main appointments page view"""
+    clinic = request.user.userprofile.clinic
+    appointments = Appointment.objects.filter(doctor__clinic=clinic)
+    patients = Patient.objects.filter(clinic=clinic)
+    return render(request, 'appointments.html', {
+        'appointments': appointments, 
+        'patients': patients
+    })
 
 @login_required
 def create_appointment(request):
@@ -105,11 +108,27 @@ def create_appointment(request):
 
 @login_required
 def appointment_detail(request, appointment_id):
-    appointment = get_object_or_404(Appointment, id=appointment_id)
-    return render(request, 'appointments/appointment_detail.html', {'appointment': appointment})
+    """View for individual appointment details"""
+    appointment = get_object_or_404(
+        Appointment, 
+        id=appointment_id, 
+        doctor__clinic=request.user.userprofile.clinic
+    )
+    return render(request, 'appointments/appointment_detail.html', 
+                 {'appointment': appointment})
 
 @login_required
 def appointment_delete(request, appointment_id):
-    appointment = get_object_or_404(Appointment, id=appointment_id)
-    appointment.delete()
-    return redirect('users:appointments')
+    """View for deleting appointments"""
+    appointment = get_object_or_404(
+        Appointment, 
+        id=appointment_id, 
+        doctor__clinic=request.user.userprofile.clinic
+    )
+    if request.method == 'DELETE':
+        appointment.delete()
+        return HttpResponse(status=204)
+    elif request.method == 'POST':
+        appointment.delete()
+        return redirect('users:appointments')
+    return HttpResponse(status=405)

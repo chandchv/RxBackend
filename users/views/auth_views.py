@@ -19,6 +19,7 @@ from django.db.models import Max
 
 @ensure_csrf_cookie
 def login_view(request):
+    """Handle user login through web interface"""
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
@@ -53,18 +54,19 @@ def login_view(request):
         else:
             messages.error(request, 'Invalid username or password.')
     
-    return render(request, 'auth/login.html')
+    return render(request, 'login.html')
 
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_api(request):
     try:
-        # Log the incoming request
-        print("Login request data:", request.data)
+        print("Received login request:", request.data)  # Debug print
         
         username = request.data.get('username')
         password = request.data.get('password')
+        
+        print(f"Attempting login for user: {username}")  # Debug print
         
         if not username or not password:
             return Response({
@@ -72,26 +74,56 @@ def login_api(request):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         user = authenticate(username=username, password=password)
-
-        if user:
+        print(f"Authentication result: {user}")  # Debug print
+        
+        if user is not None:
             refresh = RefreshToken.for_user(user)
-            return Response({
-                'success': True,
+            
+            # Determine user type
+            user_type = 'unknown'
+            additional_data = {}
+            
+            if hasattr(user, 'doctor'):
+                user_type = 'doctor'
+                additional_data = {
+                    'doctor_id': user.doctor.id,
+                    'clinic': user.doctor.clinic.name if user.doctor.clinic else None,
+                }
+            elif hasattr(user, 'patient'):
+                user_type = 'patient'
+                additional_data = {
+                    'patient_id': user.patient.patient_id,  # Use patient_id instead of id
+                }
+            
+            response_data = {
+                'status': 'success',
                 'access': str(refresh.access_token),
                 'refresh': str(refresh),
-                'username': user.username,
-                'email': user.email,
-                'is_email_verified': user.is_active
-            }, status=status.HTTP_200_OK)
-        else:
-            return Response({
-                'error': 'Invalid credentials'
-            }, status=status.HTTP_401_UNAUTHORIZED)
+                'user_type': user_type,
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                },
+                **additional_data
+            }
             
-    except Exception as e:
-        print(f"Login error: {str(e)}")  # Log the error
+            print("Sending successful response:", response_data)  # Debug print
+            return Response(response_data, status=status.HTTP_200_OK)
+        
         return Response({
-            'error': str(e)
+            'status': 'error',
+            'error': 'Invalid credentials'
+        }, status=status.HTTP_401_UNAUTHORIZED)
+        
+    except Exception as e:
+        print(f"Login error: {str(e)}")  # Debug print
+        return Response({
+            'status': 'error',
+            'error': 'An error occurred during login',
+            'detail': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @csrf_exempt
@@ -271,6 +303,14 @@ def verify_doctor_api(request):
             'success': False,
             'error': f'Server error: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def logout_api(request):
+    logout(request)
+    return redirect('users:login')
+
 
 def logout_view(request):
     logout(request)
@@ -535,3 +575,32 @@ def doctor_signup_view(request):
         form = DoctorSignupForm()
     
     return render(request, 'doctor/doctor_signup.html', {'form': form})
+def signup_view(request):
+    """Handle user signup through web interface"""
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        
+        try:
+            # Check if user already exists
+            if User.objects.filter(username=username).exists():
+                return render(request, 'signup.html', {'error': 'Username already exists'})
+            if User.objects.filter(email=email).exists():
+                return render(request, 'signup.html', {'error': 'Email already exists'})
+            
+            # Create new user
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password
+            )
+            
+            # Log the user in
+            login(request, user)
+            return redirect('users:doctor_dashboard')
+            
+        except Exception as e:
+            return render(request, 'signup.html', {'error': str(e)})
+    
+    return render(request, 'signup.html')

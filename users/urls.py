@@ -1,4 +1,5 @@
 from django.urls import path, include
+from .views import auth_views
 from .views import (
     signup_view,
     login_view,
@@ -28,7 +29,6 @@ from .views.template_views import (
     signup_view,
     login_view,
     dashboard_view,
-    appointments_view,
     profile_view,   
     logout_view,
     patients_view,
@@ -69,6 +69,9 @@ from .views.prescription_views import (
     prescription_detail,
     patient_prescriptions,
     prescriptions_view,
+    PatientPrescriptionsView,
+    CreatePrescriptionView,
+    PrescriptionListView,
 )
 
 from .views.clinic_admin_views import (
@@ -85,8 +88,26 @@ from .views.clinic_admin_views import (
     toggle_staff_status,
 )
 
-from .views import auth_views
+from .views.auth_views import (
+    
+    login_api,
+    logout_api,
+    signup_api,
+    doctor_signup_api,
+    patient_signup_api,
+    doctor_signup_view,
+    patient_signup_view,
+    
+    
+)
 
+from .views.api_views import (
+    get_patient_appointments,
+    get_doctors,
+    get_clinic_appointments,
+    get_clinic_doctors,
+    get_clinic_staff,
+)
 
 app_name = 'users'
 
@@ -156,11 +177,26 @@ urlpatterns = [
        # path('clinics/', get_clinics_list, name='get_clinics_list'),
         #path('staff/', get_staff_list, name='get_staff_list'),
        # path('users/', get_users_list, name='get_users_list'),
-        path('login/', login_view, name='login'),
-        path('logout/', logout_view, name='logout'),
-        path('signup/', signup_view, name='signup'),
+        path('login/', login_api, name='login'),
+        path('logout/', logout_api, name='logout'),
+        path('signup/', signup_api, name='signup'),
+        path('doctor/signup/', doctor_signup_api, name='doctor_signup'),
+        path('patient/signup/', patient_signup_api, name='patient_signup'),
+        path('get-csrf-token/', api_views.get_csrf_token, name='get_csrf_token'),
+        path('appointments/', get_patient_appointments, name='get_patient_appointments'),
+        path('doctors/', get_doctors, name='get_doctors'),
+        path('clinic/appointments/', get_clinic_appointments, name='get_clinic_appointments'),
+        path('clinic/doctors/', get_clinic_doctors, name='get_clinic_doctors'),
+        path('clinic/staff/', get_clinic_staff, name='get_clinic_staff'),
+        path('patient/appointments/', api_views.patient_appointments, name='patient_appointments'),
+        path('patient/prescriptions/', api_views.patient_prescriptions, name='patient_prescriptions'),
+        path('patient/prescriptions_detail/<int:pk>/', api_views.patient_prescriptions_detail, name='patient_prescriptions_detail'),
+
+        #path('doctors/', get_doctors, name='get_doctors'),
+        
     ], 'api'))),
 
+   
     # Clinic Admin URLs - Updated paths
     path('clinic-admin/', clinic_admin_dashboard, name='clinic_admin_dashboard'),
     path('clinic-admin/profile/', clinic_profile, name='clinic_profile'),
@@ -181,16 +217,16 @@ urlpatterns = [
     # Doctor URLs
     path('doctor/appointments/', doctor_views.doctor_appointments, name='doctor_appointments'),
     path('doctor/appointments/create/', doctor_views.create_appointment, name='doctor_create_appointment'),
-    path('doctor/signup/', auth_views.doctor_signup_view, name='doctor_signup'),
-    path('doctor/signup/api/', auth_views.doctor_signup_api, name='doctor_signup_api'),
+    path('doctor/signup/', doctor_signup_view, name='doctor_signup'),
+    path('doctor/signup/api/', doctor_signup_api, name='doctor_signup_api'),
     path('doctor/patients/', patient_views.patients_list, name='patients_list'),
     path('doctor/patients/create/', patient_views.create_patient, name='create_patient'),
     path('doctor/patients/<int:patient_id>/', patient_views.patient_detail, name='patient_detail'),
     path('doctor/patients/<int:patient_id>/edit/', patient_views.patient_edit, name='patient_edit'),
     
     # Patient URLs
-    path('patient/signup/', auth_views.patient_signup_view, name='patient_signup'),
-    path('patient/signup/api/', auth_views.patient_signup_api, name='patient_signup_api'),
+    path('patient/signup/', patient_signup_view, name='patient_signup'),
+    path('patient/signup/api/', patient_signup_api, name='patient_signup_api'),
     path('patient/dashboard/', patient_dashboard, name='patient_dashboard'),
     path('patient/prescriptions/', patient_prescriptions, name='patient_prescriptions'),  
     path('patient/prescriptions/<int:pk>/', prescription_detail, name='prescription_detail'),
@@ -206,7 +242,7 @@ urlpatterns = [
             name='prescription_detail'),
     path('doctor/patients/<int:patient_id>/prescriptions/', 
          prescription_views.patient_prescriptions, name='patient_prescriptions'),
-    path('doctor/dashboard/', doctor_views.doctor_dashboard, name='doctor_dashboard'),
+    
     path('doctor/patients/<int:patient_id>/', patient_views.patient_detail, name='patient_detail'),
     path('doctor/prescriptions/<int:pk>/pdf/', pdf_views.generate_prescription_pdf, name='prescription_pdf'),
     # Authentication URLs
@@ -219,7 +255,7 @@ urlpatterns = [
          api_views.update_appointment_status, name='api_update_appointment_status'),
     
     # Default dashboard
-    path('dashboard/', doctor_views.doctor_dashboard, name='dashboard'),
+    #path('dashboard/', doctor_views.doctor_dashboard, name='dashboard'),
     
     # Add to your urlpatterns
     path('patient/appointments/create/', patient_views.patient_create_appointment, name='patient_create_appointment'),
@@ -228,5 +264,33 @@ urlpatterns = [
     
     path('admin/dashboard/', admin_views.admin_dashboard, name='admin_dashboard'),
     path('api/drug-suggestions/', drug_suggestions, name='drug_suggestions'),
-   
+    path('api/patients/prescriptions/', PatientPrescriptionsView.as_view(), name='patient_prescriptions'),
+    path('api/patients/prescriptions/create/', CreatePrescriptionView.as_view(), name='create_prescription'),
+    path('patient/prescriptions/', PrescriptionListView.as_view(), name='patient_prescriptions_web'),
+    
+    # Patient API endpoints
+    path('api/patient/me/', api_views.patient_me, name='patient_me'),
+    path('api/patients/prescriptions/', api_views.patient_prescriptions, name='patient_prescriptions'),
+    
+    # Doctor API endpoints
+    path('api/doctor/me/', api_views.doctor_me, name='doctor_me'),
+    path('api/doctor/appointments/', api_views.doctor_appointments, name='doctor_appointments'),
+    
+    # Patient API endpoints
+    path('api/patient/appointments/', api_views.patient_appointments, name='patient_appointments'),
+    
+    # Clinic Profile endpoints
+    path('api/clinic/profile/', api_views.clinic_profile_api, name='clinic_profile_api'),
+    
+    # Superuser Admin endpoints
+    path('api/admin/clinics/', api_views.admin_clinics_api, name='admin_clinics_api'),
+    path('api/admin/clinics/<int:clinic_id>/doctors/', api_views.admin_doctors_api, name='admin_doctors_api'),
+    path('api/admin/clinics/<int:clinic_id>/staff/', api_views.admin_staff_api, name='admin_staff_api'),
+    path('api/admin/clinics/<int:clinic_id>/appointments/', api_views.clinic_appointments_api, name='clinic_appointments_api'),
+    path('api/get-csrf-token/', api_views.get_csrf_token, name='get_csrf_token'),
+    path('doctors/verify/', api_views.verify_doctor, name='verify_doctor'),
+    path('doctors/api/create/', api_views.create_doctor_profile, name='create_doctor_profile'),
+    path('verify-doctor/', auth_views.verify_doctor_api, name='verify_doctor'),
+    path('api/doctor/patients/', api_views.doctor_patients, name='doctor_patients'),
+    path('doctor/create-patient/', doctor_views.create_patient_doctor, name='create_patient_doctor'),
 ]

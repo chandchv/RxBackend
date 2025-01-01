@@ -34,9 +34,8 @@ urlpatterns = [
     path('dashboard/', views.dashboard_view, name='dashboard'),
     path('', redirect_to_dashboard, name='root'),  # Add this line for root URL
     path('api/', include(('users.urls', 'users_api'), namespace='users_api')),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]
 
 # Add static and media URL patterns
 if settings.DEBUG:
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
