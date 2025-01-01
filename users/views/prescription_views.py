@@ -16,6 +16,8 @@ from xhtml2pdf import pisa
 from io import BytesIO
 import os
 import json
+from rest_framework.views import APIView
+from django.views import View
 
 
 @login_required
@@ -241,3 +243,39 @@ def prescriptions_view(request):
         print(f"Error in prescriptions_view: {str(e)}")
         messages.error(request, f'Error accessing prescriptions: {str(e)}')
         return redirect('users:doctor_dashboard')
+
+class PatientPrescriptionsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """Get prescriptions for the logged-in patient."""
+        try:
+            patient = request.user.patient
+            prescriptions = Prescription.objects.filter(patient=patient).order_by('-created_at')
+            serializer = PrescriptionSerializer(prescriptions, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"Error fetching prescriptions: {str(e)}")
+            return Response({"error": "Failed to fetch prescriptions"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class CreatePrescriptionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """Create a new prescription."""
+        serializer = PrescriptionSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class PrescriptionListView(View):
+    def get(self, request):
+        """Render the list of prescriptions for the logged-in patient."""
+        try:
+            patient = request.user.patient
+            prescriptions = Prescription.objects.filter(patient=patient).order_by('-created_at')
+            return render(request, 'patient/prescriptions.html', {'prescriptions': prescriptions})
+        except Exception as e:
+            print(f"Error fetching prescriptions: {str(e)}")
+            return render(request, 'error.html', {'message': 'Failed to fetch prescriptions'})

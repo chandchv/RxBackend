@@ -4,6 +4,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
 from django.db.models import Q
+from django.conf import settings
 
 class Clinic(models.Model):
     name = models.CharField(max_length=255)
@@ -12,6 +13,8 @@ class Clinic(models.Model):
     email = models.EmailField()
     registration_number = models.CharField(max_length=50, unique=True)
     logo = models.ImageField(upload_to='clinic_logos/', null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
         return self.name
@@ -50,18 +53,14 @@ class Staff(models.Model):
     ]
     
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    clinic = models.ForeignKey(
-        Clinic, 
-        on_delete=models.CASCADE,
-        null=True,  # Allow null temporarily for migration
-        blank=True
-    )
+    clinic = models.ForeignKey(Clinic, on_delete=models.CASCADE, null=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
     joining_date = models.DateField()
-    is_active = models.BooleanField(default=True)
-    
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
     def __str__(self):
-        return f"{self.user.get_full_name()} - {self.get_role_display()}"
+        return f"{self.user.get_full_name()} - {self.role}"
 
 class Doctor(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -236,3 +235,16 @@ class PatientVitals(models.Model):
         if self.weight and self.height:
             self.bmi = self.calculate_bmi()
         super().save(*args, **kwargs)
+
+class ClinicAdmin(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='clinic_admin')
+    clinic = models.OneToOneField('Clinic', on_delete=models.CASCADE, related_name='admin')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.clinic.name}"
+
+    class Meta:
+        verbose_name = "Clinic Administrator"
+        verbose_name_plural = "Clinic Administrators"

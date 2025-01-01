@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header Section -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">Manage Clinics</h1>
+        <a href="{% url 'users:create_clinic' %}" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Add New Clinic
+        </a>
+    </div>
+
+    <!-- Clinics Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for clinic in clinics %}
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="p-6">
+                {% if clinic.logo %}
+                    <img src="{{ clinic.logo.url }}" alt="{{ clinic.name }}" class="w-20 h-20 object-cover rounded-full mx-auto mb-4">
+                {% endif %}
+                <h2 class="text-xl font-semibold text-gray-800 mb-2">{{ clinic.name }}</h2>
+                <p class="text-gray-600 mb-4">{{ clinic.address }}</p>
+                
+                <!-- Stats -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="text-center p-2 bg-gray-50 rounded">
+                        <span class="block text-lg font-semibold text-blue-600">{{ clinic.doctors.count }}</span>
+                        <span class="text-sm text-gray-600">Doctors</span>
+                    </div>
+                    <div class="text-center p-2 bg-gray-50 rounded">
+                        <span class="block text-lg font-semibold text-blue-600">{{ clinic.appointments.count }}</span>
+                        <span class="text-sm text-gray-600">Appointments</span>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex justify-between mt-4">
+                    <a href="{% url 'users:clinic_detail' clinic.id %}" class="text-blue-500 hover:text-blue-600">
+                        View Details
+                    </a>
+                    <a href="{% url 'users:clinic_edit' clinic.id %}" class="text-gray-500 hover:text-gray-600">
+                        Edit
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-span-full text-center py-12 bg-gray-50 rounded-lg">
+            <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+            </svg>
+            <p class="text-gray-600 mb-2">No clinics found</p>
+            <a href="{% url 'users:create_clinic' %}" class="text-blue-500 hover:text-blue-600">Add your first clinic</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %} 

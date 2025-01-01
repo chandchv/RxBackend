@@ -7,6 +7,20 @@
     <div class="bg-white shadow-lg rounded-lg p-6">
         <h2 class="text-2xl font-bold mb-6">Add New Patient</h2>
 
+        <style>
+            .form-input {
+                @apply mt-1 block w-full rounded-md border-gray-300 shadow-sm 
+                bg-gray-50 focus:ring-blue-500 focus:border-blue-500 
+                hover:bg-white transition-colors duration-200;
+            }
+            
+            .form-select {
+                @apply mt-1 block w-full rounded-md border-gray-300 shadow-sm 
+                bg-gray-50 focus:ring-blue-500 focus:border-blue-500 
+                hover:bg-white transition-colors duration-200;
+            }
+        </style>
+
         <form method="POST" class="space-y-4">
             {% csrf_token %}
             
@@ -15,70 +29,79 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700">First Name *</label>
                     <input type="text" name="first_name" required
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                           class="form-input">
                 </div>
                 
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Last Name *</label>
                     <input type="text" name="last_name" required
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                           class="form-input">
                 </div>
                 
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Date of Birth *</label>
                     <input type="date" name="date_of_birth" required
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                           class="form-input">
                 </div>
                 
+               
+
+                <!-- Gender dropdown -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Gender *</label>
-                    <select name="gender" required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <select name="gender" required class="form-select">
                         <option value="">Select Gender</option>
-                        <option value="M">Male</option>
-                        <option value="F">Female</option>
-                        <option value="O">Other</option>
-                    </select>
-                </div>
-                <div></div>
-                    <label class="block text-sm font-medium text-gray-700">Blood Group</label>
-                    <select name="blood_group" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="">Select Blood Group</option>
-                        {% for group in blood_groups %}
-                        <option value="{{ group }}">{{ group }}</option>
+                        {% for value, label in gender_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
                         {% endfor %}
                     </select>
                 </div>
+
+                <!-- Blood Group dropdown -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Username</label>
-                    <input type="text" name="user" required
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <label class="block text-sm font-medium text-gray-700">Blood Group</label>
+                    <select name="blood_group" class="form-select">
+                        <option value="">Select Blood Group</option>
+                        {% for value, label in blood_groups %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 
                 <!-- Contact Information -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Phone Number *</label>
                     <input type="tel" name="phone_number" required
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                           class="form-input">
                 </div>
                 
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Email</label>
                     <input type="email" name="email"
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                           class="form-input">
                 </div>
                 
                 <!-- Address -->
                 <div class="col-span-2">
                     <label class="block text-sm font-medium text-gray-700">Address</label>
                     <textarea name="address" rows="3"
-                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                              class="form-input"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Pincode</label>
+                    <input type="text" name="pincode"
+                           class="form-input">
                 </div>
             </div>
 
-            <div class="mt-6">
+            <div class="mt-6 flex justify-between">
+                <a href="{% url 'users:doctor_dashboard' %}" 
+                   class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
+                    Back to Dashboard
+                </a>
                 <button type="submit" 
-                        class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+                        class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
                     Add Patient
                 </button>
             </div>

@@ -46,21 +46,7 @@ def dashboard_view(request):
     return render(request, 'dashboard.html')
     
 
-@login_required
-def appointments_list(request):
-    """View for HTMX to load appointments list"""
-    appointments = Appointment.objects.filter(doctor=request.user).order_by('-date')
-    return render(request, 'appointments_list.html', {
-        'appointments': appointments
-    })
 
-@login_required
-def appointments_view(request):
-    """Main appointments page view"""
-    context = {
-        'patients': Patient.objects.all()
-    }
-    return render(request, 'appointments.html', context)
 
 @login_required
 def profile_view(request):
@@ -95,22 +81,7 @@ def logout_view(request):
     logout(request)
     return redirect('users:login')
 
-@login_required
-def appointment_detail(request, pk):
-    """View for individual appointment details"""
-    appointment = get_object_or_404(Appointment, pk=pk, doctor=request.user)
-    return render(request, 'appointment_detail.html', {
-        'appointment': appointment
-    })
 
-@login_required
-def appointment_delete(request, pk):
-    """View for deleting appointments via HTMX"""
-    appointment = get_object_or_404(Appointment, pk=pk, doctor=request.user)
-    if request.method == 'DELETE':
-        appointment.delete()
-        return HttpResponse(status=204)
-    return HttpResponse(status=405)
 
 @login_required(login_url='users:login')
 def patients_view(request):

@@ -40,6 +40,7 @@ class PatientForm(forms.ModelForm):
         fields = ['first_name', 'last_name', 'date_of_birth', 'gender', 
                  'phone_number', 'email', 'address', 'pincode']
         widgets = {
+            'blood_group': forms.Select(choices=[('A+', 'A+'), ('A-', 'A-'), ('B+', 'B+'), ('B-', 'B-'), ('O+', 'O+'), ('O-', 'O-'), ('AB+', 'AB+'), ('AB-', 'AB-')]),
             'date_of_birth': forms.DateInput(attrs={'type': 'date'}),
             'gender': forms.Select(choices=[('M', 'Male'), ('F', 'Female'), ('O', 'Other')])
         }
@@ -77,13 +78,14 @@ class AppointmentForm_patient(forms.ModelForm):
 class AppointmentForm(forms.ModelForm):
     patient = forms.ModelChoiceField(
         queryset=Patient.objects.all(),
-        required=False,  # Make it not required as it will be set automatically for patient users
+        required=True,  # Make it not required as it will be set automatically for patient users
         widget=forms.Select(attrs={
             'class': 'form-control'
         })
     )
     
     appointment_date = forms.DateTimeField(
+        required=True,
         widget=forms.DateTimeInput(attrs={
             'type': 'datetime-local',
             'class': 'form-control',
@@ -92,6 +94,7 @@ class AppointmentForm(forms.ModelForm):
     )
     
     reason = forms.CharField(
+        required=True,
         widget=forms.Textarea(attrs={
             'rows': 3,
             'class': 'form-control',
@@ -112,7 +115,7 @@ class AppointmentForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Make fields optional initially - we'll handle required validation in the view
         self.fields['doctor'].required = False
-        self.fields['patient'].required = False
+        self.fields['patient'].required = True
     def clean_appointment_date(self):
         date = self.cleaned_data['appointment_date']
         if date < timezone.now():

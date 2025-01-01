@@ -32,8 +32,8 @@ def clinic_admin_dashboard(request):
         # 'patients_count': Patient.objects.count(),
         # Remove appointments count as well if Appointment model doesn't exist
         # 'todays_appointments': Appointment.objects.filter(
-        #     appointment_date__date=today
-        # ).count(),
+         #   appointment_date__date=today
+        #).count(),
     }
     
     return render(request, 'clinic_admin/admin_dashboard.html', context)

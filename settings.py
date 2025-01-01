@@ -14,8 +14,7 @@ SECRET_KEY = "REMOVED"
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ['*']
 
 # Application definition
 
@@ -125,6 +124,9 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
+
+
+
 CORS_ALLOW_ALL_ORIGINS = True  # For development only
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
@@ -158,7 +160,7 @@ REST_FRAMEWORK = {
 }
 
  # For development only
-ALLOWED_HOSTS = ['192.168.51.6', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['*']
 
 
 

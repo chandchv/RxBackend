@@ -1,6 +1,8 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.models import User
 from django.utils.html import format_html
-from .models import Clinic, Doctor, Staff, UserProfile, Patient, Appointment, Prescription, PrescriptionItem
+from .models import Clinic, Doctor, Staff, UserProfile, Patient, Appointment, Prescription, PrescriptionItem, ClinicAdmin
 
 # First unregister if models are already registered
 try:
@@ -28,6 +30,12 @@ try:
 except admin.sites.NotRegistered:
     pass
 
+@admin.register(ClinicAdmin)
+class ClinicAdminAdmin(admin.ModelAdmin):
+    list_display = ('user', 'clinic', 'created_at')
+    search_fields = ('user__username', 'clinic__name')
+    list_filter = ('created_at',)
+
 # Now register with new admin classes
 @admin.register(Clinic)
 class ClinicAdmin(admin.ModelAdmin):
@@ -54,9 +62,18 @@ class DoctorAdmin(admin.ModelAdmin):
 
 @admin.register(Staff)
 class StaffAdmin(admin.ModelAdmin):
-    list_display = ('user', 'role', 'clinic', 'is_active')
-    search_fields = ('user__username', 'user__email')
-    list_filter = ('role', 'is_active')
+    list_display = ('get_full_name', 'role', 'clinic', 'get_is_active')
+    list_filter = ('role', 'clinic')
+    search_fields = ('user__first_name', 'user__last_name', 'user__email')
+    
+    def get_full_name(self, obj):
+        return obj.user.get_full_name()
+    get_full_name.short_description = 'Name'
+    
+    def get_is_active(self, obj):
+        return obj.user.is_active
+    get_is_active.boolean = True
+    get_is_active.short_description = 'Active'
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):

@@ -212,6 +212,7 @@ def doctor_appointments(request):
         messages.error(request, 'Error accessing appointments')
         return redirect('users:dashboard')
 
+
 @login_required
 def create_appointment(request):
     try:
@@ -224,7 +225,7 @@ def create_appointment(request):
                 appointment.doctor = doctor
                 appointment.save()
                 messages.success(request, 'Appointment scheduled successfully')
-                return redirect('users:doctor_appointments')
+                return redirect('users:doctor_dashboard')
         else:
             form = AppointmentForm()
             
@@ -240,6 +241,7 @@ def create_appointment(request):
         print(f"Error creating appointment: {str(e)}")
         messages.error(request, 'Error scheduling appointment')
         return redirect('users:doctor_appointments')
+  
 
 @login_required
 def doctor_dashboard(request):
@@ -327,3 +329,67 @@ def appointment_detail(request, appointment_id):
     except Appointment.DoesNotExist:
         messages.error(request, 'Appointment not found')
         return redirect('users:doctor_appointments')
+
+@login_required
+def doctors_list(request):
+    """View to list all doctors in a clinic"""
+    try:
+        clinic = request.user.userprofile.clinic
+        doctors = Doctor.objects.filter(clinic=clinic).order_by('name')
+        return render(request, 'clinic_admin/doctors_list.html', {
+            'doctors': doctors
+        })
+    except Exception as e:
+        messages.error(request, f"Error loading doctors: {str(e)}")
+        return render(request, 'clinic_admin/doctors_list.html', {
+            'doctors': []
+        })
+@login_required
+def create_patient_doctor(request):
+    try:
+        # Get the doctor and their associated clinic
+        doctor = Doctor.objects.get(user=request.user)
+        clinic = doctor.clinic
+        
+        
+        
+        if request.method == 'POST':
+            try:
+                # Create patient with the data from the form
+                patient = Patient.objects.create(
+                    first_name=request.POST['first_name'],
+                    last_name=request.POST['last_name'],
+                    date_of_birth=request.POST['date_of_birth'],
+                    gender=request.POST['gender'],
+                    blood_group=request.POST.get('blood_group'),
+                    phone_number=request.POST['phone_number'],
+                    email=request.POST.get('email', ''),
+                    address=request.POST.get('address', ''),
+                    pincode=request.POST.get('pincode', ''),
+                    clinic=clinic
+                )
+                messages.success(request, 'Patient added successfully!')
+                return redirect('users:doctor_dashboard')
+            except Exception as e:
+                print(f"Error creating patient: {str(e)}")
+                messages.error(request, f'Error adding patient: {str(e)}')
+        
+        # Create context with debug information
+        context = {
+            'blood_groups': Patient.BLOOD_GROUP_CHOICES,
+            'gender_choices': Patient.GENDER_CHOICES,
+            'debug_blood_groups': str(Patient.BLOOD_GROUP_CHOICES),  # Debug info
+            'debug_gender': str(Patient.GENDER_CHOICES)              # Debug info
+        }
+        
+       
+        
+        return render(request, 'doctor/create_patient.html', context)
+    
+    except Doctor.DoesNotExist:
+        messages.error(request, 'Doctor profile not found')
+        return redirect('users:doctor_dashboard')
+    except Exception as e:
+        print(f"Error in create_patient view: {str(e)}")
+        messages.error(request, 'Error accessing patient creation')
+        return redirect('users:doctor_dashboard')
