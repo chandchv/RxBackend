@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
-from .models import Patient, Appointment, Doctor
+from .models import Patient, Appointment, Doctor, DoctorAvailability
 from django.utils import timezone
 
 class PatientSignupForm(UserCreationForm):
@@ -45,11 +45,11 @@ class PatientForm(forms.ModelForm):
             'gender': forms.Select(choices=[('M', 'Male'), ('F', 'Female'), ('O', 'Other')])
         }
 class AppointmentForm_patient(forms.ModelForm):
-    appointment_date = forms.DateTimeField(
-        widget=forms.DateTimeInput(attrs={
-            'type': 'datetime-local',
+    appointment_date = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'type': 'date',
             'class': 'form-control',
-            'min': timezone.now().strftime('%Y-%m-%dT%H:%M')
+            'min': timezone.now().strftime('%Y-%m-%d')
         })
     )
     
@@ -73,6 +73,12 @@ class AppointmentForm_patient(forms.ModelForm):
         if date < timezone.now():
             raise forms.ValidationError("Appointment date cannot be in the past")
         return date
+    
+    def clean_appointment_time(self):
+        time = self.cleaned_data['appointment_time']
+        if time < timezone.now().time():
+            raise forms.ValidationError("Appointment time cannot be in the past")
+        return time
 
 
 class AppointmentForm(forms.ModelForm):
@@ -84,12 +90,20 @@ class AppointmentForm(forms.ModelForm):
         })
     )
     
-    appointment_date = forms.DateTimeField(
+    appointment_date = forms.DateField(
         required=True,
-        widget=forms.DateTimeInput(attrs={
-            'type': 'datetime-local',
+        widget=forms.DateInput(attrs={
+            'type': 'date',
             'class': 'form-control',
-            'min': timezone.now().strftime('%Y-%m-%dT%H:%M')
+            'min': timezone.now().strftime('%Y-%m-%d')
+        })
+    )
+    
+    appointment_time = forms.TimeField(
+        required=True,
+        widget=forms.TimeInput(attrs={
+            'type': 'time',
+            'class': 'form-control'
         })
     )
     
@@ -104,9 +118,10 @@ class AppointmentForm(forms.ModelForm):
 
     class Meta:
         model = Appointment
-        fields = ['patient', 'doctor', 'appointment_date', 'reason']
+        fields = ['patient', 'doctor', 'appointment_date', 'appointment_time', 'reason']
         widgets = {
             'appointment_date': forms.DateInput(attrs={'type': 'date'}),
+            'appointment_time': forms.TimeInput(attrs={'type': 'time'}),
             'status': forms.Select(choices=Appointment.STATUS_CHOICES),
             'reason': forms.Textarea(attrs={'rows': 3}),
             'doctor': forms.Select(attrs={'class': 'form-control'})
@@ -118,21 +133,11 @@ class AppointmentForm(forms.ModelForm):
         self.fields['patient'].required = True
     def clean_appointment_date(self):
         date = self.cleaned_data['appointment_date']
-        if date < timezone.now():
+        if date < timezone.now().date():
             raise forms.ValidationError("Appointment date cannot be in the past")
         return date
     
-    def clean(self):
-        cleaned_data = super().clean()
-        date = cleaned_data.get('appointment_date')
-        time = cleaned_data.get('appointment_time')
-        
-        if date and time:
-            # Combine date and time
-            from datetime import datetime, time as dt_time
-            cleaned_data['appointment_date'] = datetime.combine(date, time)
-        
-        return cleaned_data
+
 
 class DoctorForm(forms.ModelForm):
     class Meta:
@@ -158,3 +163,12 @@ class DoctorSignupForm(UserCreationForm):
     class Meta:
         model = User
         fields = ('username', 'first_name', 'last_name', 'email', 'password1', 'password2')
+
+class DoctorAvailabilityForm(forms.ModelForm):
+    class Meta:
+        model = DoctorAvailability
+        fields = ['day_of_week', 'shift', 'start_time', 'end_time', 'is_available']
+        widgets = {
+            'start_time': forms.TimeInput(attrs={'type': 'time'}),
+            'end_time': forms.TimeInput(attrs={'type': 'time'}),
+        }

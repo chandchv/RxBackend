@@ -4,9 +4,9 @@ from rest_framework.decorators import api_view, permission_classes, parser_class
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404      
 from ..models import Doctor, Appointment, Patient, Prescription, Clinic, Staff, ClinicAdmin
-from ..serializers import AppointmentSerializer, PatientListSerializer, PrescriptionSerializer, DoctorSerializer, ClinicSerializer
+from ..serializers import AppointmentSerializer,PatientSerializer, PatientListSerializer, PrescriptionSerializer, DoctorSerializer, ClinicSerializer, MedicalHistorySerializer
 import logging
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from ..models import Patient, Prescription
@@ -664,3 +664,11 @@ def doctor_patients(request):
             patient = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def patient_medical_history_api(request):
+    patient = Patient.objects.get(user=request.user)
+    medical_history = MedicalHistory.objects.filter(patient=patient)
+    serializer = MedicalHistorySerializer(medical_history, many=True)
+    return Response(serializer.data)

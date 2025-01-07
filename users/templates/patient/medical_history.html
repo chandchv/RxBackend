@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}Medical History{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-2xl font-bold mb-6">Medical History</h1>
+
+    <!-- Past Appointments -->
+    <div class="bg-white rounded-lg shadow p-6 mb-8">
+        <h2 class="text-xl font-bold mb-4">Past Appointments</h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doctor</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for appointment in past_appointments %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {{ appointment.appointment_date }}
+                        </td>
+                        <td class="px-6 py-4">
+                            Dr. {{ appointment.doctor.user.get_full_name }}
+                        </td>
+                        <td class="px-6 py-4">
+                            {{ appointment.reason|default:"Not specified" }}
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                       {% if appointment.status == 'completed' %}bg-green-100 text-green-800
+                                       {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ appointment.get_status_display }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                            No past appointments found
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Prescriptions -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-xl font-bold mb-4">Prescriptions</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for prescription in prescriptions %}
+            <div class="border rounded-lg p-4">
+                <div class="mb-2">
+                    <span class="text-gray-600">Date:</span>
+                    <span class="font-medium">{{ prescription.date }}</span>
+                </div>
+                <div class="mb-2">
+                    <span class="text-gray-600">Doctor:</span>
+                    <span class="font-medium">Dr. {{ prescription.doctor.user.get_full_name }}</span>
+                </div>
+                <div class="mb-2">
+                    <span class="text-gray-600">Diagnosis:</span>
+                    <span class="font-medium">{{ prescription.diagnosis }}</span>
+                </div>
+                <div>
+                    <span class="text-gray-600">Medications:</span>
+                    <div class="mt-1">
+                        {{ prescription.medications|linebreaks }}
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-span-full text-center text-gray-500">
+                No prescriptions found
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from ..models import Doctor, Appointment, Patient
+from ..models import Doctor, Appointment, Patient, DoctorAvailability, AppointmentSlot, DoctorLeave, Billing
 from ..serializers import DoctorSerializer
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -11,10 +11,13 @@ from django.http import JsonResponse
 from ..scripts.scrapeGpt01 import verify_doctor as verify_doctor_api
 import json
 from django.db.models import Q
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from django.utils import timezone
 from django.db.models import Count
-from ..forms import AppointmentForm
+from ..forms import AppointmentForm, DoctorAvailabilityForm
+from django.core.exceptions import ValidationError
+from ..decorators import user_is_doctor
+from django.db import models
 
 class DoctorCreateView(APIView):
     permission_classes = [IsAuthenticated]
@@ -164,7 +167,7 @@ def get_doctors_list(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
-def dashboard_view(request):
+def doctor_dashboard_view(request):
     # Get all doctors
     doctors = Doctor.objects.all()
     print(f"Total doctors in database: {doctors.count()}")
@@ -174,6 +177,9 @@ def dashboard_view(request):
     today_appointments = Appointment.objects.filter(
         appointment_date__date=today
     ).order_by('appointment_date')
+    
+    total_patients = Patient.objects.count()
+    pending_appointments = Appointment.objects.filter(status='pending').count()
     
     # Format doctors for the template
     formatted_doctors = [
@@ -190,12 +196,14 @@ def dashboard_view(request):
     context = {
         'doctors': formatted_doctors,
         'today_appointments': today_appointments,
+        'total_patients': total_patients,
+        'pending_appointments': pending_appointments,
     }
     
     return render(request, 'dashboard.html', context)
 
 @login_required
-def doctor_appointments(request):
+def doctor_appointments_view(request):
     try:
         # Get the doctor's appointments
         doctor = Doctor.objects.get(user=request.user)
@@ -206,11 +214,11 @@ def doctor_appointments(request):
         })
     except Doctor.DoesNotExist:
         messages.error(request, 'Doctor profile not found')
-        return redirect('users:dashboard')
+        return redirect('users:doctor_dashboard')
     except Exception as e:
         print(f"Error fetching appointments: {str(e)}")
         messages.error(request, 'Error accessing appointments')
-        return redirect('users:dashboard')
+        return redirect('users:doctor_dashboard')
 
 
 @login_required
@@ -223,16 +231,33 @@ def create_appointment(request):
             if form.is_valid():
                 appointment = form.save(commit=False)
                 appointment.doctor = doctor
-                appointment.save()
-                messages.success(request, 'Appointment scheduled successfully')
-                return redirect('users:doctor_dashboard')
+                appointment.status = 'scheduled'
+                
+                # Check if slot is available
+                existing_appointment = Appointment.objects.filter(
+                    doctor=doctor,
+                    appointment_date=form.cleaned_data['appointment_date'],
+                    appointment_time=form.cleaned_data['appointment_time'],
+                    status='scheduled'
+                ).exists()
+                
+                if existing_appointment:
+                    messages.error(request, 'This time slot is already booked')
+                else:
+                    appointment.save()
+                    messages.success(request, 'Appointment scheduled successfully')
+                    return redirect('users:doctor_dashboard')
+            else:
+                print("Form errors:", form.errors)  # Debug print
+                messages.error(request, 'Please check the form data')
         else:
             form = AppointmentForm()
             
-        return render(request, 'doctor/create_appointment.html', {
+        context = {
             'form': form,
             'patients': Patient.objects.filter(clinic=doctor.clinic)
-        })
+        }
+        return render(request, 'doctor/create_appointment.html', context)
         
     except Doctor.DoesNotExist:
         messages.error(request, 'Doctor profile not found')
@@ -246,24 +271,24 @@ def create_appointment(request):
 @login_required
 def doctor_dashboard(request):
     try:
-        # Get the doctor's profile
         doctor = Doctor.objects.get(user=request.user)
         today = timezone.now().date()
-        
+        current_time = timezone.now().time()
+
         # Get today's appointments
         todays_appointments = Appointment.objects.filter(
             doctor=doctor,
-            appointment_date__date=today,
+            appointment_date=today,
             status='scheduled'
-        ).order_by('appointment_date')
-        
-        # Get upcoming appointments for the next 30 days
+        ).order_by('appointment_time')  # Order by time
+
+        # Get upcoming appointments
         upcoming_appointments = Appointment.objects.filter(
             doctor=doctor,
-            appointment_date__date__gt=today,
-            appointment_date__date__lte=today + timedelta(days=7)
-        ).order_by('appointment_date')
-        
+            appointment_date__gt=today,
+            status='scheduled'
+        ).order_by('appointment_date', 'appointment_time')  # Order by date then time
+
         # Get monthly calendar data
         current_month = today.month
         current_year = today.year
@@ -273,31 +298,24 @@ def doctor_dashboard(request):
             doctor=doctor,
             appointment_date__year=current_year,
             appointment_date__month=current_month
-        ).values('appointment_date__date').annotate(
+        ).values('appointment_date').annotate(
             count=Count('id')
         )
-        
-        # Create appointment calendar data
-        appointment_days = {
-            app['appointment_date__date']: app['count'] 
-            for app in month_appointments
-        }
-        
+
         # Statistics
         total_patients_today = todays_appointments.count()
         completed_today = Appointment.objects.filter(
             doctor=doctor,
-            appointment_date__date=today,
+            appointment_date=today,
             status='completed'
         ).count()
-        
+
         context = {
             'doctor': doctor,
             'todays_appointments': todays_appointments,
             'upcoming_appointments': upcoming_appointments,
             'total_patients_today': total_patients_today,
             'completed_today': completed_today,
-            'appointment_days': appointment_days,
             'current_month': today.strftime('%B %Y'),
         }
         
@@ -393,3 +411,215 @@ def create_patient_doctor(request):
         print(f"Error in create_patient view: {str(e)}")
         messages.error(request, 'Error accessing patient creation')
         return redirect('users:doctor_dashboard')
+
+@login_required
+def create_appointment_doctor(request):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        
+        if request.method == 'POST':
+            appointment = Appointment.objects.create(
+                patient_id=request.POST['patient'],
+                doctor=doctor,
+                appointment_date=request.POST['appointment_date'],
+                appointment_time=request.POST['appointment_time'],
+                symptoms=request.POST['symptoms'],
+                existing_diseases=request.POST.get('existing_diseases', ''),
+                current_medications=request.POST.get('current_medications', ''),
+                notes=request.POST.get('notes', '')
+            )
+            messages.success(request, 'Appointment scheduled successfully')
+            return redirect('users:doctor_dashboard')
+            
+        context = {
+            'patients': Patient.objects.filter(clinic=doctor.clinic)
+        }
+        return render(request, 'doctor/create_appointment.html', context)
+        
+    except Doctor.DoesNotExist:
+        messages.error(request, 'Doctor profile not found')
+        return redirect('users:doctor_dashboard')
+    except Exception as e:
+        print(f"Error creating appointment: {str(e)}")
+        messages.error(request, 'Error scheduling appointment')
+        return redirect('users:doctor_dashboard')
+
+@login_required
+def manage_availability(request):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        
+        if request.method == 'POST':
+            form = DoctorAvailabilityForm(request.POST)
+            if form.is_valid():
+                availability = form.save(commit=False)
+                availability.doctor = doctor
+                availability.save()
+                messages.success(request, 'Availability schedule updated successfully')
+                return redirect('users:doctor_dashboard')
+        else:
+            form = DoctorAvailabilityForm()
+        
+        availabilities = DoctorAvailability.objects.filter(doctor=doctor)
+        context = {
+            'form': form,
+            'availabilities': availabilities
+        }
+        return render(request, 'doctor/manage_availability.html', context)
+        
+    except Doctor.DoesNotExist:
+        messages.error(request, 'Doctor profile not found')
+        return redirect('users:dashboard')
+
+@login_required
+def generate_slots(request):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        today = timezone.now().date()
+        end_date = today + timedelta(days=30)  # Generate slots for next 30 days
+        
+        # Get all leaves for the date range
+        leaves = DoctorLeave.objects.filter(
+            doctor=doctor,
+            start_date__lte=end_date,
+            end_date__gte=today
+        )
+        
+        # Create a set of dates where doctor is on leave
+        leave_dates = set()
+        for leave in leaves:
+            current_date = leave.start_date
+            while current_date <= leave.end_date:
+                leave_dates.add(current_date)
+                current_date += timedelta(days=1)
+        
+        slots_created = 0
+        dates_processed = 0
+        
+        current_date = today
+        while current_date <= end_date:
+            # Skip if doctor is on leave
+            if current_date in leave_dates:
+                current_date += timedelta(days=1)
+                continue
+                
+            # Get availability for current day of week
+            availabilities = DoctorAvailability.objects.filter(
+                doctor=doctor,
+                day_of_week=current_date.weekday(),
+                is_available=True
+            )
+            
+            for availability in availabilities:
+                slots = availability.generate_slots(current_date)
+                
+                for slot_time in slots:
+                    # Create slot if it doesn't exist
+                    slot, created = AppointmentSlot.objects.get_or_create(
+                        doctor=doctor,
+                        date=current_date,
+                        start_time=slot_time.time(),
+                        end_time=(slot_time + timedelta(minutes=10)).time()
+                    )
+                    if created:
+                        slots_created += 1
+            
+            dates_processed += 1
+            current_date += timedelta(days=1)
+            
+        messages.success(
+            request, 
+            f'Successfully generated {slots_created} slots across {dates_processed} days'
+        )
+        return redirect('users:manage_availability')
+        
+    except Doctor.DoesNotExist:
+        messages.error(request, 'Doctor profile not found')
+        return redirect('users:dashboard')
+    except Exception as e:
+        print(f"Error generating slots: {str(e)}")
+        messages.error(request, f'Error generating slots: {str(e)}')
+        return redirect('users:manage_availability')
+
+@login_required
+def manage_leaves(request):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        
+        if request.method == 'POST':
+            start_date = request.POST.get('start_date')
+            end_date = request.POST.get('end_date')
+            reason = request.POST.get('reason', '')
+            
+            try:
+                leave = DoctorLeave.objects.create(
+                    doctor=doctor,
+                    start_date=start_date,
+                    end_date=end_date,
+                    reason=reason
+                )
+                messages.success(request, 'Leave added successfully')
+            except ValidationError as e:
+                messages.error(request, str(e))
+            except Exception as e:
+                messages.error(request, f'Error adding leave: {str(e)}')
+        
+        # Get upcoming leaves
+        upcoming_leaves = DoctorLeave.objects.filter(
+            doctor=doctor,
+            end_date__gte=timezone.now().date()
+        ).order_by('start_date')
+        
+        context = {
+            'upcoming_leaves': upcoming_leaves
+        }
+        return render(request, 'doctor/manage_leaves.html', context)
+        
+    except Doctor.DoesNotExist:
+        messages.error(request, 'Doctor profile not found')
+        return redirect('users:dashboard')
+
+@login_required
+@user_is_doctor
+def billing_overview(request):
+    # Logic for doctor's billing overview
+    total_appointments = Appointment.objects.filter(doctor=request.user.doctor).count()
+    total_billing = Billing.objects.filter(appointment__doctor=request.user.doctor).aggregate(total=models.Sum('amount'))['total'] or 0
+
+    context = {
+        'total_appointments': total_appointments,
+        'total_billing': total_billing,
+    }
+    return render(request, 'doctor/billing_overview.html', context)
+
+@login_required
+@user_is_doctor
+def report_overview(request):
+    # Logic for doctor's report overview
+    context = {
+        # Add report data here
+    }
+    return render(request, 'doctor/report_overview.html', context)
+
+@login_required
+def doctor_profile(request):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        if request.method == 'POST':
+            # Handle profile updates here
+            doctor.phone = request.POST.get('phone', doctor.phone)
+            doctor.specialization = request.POST.get('specialization', doctor.specialization)
+            doctor.save()
+            messages.success(request, 'Profile updated successfully')
+            return redirect('users:doctor_profile')
+            
+        context = {
+            'doctor': doctor,
+        }
+        return render(request, 'doctor/profile.html', context)
+        
+    except Doctor.DoesNotExist:
+        messages.error(request, 'Doctor profile not found')
+        return redirect('users:dashboard')
+
+

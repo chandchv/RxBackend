@@ -23,38 +23,52 @@ def login_view(request):
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
+        print(f"Login attempt for user: {username}")  # Debug print
+        
         user = authenticate(request, username=username, password=password)
         
         if user is not None:
             login(request, user)
+            print(f"User authenticated successfully: {user.username}")  # Debug print
             
             # Create or get token for API authentication
             token, _ = Token.objects.get_or_create(user=user)
             request.session['auth_token'] = token.key
 
             try:
-                # Check if the user is a doctor
-                if Doctor.objects.filter(user=user).exists():
-                    print("User is a doctor, redirecting to doctor dashboard")  # Debug print
+                # First check if user is admin/staff
+                if user.is_staff or user.is_superuser:
+                    print(f"User {username} is admin/staff")  # Debug print
+                    return redirect('users:clinic_admin_dashboard')
+                
+                # Then check if the user is a doctor
+                elif Doctor.objects.filter(user=user).exists():
+                    print(f"User {username} is a doctor")  # Debug print
                     return redirect('users:doctor_dashboard')
                 
-                # Check if the user is a patient
+                # Then check if the user is a patient
                 elif Patient.objects.filter(user=user).exists():
-                    print("User is a patient, redirecting to patient dashboard")  # Debug print
+                    print(f"User {username} is a patient")  # Debug print
                     return redirect('users:patient_dashboard')
                 
                 else:
-                    print("User has no specific role, redirecting to default dashboard")  # Debug print
-                    return redirect('users:dashboard')
+                    print(f"User {username} has no specific role")  # Debug print
+                    messages.warning(request, 'User has no assigned role.')
+                    return redirect('users:login')
 
             except Exception as e:
                 print(f"Error during login redirection: {str(e)}")  # Debug print
-                messages.error(request, 'Error during login. Please try again.')
+                messages.error(request, f'Error during login: {str(e)}')
                 return redirect('users:login')
         else:
+            print(f"Authentication failed for user: {username}")  # Debug print
             messages.error(request, 'Invalid username or password.')
     
-    return render(request, 'login.html')
+    # Show any messages in the template
+    return render(request, 'login.html', {
+        'next': request.GET.get('next', '')
+    })
+
 
 @csrf_exempt
 @api_view(['POST'])

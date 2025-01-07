@@ -45,8 +45,8 @@ from .doctor_views import (
     verify_doctor_api_view,
     save_doctor,
     get_doctors_list,
-    dashboard_view,
-    doctor_dashboard,
+    doctor_dashboard_view,
+    create_appointment,
 )
 
 __all__ = [

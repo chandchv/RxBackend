@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage Leaves{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-8">
+    <div class="bg-white shadow-lg rounded-lg p-6">
+        <h2 class="text-2xl font-bold mb-6">Manage Leaves</h2>
+
+        <form method="POST" class="space-y-4">
+            {% csrf_token %}
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Start Date *</label>
+                    <input type="date" name="start_date" required
+                           min="{{ today|date:'Y-m-d' }}"
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">End Date *</label>
+                    <input type="date" name="end_date" required
+                           min="{{ today|date:'Y-m-d' }}"
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                </div>
+
+                <div class="col-span-2">
+                    <label class="block text-sm font-medium text-gray-700">Reason</label>
+                    <textarea name="reason" rows="3"
+                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                </div>
+            </div>
+
+            <div class="mt-6">
+                <button type="submit" 
+                        class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+                    Add Leave
+                </button>
+            </div>
+        </form>
+
+        <!-- Upcoming Leaves -->
+        <div class="mt-8">
+            <h3 class="text-xl font-bold mb-4">Upcoming Leaves</h3>
+            <div class="grid grid-cols-1 gap-4">
+                {% for leave in upcoming_leaves %}
+                <div class="border rounded p-4">
+                    <p class="font-medium">{{ leave.start_date|date:"M d, Y" }} - {{ leave.end_date|date:"M d, Y" }}</p>
+                    {% if leave.reason %}
+                    <p class="text-gray-600">{{ leave.reason }}</p>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <p class="text-gray-500">No upcoming leaves scheduled</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -157,3 +157,13 @@ class PatientListSerializer(serializers.ModelSerializer):
             validated_data['patient_id'] = patient_id
         
         return Patient.objects.create(**validated_data)
+    
+class MedicalHistorySerializer(serializers.ModelSerializer):
+    patient_name = serializers.CharField(source='patient.user.get_full_name', read_only=True)
+    doctor_name = serializers.CharField(source='doctor.name', read_only=True)
+    
+    class Meta:
+        model = Patient
+        fields = ['id', 'patient_name', 'doctor_name', 'appointment', 'diagnosis', 'treatment', 'created_at']
+    
+   

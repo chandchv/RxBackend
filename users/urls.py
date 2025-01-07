@@ -1,4 +1,6 @@
 from django.urls import path, include
+
+from .views import doctor_views, staff_views, admin_views
 from .views import auth_views
 from .views import (
     signup_view,
@@ -19,6 +21,8 @@ from .views import (
     api_views,
     admin_views,
     pdf_views,
+    billing_views,
+    report_views,
 )
 
 from .views.drugs_views import (
@@ -52,6 +56,8 @@ from .views.appointment_views import (
     appointments_view,
     appointment_detail,
     appointment_delete,
+    update_appointment_status,
+    appointment_edit,
 )
 from .views.patient_views import (
     create_patient,
@@ -86,6 +92,7 @@ from .views.clinic_admin_views import (
     staff_list,
     edit_staff,
     toggle_staff_status,
+    doctor_details,
 )
 
 from .views.auth_views import (
@@ -108,6 +115,10 @@ from .views.api_views import (
     get_clinic_doctors,
     get_clinic_staff,
 )
+
+from .views import dashboard_views
+from .views import appointment_views
+from .views import clinic_admin_views
 
 app_name = 'users'
 
@@ -136,29 +147,23 @@ urlpatterns = [
     path('appointment/<int:pk>/', AppointmentView.as_view(), name='appointment_detail'),
     path('appointment/<int:pk>/delete/', appointment_delete, name='appointment_delete'),
     
-    # Doctor URLs
-    path('doctor/dashboard/', doctor_views.doctor_dashboard, name='doctor_dashboard'),
-    path('doctors/', DoctorListView.as_view(), name='doctors_list'),
-    path('doctors/create/', DoctorCreateView.as_view(), name='create_doctor'),
-    path('doctors/<int:pk>/', DoctorDetailView.as_view(), name='doctor_detail'),
-    path('doctors/save/', save_doctor, name='save_doctor'),
-    path('doctors/verify/', verify_doctor_api_view, name='verify_doctor'),
-    path('doctors/appointments/', doctor_views.doctor_appointments, name='doctor_appointments'),
-    path('doctors/appointments/create/', doctor_views.create_appointment, name='create_appointment'),
-    path('doctors/appointments/<int:appointment_id>/', doctor_views.appointment_detail, name='appointment_detail'),
+   
     
     # Authentication & Profile URLs
+    path('', login_view, name='login'),
     path('login/', login_view, name='login'),
     path('signup/', signup_view, name='signup'),
     path('logout/', logout_view, name='logout'),
-    path('profile/', profile_view, name='profile'),
+    path('profile/', profile_view, name='profile'), 
     
     # Dashboard
-    path('dashboard/', dashboard_view, name='dashboard'),
-    path('patients/', patients_view, name='patients_list'),
-    path('patients/create/', create_patient, name='create_patient'),
-    path('appointments/', appointments_view, name='appointments'),
-    
+   
+    path('doctor/dashboard/', dashboard_views.doctor_dashboard, name='doctor_dashboard'),
+    path('patient/dashboard/', patient_views.patient_dashboard, name='patient_dashboard'),
+    path('doctor/admin/dashboard/', dashboard_views.admin_dashboard, name='admin_dashboard'),
+    path('clinic/admin/dashboard/', dashboard_views.admin_dashboard, name='clinic_admin_dashboard'),
+    path('dashboard/', dashboard_views.dashboard_redirect, name='dashboard'),
+
     #Prescription URLs
     #path('prescriptions/', get_prescriptions, name='prescriptions'),
     path('prescriptions/create/', create_prescription, name='create_prescription'),
@@ -189,7 +194,7 @@ urlpatterns = [
         path('clinic/doctors/', get_clinic_doctors, name='get_clinic_doctors'),
         path('clinic/staff/', get_clinic_staff, name='get_clinic_staff'),
         path('patient/appointments/', api_views.patient_appointments, name='patient_appointments'),
-        path('patient/prescriptions/', api_views.patient_prescriptions, name='patient_prescriptions'),
+        path('patient/prescriptions/', api_views.patient_prescriptions, name='api_patient_prescriptions'),
         path('patient/prescriptions_detail/<int:pk>/', api_views.patient_prescriptions_detail, name='patient_prescriptions_detail'),
 
         #path('doctors/', get_doctors, name='get_doctors'),
@@ -215,7 +220,7 @@ urlpatterns = [
     path('clinic-admin/staff/<int:staff_id>/toggle-status/', toggle_staff_status, name='toggle_staff_status'),
 
     # Doctor URLs
-    path('doctor/appointments/', doctor_views.doctor_appointments, name='doctor_appointments'),
+    path('doctor/appointments/', doctor_views.doctor_appointments_view, name='doctor_appointments_view'),
     path('doctor/appointments/create/', doctor_views.create_appointment, name='doctor_create_appointment'),
     path('doctor/signup/', doctor_signup_view, name='doctor_signup'),
     path('doctor/signup/api/', doctor_signup_api, name='doctor_signup_api'),
@@ -223,15 +228,28 @@ urlpatterns = [
     path('doctor/patients/create/', patient_views.create_patient, name='create_patient'),
     path('doctor/patients/<int:patient_id>/', patient_views.patient_detail, name='patient_detail'),
     path('doctor/patients/<int:patient_id>/edit/', patient_views.patient_edit, name='patient_edit'),
+    path('doctor/profile/', doctor_views.doctor_profile, name='doctor_profile'),
+
+     # Doctor URLs
+    
+    #path('doctors/', DoctorListView.as_view(), name='doctors_list'),
+    path('doctors/create/', DoctorCreateView.as_view(), name='create_doctor'),
+    path('doctors/<int:pk>/', DoctorDetailView.as_view(), name='doctor_detail'),
+    path('doctors/save/', save_doctor, name='save_doctor'),
+    path('doctors/verify/', verify_doctor_api_view, name='verify_doctor'),
+    
+    path('doctors/appointments/create/', doctor_views.create_appointment, name='create_appointment'),
+    path('doctors/appointments/<int:appointment_id>/', doctor_views.appointment_detail, name='appointment_detail'),
+
     
     # Patient URLs
     path('patient/signup/', patient_signup_view, name='patient_signup'),
     path('patient/signup/api/', patient_signup_api, name='patient_signup_api'),
-    path('patient/dashboard/', patient_dashboard, name='patient_dashboard'),
+    path('patient/dashboard/', patient_views.patient_dashboard, name='patient_dashboard'),
     path('patient/prescriptions/', patient_prescriptions, name='patient_prescriptions'),  
     path('patient/prescriptions/<int:pk>/', prescription_detail, name='prescription_detail'),
     path('patient/appointments/create/', patient_views.patient_create_appointment, name='patient_create_appointment'),
-   
+    path('patient/profile/', patient_views.patient_profile, name='patient_profile'),
     
     
     # Prescription URLs
@@ -264,13 +282,13 @@ urlpatterns = [
     
     path('admin/dashboard/', admin_views.admin_dashboard, name='admin_dashboard'),
     path('api/drug-suggestions/', drug_suggestions, name='drug_suggestions'),
-    path('api/patients/prescriptions/', PatientPrescriptionsView.as_view(), name='patient_prescriptions'),
+    path('api/patients/prescriptions/', PatientPrescriptionsView.as_view(), name='apiPresc_patient_prescriptions'),
     path('api/patients/prescriptions/create/', CreatePrescriptionView.as_view(), name='create_prescription'),
     path('patient/prescriptions/', PrescriptionListView.as_view(), name='patient_prescriptions_web'),
     
     # Patient API endpoints
     path('api/patient/me/', api_views.patient_me, name='patient_me'),
-    path('api/patients/prescriptions/', api_views.patient_prescriptions, name='patient_prescriptions'),
+    path('api/patients/prescriptions/', api_views.patient_prescriptions, name='apiviewpatient_prescriptions'),
     
     # Doctor API endpoints
     path('api/doctor/me/', api_views.doctor_me, name='doctor_me'),
@@ -293,4 +311,28 @@ urlpatterns = [
     path('verify-doctor/', auth_views.verify_doctor_api, name='verify_doctor'),
     path('api/doctor/patients/', api_views.doctor_patients, name='doctor_patients'),
     path('doctor/create-patient/', doctor_views.create_patient_doctor, name='create_patient_doctor'),
+    path('doctor/availability/', doctor_views.manage_availability, name='manage_availability'),
+    path('doctor/generate-slots/', doctor_views.generate_slots, name='generate_slots'),
+    path('doctor/leaves/', doctor_views.manage_leaves, name='manage_leaves'),
+    path('profile/setup/', dashboard_views.profile_setup, name='profile_setup'),
+    path('patient/medical-history/', 
+         patient_views.patient_medical_history, 
+         name='patient_medical_history'),
+    path('api/patient/medical-history/', api_views.patient_medical_history_api, name='patient_medical_history_api'),
+    path('billing/<int:billing_id>/', billing_views.billing_detail, name='billing_detail'),
+    path('reports/monthly/', report_views.generate_report, name='monthly_report'),
+    path('doctor/billing/', doctor_views.billing_overview, name='doctor_billing_overview'),
+    path('doctor/reports/', doctor_views.report_overview, name='doctor_report_overview'),
+    path('staff/billing/', staff_views.billing_overview, name='staff_billing_overview'),
+    path('admin/billing/', admin_views.billing_overview, name='admin_billing_overview'),
+    path('clinic_admin/appointments/create/', appointment_views.admin_create_appointment, name='admin_create_appointment'),
+    path('appointments/<int:appointment_id>/update-status/', 
+         appointment_views.update_appointment_status, 
+         name='update_appointment_status'),
+    path('appointments/<int:appointment_id>/', appointment_views.appointment_detail, name='appointment_detail'),
+    path('appointments/<int:appointment_id>/delete/', appointment_views.appointment_delete, name='appointment_delete'),
+    path('appointments/<int:appointment_id>/edit/', appointment_views.appointment_edit, name='appointment_edit'),
+    path('doctor/<int:doctor_id>/details/', 
+         clinic_admin_views.doctor_details, 
+         name='doctor_details'),
 ]

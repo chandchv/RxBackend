@@ -1177,3 +1177,20 @@ a.deletelink:focus, a.deletelink:hover {
     color: var(--body-fg);
     background-color: var(--body-bg);
 }
+.button {
+    display: inline-block;
+    text-align: center;
+    text-decoration: none;
+    transition: background-color 0.3s ease;
+}
+
+.button-text {
+    font-size: 1.25rem; /* Increase font size */
+    font-weight: bold;  /* Make text bold */
+    color: #ffffff;     /* Ensure text color is white for contrast */
+    padding: 0.5rem 0;  /* Add padding for better spacing */
+}
+
+.button:hover .button-text {
+    color: #ffffff;     /* Ensure text color remains white on hover */
+}
