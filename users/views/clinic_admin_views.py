@@ -43,7 +43,8 @@ def clinic_profile(request):
     """View and update clinic profile"""
     user_profile = request.user.userprofile
     clinic = user_profile.clinic
-    
+    profile = user_profile.profile
+
     if request.method == 'POST':
         if not clinic:
             # Create new clinic
@@ -80,12 +81,8 @@ def generate_random_password(length=12):
 @login_required
 def add_doctor(request):
     """Add new doctor view"""
-    clinic = request.user.userprofile.clinic
+    clinic = request.user.profile.clinic
     
-    if not clinic:
-        messages.error(request, "Please set up your clinic first.")
-        return redirect('users:clinic_profile')
-        
     if request.method == 'POST':
         try:
             # Get verification data
@@ -143,8 +140,12 @@ def add_doctor(request):
                     doctor.profile_picture = request.FILES['profile_picture']
                     doctor.save()
             
-            messages.success(request, f'Doctor added successfully! Initial password: {random_password}')
-            return redirect('users:doctors_list')
+            messages.success(request, 'Doctor added successfully!')
+            # Store password in session temporarily
+            request.session['initial_password'] = random_password
+            
+            # Redirect to doctor details page
+            return redirect('users:doctor_details', doctor_id=doctor.id)
             
         except ValueError as e:
             messages.error(request, str(e))
@@ -170,7 +171,8 @@ def doctors_list(request):
 def add_staff(request):
     """Add new staff member"""
     clinic = request.user.userprofile.clinic
-    
+    profile = request.user.profile
+
     if not clinic:
         messages.error(request, "Please set up your clinic first.")
         return redirect('users:clinic_profile')
@@ -306,6 +308,8 @@ def verify_doctor_credentials(request):
     """Verify doctor credentials during addition"""
     try:
         import json
+        import re
+        from datetime import datetime
         data = json.loads(request.body)
         
         # Format the data for verification
@@ -319,22 +323,37 @@ def verify_doctor_credentials(request):
         print("Doctor details:", doctor_details)
         
         # Import and call verification function
-        #from ..scripts.scrapeGpt1 import verify_doctor as verify_doctor_api
         success, result = verify_doctor_api(doctor_details)
         
-        print("\n=== Verification Response ===")
-        print(f"Success: {success}")
-        print(f"Result: {result}")
-        
         if success and isinstance(result, dict):
+            # Parse license number and registration date
+            license_info = result.get('registration_number', '')
+            
+            # Extract license number and date using regex
+            license_match = re.search(r'(\d+)\s+Date of Reg\.\s+(\d{2}/\d{2}/\d{4})', license_info)
+            
+            if license_match:
+                license_number = license_match.group(1)
+                reg_date = license_match.group(2)
+                
+                # Convert date string to proper format
+                try:
+                    reg_date_obj = datetime.strptime(reg_date, '%d/%m/%Y')
+                    formatted_reg_date = reg_date_obj.strftime('%Y-%m-%d')
+                except ValueError:
+                    formatted_reg_date = None
+            else:
+                license_number = license_info
+                formatted_reg_date = None
+            
             return JsonResponse({
                 'verified': True,
                 'verification_data': {
                     'name': result.get('name', ''),
                     'father_name': result.get('father_name', ''),
                     'date_of_birth': result.get('date_of_birth', ''),
-                    'registration_number': result.get('registration_number', ''),
-                    'registration_date': result.get('registration_date', ''),
+                    'registration_number': license_number.strip(),  # Clean license number
+                    'registration_date': formatted_reg_date,  # Add parsed registration date
                     'state_council': result.get('state_council', ''),
                     'qualification': result.get('qualification', ''),
                     'qualification_year': result.get('qualification_year', ''),
@@ -354,3 +373,14 @@ def verify_doctor_credentials(request):
             'verified': False,
             'message': f"Error during verification: {str(e)}"
         })
+
+@login_required
+def doctor_details(request, doctor_id):
+    """View doctor details"""
+    doctor = get_object_or_404(Doctor, id=doctor_id)
+    
+    context = {
+        'doctor': doctor,
+        'initial_password': request.session.pop('initial_password', None)  # Get and remove password from session
+    }
+    return render(request, 'clinic_admin/doctor_details.html', context)

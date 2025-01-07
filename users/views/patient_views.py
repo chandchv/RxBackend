@@ -165,7 +165,6 @@ def patient_edit(request, patient_id):
 @login_required
 def patient_create_appointment(request):
     try:
-        # Verify the user is a patient
         patient = Patient.objects.get(user=request.user)
         
         if request.method == 'POST':
@@ -179,15 +178,17 @@ def patient_create_appointment(request):
                 if Appointment.objects.filter(
                     doctor=appointment.doctor,
                     appointment_date=appointment.appointment_date,
+                    appointment_time=appointment.appointment_time,  # Add time check
                     status='scheduled'
                 ).exists():
                     messages.error(request, 'This time slot is already booked. Please select another time.')
                 else:
                     appointment.save()
                     messages.success(request, 'Appointment scheduled successfully!')
-                    return redirect('users:patient_appointments')
+                    return redirect('users:patient_dashboard')
             else:
                 messages.error(request, 'Invalid form submission. Please check the data.')
+                print(form.errors)  # For debugging
         else:
             form = AppointmentForm_patient()
 
@@ -334,4 +335,53 @@ def prescription_detail(request, pk):
         if hasattr(request.user, 'doctor'):
             return redirect('users:doctor_dashboard')
         return redirect('users:patient_dashboard')
+
+@login_required
+def patient_medical_history(request):
+    try:
+        patient = Patient.objects.get(user=request.user)
+        
+        # Get all past appointments
+        past_appointments = Appointment.objects.filter(
+            patient=patient,
+            appointment_date__lt=timezone.now().date()
+        ).order_by('-appointment_date')
+        
+        # Get all prescriptions
+        prescriptions = Prescription.objects.filter(
+            patient=patient
+        ).order_by('-date')
+        
+        context = {
+            'patient': patient,
+            'past_appointments': past_appointments,
+            'prescriptions': prescriptions,
+        }
+        
+        return render(request, 'patient/medical_history.html', context)
+        
+    except Patient.DoesNotExist:
+        messages.error(request, 'Patient profile not found')
+        return redirect('users:dashboard')
+
+@login_required
+def patient_profile(request):
+    try:
+        patient = Patient.objects.get(user=request.user)
+        if request.method == 'POST':
+            # Handle profile updates here
+            patient.phone = request.POST.get('phone', patient.phone)
+            patient.address = request.POST.get('address', patient.address)
+            patient.save()
+            messages.success(request, 'Profile updated successfully')
+            return redirect('users:patient_profile')
+            
+        context = {
+            'patient': patient,
+        }
+        return render(request, 'patient/profile.html', context)
+        
+    except Patient.DoesNotExist:
+        messages.error(request, 'Patient profile not found')
+        return redirect('users:dashboard')
 

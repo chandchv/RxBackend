@@ -2,6 +2,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.utils import timezone
 from ..models import Doctor, Staff, Patient, Appointment
+from ..decorators import user_is_admin
 
 @login_required
 def admin_dashboard(request):
@@ -19,3 +20,14 @@ def admin_dashboard(request):
     }
     
     return render(request, 'clinic_admin/admin_dashboard.html', context) 
+
+@login_required
+@user_is_admin
+def billing_overview(request):
+    # Logic for admin's billing overview
+    context = {
+        'total_patients': 0,  # Replace with actual logic
+        'total_appointments': 0,  # Replace with actual logic
+        'total_billing': 0,  # Replace with actual logic
+    }
+    return render(request, 'admin/billing_overview.html', context) 

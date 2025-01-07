@@ -1,44 +1,115 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
-from ..models import Doctor, Appointment
-from django.db.models import Q
+from django.utils import timezone
+from ..models import Doctor, Patient, Appointment, Staff, ActivityLog
+from datetime import datetime, timedelta
+from django.contrib import messages
+import logging
+
+logger = logging.getLogger(__name__)
 
 @login_required
-def dashboard_view(request):
-    print("\n=== DASHBOARD VIEW STARTED ===")
-    
-    # Get all verified doctors - remove any additional filters
-    doctors = Doctor.objects.all()
-    print(f"Total doctors in database: {doctors.count()}")
-    
-    # Print raw doctor data
-    for doc in doctors:
-        print(f"Doctor in DB - ID: {doc.id}, Name: {doc.name}, Verified: {doc.verified}")
-    
-    # Format the doctors list
-    formatted_doctors = []
-    for doctor in doctors:
-        doctor_info = {
-            'id': doctor.id,
-            'name': doctor.name,
-            'specialization': doctor.specialization or 'General Practice',
-            'medical_council': doctor.medical_council,
-            'license_number': doctor.license_number
+def doctor_dashboard(request):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        today = timezone.now().date()
+        
+        context = {
+            'doctor': doctor,
+            'today_appointments': Appointment.objects.filter(
+                doctor=doctor,
+                appointment_date=today
+            ).order_by('appointment_time'),
+            'today_appointments_count': Appointment.objects.filter(
+                doctor=doctor,
+                appointment_date=today
+            ).count(),
+            'total_patients': Patient.objects.filter(clinic=doctor.clinic).count(),
+            'pending_appointments': Appointment.objects.filter(
+                doctor=doctor,
+                status='scheduled'
+            ).count()
         }
-        formatted_doctors.append(doctor_info)
-        print(f"Formatted doctor: {doctor_info}")
+        return render(request, 'doctor/dashboard.html', context)
+    except Doctor.DoesNotExist:
+        return redirect('users:dashboard')
+
+
+
+@login_required
+def admin_dashboard(request):
+    if not request.user.is_staff:
+        return redirect('users:dashboard')
     
-    # Get appointments
-    appointments = Appointment.objects.filter(
-        Q(patient__user=request.user) | Q(doctor__user=request.user)
-    ).order_by('-appointment_date')
+    today = timezone.now().date()
     
     context = {
-        'doctors': formatted_doctors,
-        'appointments': appointments,
+        'total_doctors': Doctor.objects.count(),
+        'total_patients': Patient.objects.count(),
+        'total_staff': Staff.objects.count(),
+        'today_appointments': Appointment.objects.filter(
+            appointment_date=today
+        ).count(),
+        'recent_activities': ActivityLog.objects.all().order_by('-timestamp')[:10]
     }
+    return render(request, 'doctor/admin/dashboard.html', context)
+
+@login_required
+def dashboard_redirect(request):
+    """Redirects users to their appropriate dashboard based on their role"""
+    logger.info(f"User {request.user.username} accessing dashboard redirect")
     
-    print(f"Number of doctors being sent to template: {len(formatted_doctors)}")
-    print("=== DASHBOARD VIEW COMPLETED ===\n")
+    # First check if user is authenticated
+    if not request.user.is_authenticated:
+        logger.warning("Unauthenticated user attempting to access dashboard")
+        return redirect('login')
+    if request.user.is_authenticated:
+        return redirect('users:clinic_admin_dashboard')
+    # Check if user is staff/admin
+    if request.user.is_staff:
+        logger.info(f"Staff user {request.user.username} redirecting to admin dashboard")
+        return redirect('users:clinic_admin_dashboard')
     
-    return render(request, 'dashboard.html', context) 
+    # Check if user is a doctor
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        logger.info(f"Doctor {doctor.name} redirecting to doctor dashboard")
+        return redirect('users:doctor_dashboard')
+    except Doctor.DoesNotExist:
+        logger.debug(f"User {request.user.username} is not a doctor")
+    
+    # Check if user is a patient
+    try:
+        patient = Patient.objects.get(user=request.user)
+        logger.info(f"Patient {patient.get_full_name()} redirecting to patient dashboard")
+        return redirect('users:patient_dashboard')
+    except Patient.DoesNotExist:
+        logger.warning(f"User {request.user.username} has no associated patient profile")
+    
+    # If no role is found, redirect to a default page
+    logger.warning(f"No role found for user {request.user.username}")
+    messages.warning(request, 'No user profile found. Please contact support.')
+    return redirect('users:profile_setup')
+
+# Add a new view for profile setup
+def profile_setup(request):
+    if request.method == 'POST':
+        # Handle profile creation
+        try:
+            patient = Patient.objects.create(
+                user=request.user,
+                first_name=request.POST.get('first_name'),
+                last_name=request.POST.get('last_name'),
+                date_of_birth=request.POST.get('date_of_birth'),
+                gender=request.POST.get('gender'),
+                phone_number=request.POST.get('phone_number'),
+                email=request.POST.get('email'),
+                address=request.POST.get('address'),
+                pincode=request.POST.get('pincode')
+            )
+            messages.success(request, 'Profile created successfully!')
+            return redirect('users:patient_dashboard')
+        except Exception as e:
+            messages.error(request, f'Error creating profile: {str(e)}')
+    
+    return render(request, 'patient/profile_setup.html') 

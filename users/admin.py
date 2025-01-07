@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
 from django.utils.html import format_html
-from .models import Clinic, Doctor, Staff, UserProfile, Patient, Appointment, Prescription, PrescriptionItem, ClinicAdmin
+from .models import Clinic, Doctor, UserProfile, Patient, Appointment, Prescription, PrescriptionItem, ClinicAdmin
 
 # First unregister if models are already registered
 try:
@@ -59,21 +59,6 @@ class DoctorAdmin(admin.ModelAdmin):
     def verify_doctors(self, request, queryset):
         queryset.update(verified=True)
     verify_doctors.short_description = "Mark selected doctors as verified"
-
-@admin.register(Staff)
-class StaffAdmin(admin.ModelAdmin):
-    list_display = ('get_full_name', 'role', 'clinic', 'get_is_active')
-    list_filter = ('role', 'clinic')
-    search_fields = ('user__first_name', 'user__last_name', 'user__email')
-    
-    def get_full_name(self, obj):
-        return obj.user.get_full_name()
-    get_full_name.short_description = 'Name'
-    
-    def get_is_active(self, obj):
-        return obj.user.is_active
-    get_is_active.boolean = True
-    get_is_active.short_description = 'Active'
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):

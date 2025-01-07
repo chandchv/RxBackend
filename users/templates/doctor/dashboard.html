@@ -3,181 +3,106 @@
 {% block title %}Doctor Dashboard{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 py-8">
-    <!-- Welcome Section -->
-    <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
-        <h1 class="text-2xl font-bold text-gray-900">Welcome, Dr. {{ doctor.name }}</h1>
-        <p class="text-gray-600">{{ today|date:"l, F j, Y" }}</p>
-    </div>
-
+<div class="container mx-auto px-4 py-8">
     <!-- Stats Overview -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-medium text-gray-900">Today's Appointments</h3>
-            <p class="text-3xl font-bold text-blue-600">{{ total_patients_today }}</p>
-            <p class="text-sm text-gray-500">{{ completed_today }} completed</p>
+            <h3 class="text-lg font-semibold text-gray-700">Today's Appointments</h3>
+            <p class="text-3xl font-bold text-blue-600">{{ today_appointments_count }}</p>
         </div>
-
         <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-medium text-gray-900">Total Patients</h3>
-            <p class="text-3xl font-bold text-green-600">{{ patients }}</p>
-            
-            
-            <a href="{% url 'users:patients_list' %}" 
-            class="block text-blue-600 hover:text-blue-800">
-                View All Patients
-            </a>
+            <h3 class="text-lg font-semibold text-gray-700">Total Patients</h3>
+            <p class="text-3xl font-bold text-green-600">{{ total_patients }}</p>
         </div>
-
         <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-medium text-gray-900">Quick Actions</h3>
-            <div class="mt-4 space-y-2">
-                <a href="{% url 'users:doctor_create_appointment' %}" 
-                   class="block text-blue-600 hover:text-blue-800">
-                    + New Appointment
-                </a>
-                <a href="{% url 'users:patients_list' %}" 
-                   class="block text-blue-600 hover:text-blue-800">
-                    View All Patients
-                </a>
-                <a href="{% url 'users:create_patient_doctor' %}" 
-                   class="block text-blue-600 hover:text-blue-800">
-                    + New Patient
-                </a>
-            </div>
+            <h3 class="text-lg font-semibold text-gray-700">Pending Appointments</h3>
+            <p class="text-3xl font-bold text-yellow-600">{{ pending_appointments }}</p>
         </div>
     </div>
 
-    <!-- Today's Appointments -->
-    <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
-        <h2 class="text-xl font-bold mb-4">Today's Appointments</h2>
-        {% if todays_appointments %}
-        <div class="space-y-4">
-            {% for appointment in todays_appointments %}
-            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div>
-                    <p class="font-medium">{{ appointment.patient.get_full_name }}</p>
-                    <p class="text-sm text-gray-600">{{ appointment.appointment_date|time:"g:i A" }}</p>
-                </div>
-                <div class="flex space-x-4">
-                    <a href="{% url 'users:patient_detail' appointment.patient.id %}" 
-                       class="text-blue-600 hover:text-blue-800">View Patient</a>
-                    {% if appointment.status == 'scheduled' %}
-                    <button onclick="updateAppointmentStatus('{{ appointment.id }}', 'completed')"
-                            class="text-green-600 hover:text-green-800">
-                        Mark Complete
-                    </button>
+    <!-- Quick Actions -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <a href="{% url 'users:create_patient_doctor' %}" 
+           class="bg-blue-300 hover:bg-blue-600 text-bold rounded-lg p-4 text-center">
+            <i class="fas fa-user-plus mb-2"></i>
+            <span class="block">Add New Patient</span>
+        </a>
+        <a href="{% url 'users:manage_availability' %}" 
+           class="bg-green-300 hover:bg-green-600 text-white rounded-lg p-4 text-center">
+            <i class="fas fa-calendar-alt mb-2"></i>
+            <span class="block">Manage Schedule</span>
+        </a>
+        <a href="{% url 'users:create_appointment' %}" 
+           class="bg-purple-300 hover:bg-purple-600 text-white rounded-lg p-4 text-center">
+            <i class="fas fa-calendar-check mb-2"></i>
+            <span class="block">Create Appointments</span>
+        </a>
+        <a href="{% url 'users:doctor_appointments_view' %}" 
+           class="bg-purple-300 hover:bg-purple-600 text-white rounded-lg p-4 text-center">
+            <i class="fas fa-calendar-check mb-2"></i>
+            <span class="block">View Appointments</span>
+        </a>
+        <a href="{% url 'users:patients_list' %}" 
+           class="bg-indigo-300 hover:bg-indigo-600 text-white rounded-lg p-4 text-center">
+            <i class="fas fa-users mb-2"></i>
+            <span class="block">Patient List</span>
+        </a>
+    </div>
+
+    <!-- Today's Schedule -->
+    <div class="bg-white rounded-lg shadow p-6 mb-8">
+        <h2 class="text-xl font-bold mb-4">Today's Schedule Total: {{ today_appointments_count }}</h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% if today_appointments %}
+                        {% for appointment in today_appointments %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {{ appointment.appointment_time|time:"H:i" }}
+                            </td>
+                            <td class="px-6 py-4">
+                                {{ appointment.patient.get_full_name }}
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                           {% if appointment.status == 'scheduled' %}bg-yellow-100 text-yellow-800
+                                           {% elif appointment.status == 'completed' %}bg-green-100 text-green-800
+                                           {% else %}bg-red-100 text-red-800{% endif %}">
+                                    {{ appointment.get_status_display }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <a href="{% url 'users:appointment_detail' appointment.id %}" 
+                                   class="text-blue-600 hover:text-blue-900">View</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                                No appointments scheduled for today ({{ today_date|date:"Y-m-d" }})
+                            </td>
+                        </tr>
                     {% endif %}
-                </div>
-            </div>
-            {% endfor %}
+                </tbody>
+            </table>
         </div>
-        {% else %}
-        <p class="text-gray-500 text-center">No appointments scheduled for today</p>
-        {% endif %}
     </div>
 
-    <!-- Upcoming Appointments -->
-    <div class="bg-white rounded-lg shadow-lg p-6">
-        <h2 class="text-xl font-bold mb-4">Upcoming Appointments</h2>
-        {% if upcoming_appointments %}
-        <div class="space-y-4">
-            {% for appointment in upcoming_appointments %}
-            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div>
-                    <p class="font-medium">{{ appointment.patient.get_full_name }}</p>
-                    <p class="text-sm text-gray-600">
-                        {{ appointment.appointment_date|date:"l, F j" }} at 
-                        {{ appointment.appointment_date|time:"g:i A" }}
-                    </p>
-                </div>
-                <a href="{% url 'users:patient_detail' appointment.patient.id %}" 
-                    class="text-blue-600 hover:text-blue-800">
-                    View Patient
-                </a>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p class="text-gray-500 text-center">No upcoming appointments</p>
-        {% endif %}
-    </div>
+    <nav>
+        <ul>
+            <li><a href="{% url 'users:doctor_billing_overview' %}">Billing Overview</a></li>
+            <li><a href="{% url 'users:doctor_report_overview' %}">Report Overview</a></li>
+        </ul>
+    </nav>
 </div>
-
-<script>
-async function patients_list() {
-    const response = await fetch('/api/patients/', {
-        headers: {
-            'Authorization': `Bearer ${getToken()}`,
-            'Content-Type': 'application/json',
-        }
-    });
-    const patients = await response.json();
-    console.log(patients);
-    return patients;
-}
-async function fetchAppointments() {
-    try {
-        const response = await fetch('/api/appointments/', {
-            headers: {
-                'Authorization': `Bearer ${getToken()}`,
-                'Content-Type': 'application/json',
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error('Failed to fetch appointments');
-        }
-        
-        const appointments = await response.json();
-        updateAppointmentsList(appointments);
-    } catch (error) {
-        console.error('Error:', error);
-    }
-}
-
-function updateAppointmentStatus(appointmentId, status) {
-    if (confirm('Are you sure you want to mark this appointment as complete?')) {
-        fetch(`/doctor/appointments/${appointmentId}/status/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
-            },
-            body: JSON.stringify({ status: status })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                window.location.reload();
-            } else {
-                alert('Error updating appointment status');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error updating appointment status');
-        });
-    }
-}
-function getToken() {
-    // Get the token from localStorage or wherever you store it
-    return localStorage.getItem('authToken');
-}
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-</script>
 {% endblock %} 

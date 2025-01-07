@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block title %}Monthly Report{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-2xl font-bold mb-6">Monthly Report</h1>
+    <div class="bg-white rounded-lg shadow p-6">
+        <p><strong>Total Patients:</strong> {{ total_patients }}</p>
+        <p><strong>Total Appointments:</strong> {{ total_appointments }}</p>
+        <p><strong>Total Billing:</strong> ${{ total_billing }}</p>
+    </div>
+</div>
+{% endblock %} 

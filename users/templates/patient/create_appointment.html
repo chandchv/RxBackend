@@ -40,14 +40,21 @@
                     <label for="id_appointment_date" class="block text-sm font-medium text-gray-700">
                         Preferred Date and Time
                     </label>
-                    <input type="datetime-local" 
+                    <input type="date" 
                            name="appointment_date" 
                            id="id_appointment_date"
-                           min="{{ min_date }}T00:00"
+                           min="{{ min_date }}"
                            required
                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                 </div>
-
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Time</label>
+                    <input type="time" 
+                           name="appointment_time" 
+                           id="id_appointment_time"
+                           required
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"> 
+                </div>
                 <!-- Reason for Visit -->
                 <div>
                     <label for="id_reason" class="block text-sm font-medium text-gray-700">

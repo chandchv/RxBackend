@@ -9,4 +9,5 @@ urlpatterns = [
     path('', include('users.urls')),  # Remove the 'users/' prefix if it's causing conflicts
     path('login/', login_view, name='login'),
     path('', include(('users.urls', 'users'), namespace='users')),  # Make sure this line exists
+    path('users/', include('RxBackend.users.urls')),  # Ensure this line is present
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
