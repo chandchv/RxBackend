@@ -41,9 +41,9 @@ def clinic_admin_dashboard(request):
 @login_required
 def clinic_profile(request):
     """View and update clinic profile"""
-    user_profile = request.user.userprofile
+    user_profile = request.user.profile
     clinic = user_profile.clinic
-    profile = user_profile.profile
+    
 
     if request.method == 'POST':
         if not clinic:
@@ -170,8 +170,8 @@ def doctors_list(request):
 @login_required
 def add_staff(request):
     """Add new staff member"""
-    clinic = request.user.userprofile.clinic
-    profile = request.user.profile
+    clinic = request.user.profile.clinic
+    
 
     if not clinic:
         messages.error(request, "Please set up your clinic first.")
