@@ -224,49 +224,82 @@ def doctor_appointments_view(request):
 @login_required
 def create_appointment(request):
     try:
-        doctor = Doctor.objects.get(user=request.user)
+        print(f"User ID: {request.user.id}")  # Debug print
+        doctor = Doctor.objects.filter(user=request.user).first()
+        
+        if not doctor:
+            print("Doctor not found for user")  # Debug print
+            messages.error(request, 'Doctor profile not found. Please complete your profile setup.')
+            return redirect('users:doctor_profile')
+            
+        print(f"Doctor found: {doctor.name}")  # Debug print
+        
+        # Check if doctor has availability set up
+        has_availability = DoctorAvailability.objects.filter(doctor=doctor).exists()
+        if not has_availability:
+            print("No availability found for doctor")  # Debug print
+            messages.warning(request, 'Please set up your availability schedule first.')
+            return redirect('users:manage_availability')
+        
+        print("Doctor has availability")  # Debug print
         
         if request.method == 'POST':
             form = AppointmentForm(request.POST)
+            # Remove doctor field validation temporarily
+            form.fields['doctor'].required = False
+            
             if form.is_valid():
                 appointment = form.save(commit=False)
+                # Explicitly set the doctor
                 appointment.doctor = doctor
                 appointment.status = 'scheduled'
                 
-                # Check if slot is available
+                # Get form data
+                appointment_date = form.cleaned_data['appointment_date']
+                appointment_time = form.cleaned_data['appointment_time']
+                
+                print(f"Creating appointment for date: {appointment_date}, time: {appointment_time}")  # Debug print
+                
+                # Check if the selected time slot is available
                 existing_appointment = Appointment.objects.filter(
                     doctor=doctor,
-                    appointment_date=form.cleaned_data['appointment_date'],
-                    appointment_time=form.cleaned_data['appointment_time'],
+                    appointment_date=appointment_date,
+                    appointment_time=appointment_time,
                     status='scheduled'
                 ).exists()
                 
                 if existing_appointment:
                     messages.error(request, 'This time slot is already booked')
                 else:
-                    appointment.save()
-                    messages.success(request, 'Appointment scheduled successfully')
-                    return redirect('users:doctor_dashboard')
+                    try:
+                        appointment.save()
+                        print(f"Appointment saved successfully: {appointment.id}")  # Debug print
+                        messages.success(request, 'Appointment scheduled successfully')
+                        return redirect('users:doctor_dashboard')
+                    except Exception as save_error:
+                        print(f"Error saving appointment: {str(save_error)}")  # Debug print
+                        messages.error(request, f'Error saving appointment: {str(save_error)}')
             else:
                 print("Form errors:", form.errors)  # Debug print
                 messages.error(request, 'Please check the form data')
         else:
-            form = AppointmentForm()
+            # Pre-fill the doctor in the form
+            form = AppointmentForm(initial={'doctor': doctor})
+            form.fields['doctor'].initial = doctor
+            form.fields['doctor'].widget.attrs['disabled'] = True
             
         context = {
             'form': form,
-            'patients': Patient.objects.filter(clinic=doctor.clinic)
+            'patients': Patient.objects.filter(clinic=doctor.clinic),
+            'doctor_id': doctor.id,
+            'doctor': doctor
         }
         return render(request, 'doctor/create_appointment.html', context)
         
-    except Doctor.DoesNotExist:
-        messages.error(request, 'Doctor profile not found')
-        return redirect('users:dashboard')
     except Exception as e:
-        print(f"Error creating appointment: {str(e)}")
+        print(f"Error in create_appointment: {str(e)}")  # Debug print
         messages.error(request, 'Error scheduling appointment')
-        return redirect('users:doctor_appointments')
-  
+        return redirect('users:doctor_dashboard')
 
 @login_required
 def doctor_dashboard(request):
@@ -622,4 +655,110 @@ def doctor_profile(request):
         messages.error(request, 'Doctor profile not found')
         return redirect('users:dashboard')
 
+@login_required
+def doctor_create_appointment(request):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        print(f"Doctor ID: {doctor.id}")  # Debug print
+        
+        if request.method == 'POST':
+            print("POST data:", request.POST)  # Debug print
+            form = AppointmentForm(request.POST)
+            
+            if form.is_valid():
+                print("Form is valid")  # Debug print
+                appointment = form.save(commit=False)
+                appointment.status = 'scheduled'
+                
+                time_str = request.POST.get('appointment_time')
+                if time_str:
+                    appointment.appointment_time = datetime.strptime(time_str, '%H:%M').time()
+                    appointment.save()
+                    print(f"Appointment saved with doctor: {appointment.doctor.id}")  # Debug print
+                    messages.success(request, 'Appointment scheduled successfully!')
+                    return redirect('users:doctor_dashboard')
+                else:
+                    messages.error(request, 'Please select an appointment time.')
+            else:
+                print("Form errors:", form.errors)  # Debug print
+                messages.error(request, 'Invalid form submission. Please check the data.')
+        else:
+            form = AppointmentForm(initial={'doctor': doctor})
+
+        context = {
+            'form': form,
+            'doctor': doctor,
+            'min_date': timezone.now().date().isoformat(),
+        }
+        
+        return render(request, 'doctor/create_appointment.html', context)
+
+    except Doctor.DoesNotExist:
+        messages.error(request, 'Doctor profile not found.')
+        return redirect('users:dashboard')
+    except Exception as e:
+        print(f"Error in create_appointment: {str(e)}")
+        messages.error(request, f'Error creating appointment: {str(e)}')
+        return redirect('users:dashboard')
+
+@login_required
+def get_available_slots_doctor(request, doctor_id, date):
+    try:
+        doctor = Doctor.objects.get(id=doctor_id)
+        selected_date = datetime.strptime(date, '%Y-%m-%d').date()
+        current_date = timezone.now().date()
+        current_time = timezone.now().time()
+        
+        print(f"Generating slots for doctor: {doctor.name}, date: {date}")  # Debug print
+        
+        # Check if selected date is in the past
+        if selected_date < current_date:
+            return JsonResponse({
+                'error': 'Cannot schedule appointments for past dates',
+                'slots': []
+            })
+            
+        # Get all booked appointments for the selected date
+        booked_slots = Appointment.objects.filter(
+            doctor=doctor,
+            appointment_date=selected_date,
+            status='scheduled'
+        ).values_list('appointment_time', flat=True)
+        
+        # Generate time slots (9 AM to 5 PM, 30-minute intervals)
+        available_slots = []
+        slot_time = datetime.strptime('09:00', '%H:%M').time()
+        end_time = datetime.strptime('17:00', '%H:%M').time()
+        
+        while slot_time <= end_time:
+            # For current date, only show future time slots
+            if selected_date == current_date and slot_time <= current_time:
+                slot_time = (datetime.combine(datetime.today(), slot_time) + 
+                           timedelta(minutes=30)).time()
+                continue
+                
+            if slot_time not in booked_slots:
+                available_slots.append({
+                    'time': slot_time.strftime('%H:%M')
+                })
+            
+            # Update slot time
+            slot_time = (datetime.combine(datetime.today(), slot_time) + 
+                        timedelta(minutes=30)).time()
+        
+        print(f"Generated {len(available_slots)} available slots")  # Debug print
+        
+        return JsonResponse({
+            'slots': available_slots,
+            'doctor_name': doctor.name,
+            'date': date
+            
+        })
+        
+    except Exception as e:
+        print(f"Error generating slots: {str(e)}")
+        return JsonResponse({
+            'error': str(e),
+            'slots': []
+        }, status=400)
 

@@ -212,7 +212,8 @@ urlpatterns = [
     path('clinic-admin/doctors/verify/', verify_doctor_credentials, name='verify_doctor_credentials'),
     path('clinic-admin/doctors/<int:doctor_id>/edit/', edit_doctor, name='edit_doctor'),
     path('clinic-admin/doctors/<int:doctor_id>/delete/', delete_doctor, name='delete_doctor'),
-    
+    path('clinic-admin/staff/appointments/create/', staff_views.staff_create_appointment, name='staff_create_appointment'),
+
     # Staff management
     path('clinic-admin/staff/', staff_list, name='staff_list'),
     path('clinic-admin/staff/add/', add_staff, name='add_staff'),
@@ -335,4 +336,11 @@ urlpatterns = [
     path('doctor/<int:doctor_id>/details/', 
          clinic_admin_views.doctor_details, 
          name='doctor_details'),
+    path('api/available-slots/patient/<int:doctor_id>/<str:date>/', 
+         patient_views.get_available_slots_patient, 
+         name='get_available_slots_patient'),
+    path('api/available-slots/doctor/<int:doctor_id>/<str:date>/', 
+            doctor_views.get_available_slots_doctor, 
+         name='get_available_slots_doctor'),
+    path('doctor/appointments/create/', doctor_views.create_appointment, name='create_appointment'),
 ]

@@ -45,99 +45,81 @@ class PatientForm(forms.ModelForm):
             'gender': forms.Select(choices=[('M', 'Male'), ('F', 'Female'), ('O', 'Other')])
         }
 class AppointmentForm_patient(forms.ModelForm):
-    appointment_date = forms.DateField(
-        widget=forms.DateInput(attrs={
-            'type': 'date',
-            'class': 'form-control',
-            'min': timezone.now().strftime('%Y-%m-%d')
-        })
-    )
+    appointment_time = forms.TimeField(input_formats=['%H:%M'])
     
-    reason = forms.CharField(
-        widget=forms.Textarea(attrs={
-            'rows': 3,
-            'class': 'form-control',
-            'placeholder': 'Please describe your reason for visit'
-        })
-    )
-
     class Meta:
         model = Appointment
-        fields = ['doctor', 'appointment_date', 'reason']
-        widgets = {
-            'doctor': forms.Select(attrs={'class': 'form-control'})
-        }
-
-    def clean_appointment_date(self):
-        date = self.cleaned_data['appointment_date']
-        if date < timezone.now():
-            raise forms.ValidationError("Appointment date cannot be in the past")
-        return date
-    
-    def clean_appointment_time(self):
-        time = self.cleaned_data['appointment_time']
-        if time < timezone.now().time():
-            raise forms.ValidationError("Appointment time cannot be in the past")
-        return time
-
-
-class AppointmentForm(forms.ModelForm):
-    patient = forms.ModelChoiceField(
-        queryset=Patient.objects.all(),
-        required=True,  # Make it not required as it will be set automatically for patient users
-        widget=forms.Select(attrs={
-            'class': 'form-control'
-        })
-    )
-    
-    appointment_date = forms.DateField(
-        required=True,
-        widget=forms.DateInput(attrs={
-            'type': 'date',
-            'class': 'form-control',
-            'min': timezone.now().strftime('%Y-%m-%d')
-        })
-    )
-    
-    appointment_time = forms.TimeField(
-        required=True,
-        widget=forms.TimeInput(attrs={
-            'type': 'time',
-            'class': 'form-control'
-        })
-    )
-    
-    reason = forms.CharField(
-        required=True,
-        widget=forms.Textarea(attrs={
-            'rows': 3,
-            'class': 'form-control',
-            'placeholder': 'Please describe the reason for visit'
-        })
-    )
-
-    class Meta:
-        model = Appointment
-        fields = ['patient', 'doctor', 'appointment_date', 'appointment_time', 'reason']
+        fields = ['doctor', 'appointment_date', 'appointment_time', 'reason']
         widgets = {
             'appointment_date': forms.DateInput(attrs={'type': 'date'}),
-            'appointment_time': forms.TimeInput(attrs={'type': 'time'}),
-            'status': forms.Select(choices=Appointment.STATUS_CHOICES),
-            'reason': forms.Textarea(attrs={'rows': 3}),
-            'doctor': forms.Select(attrs={'class': 'form-control'})
         }
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Make fields optional initially - we'll handle required validation in the view
-        self.fields['doctor'].required = False
-        self.fields['patient'].required = True
-    def clean_appointment_date(self):
-        date = self.cleaned_data['appointment_date']
-        if date < timezone.now().date():
-            raise forms.ValidationError("Appointment date cannot be in the past")
-        return date
-    
 
+    def clean(self):
+        cleaned_data = super().clean()
+        appointment_date = cleaned_data.get('appointment_date')
+        appointment_time = cleaned_data.get('appointment_time')
+        
+        if appointment_date and appointment_time:
+            # Convert to date for comparison
+            today = timezone.now().date()
+            if appointment_date < today:
+                raise forms.ValidationError("Cannot schedule appointments in the past")
+        
+        return cleaned_data
+
+class AppointmentForm(forms.ModelForm):
+    doctor = forms.ModelChoiceField(
+        queryset=Doctor.objects.all(),
+        widget=forms.HiddenInput(),
+        required=True
+    )
+    appointment_time = forms.TimeField(required=False, widget=forms.HiddenInput())
+    
+    class Meta:
+        model = Appointment
+        fields = ['doctor', 'patient', 'appointment_date', 'appointment_time', 'reason']
+        widgets = {
+            'appointment_date': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'form-input w-full rounded-md'
+            }),
+            'patient': forms.Select(attrs={
+                'class': 'form-select w-full rounded-md'
+            }),
+            'reason': forms.Textarea(attrs={
+                'class': 'form-textarea w-full rounded-md',
+                'rows': 3
+            }),
+            'appointment_time': forms.TimeInput(attrs={
+                'class': 'form-time w-full rounded-md',
+                'type': 'time'
+            })
+        }
+
+    def __init__(self, *args, **kwargs):
+        doctor = kwargs.pop('doctor', None)
+        super().__init__(*args, **kwargs)
+        if doctor:
+            self.fields['doctor'].initial = doctor
+            self.fields['patient'].queryset = Patient.objects.filter(clinic=doctor.clinic)
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if commit:
+            instance.save()
+        return instance
+    def clean(self):
+        cleaned_data = super().clean()
+        appointment_date = cleaned_data.get('appointment_date')
+        appointment_time = cleaned_data.get('appointment_time')
+        
+        if appointment_date and appointment_time:
+            # Convert to date for comparison
+            today = timezone.now().date()
+            if appointment_date < today:
+                raise forms.ValidationError("Cannot schedule appointments in the past")
+        
+        return cleaned_data
 
 class DoctorForm(forms.ModelForm):
     class Meta:
@@ -172,3 +154,46 @@ class DoctorAvailabilityForm(forms.ModelForm):
             'start_time': forms.TimeInput(attrs={'type': 'time'}),
             'end_time': forms.TimeInput(attrs={'type': 'time'}),
         }
+
+class StaffAppointmentForm(forms.ModelForm):
+    doctor = forms.ModelChoiceField(
+        queryset=Doctor.objects.all(),
+        widget=forms.Select(attrs={
+            'class': 'form-select w-full rounded-md',
+            'required': True
+        })
+    )
+    appointment_time = forms.TimeField(required=False, widget=forms.HiddenInput())
+    
+    class Meta:
+        model = Appointment
+        fields = ['doctor', 'patient', 'appointment_date', 'appointment_time', 'reason']
+        widgets = {
+            'appointment_date': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'form-input w-full rounded-md'
+            }),
+            'patient': forms.Select(attrs={
+                'class': 'form-select w-full rounded-md'
+            }),
+            'reason': forms.Textarea(attrs={
+                'class': 'form-textarea w-full rounded-md',
+                'rows': 3
+            }),
+            'appointment_time': forms.TimeInput(attrs={
+                'class': 'form-time w-full rounded-md',
+                'type': 'time'
+            })
+        }
+
+    def __init__(self, *args, **kwargs):
+        clinic = kwargs.pop('clinic', None)
+        super().__init__(*args, **kwargs)
+        if clinic:
+            self.fields['doctor'].queryset = Doctor.objects.filter(clinic=clinic)
+            self.fields['patient'].queryset = Patient.objects.filter(clinic=clinic)
+    def clean(self):
+        cleaned_data = super().clean()
+        appointment_date = cleaned_data.get('appointment_date')
+        appointment_time = cleaned_data.get('appointment_time')
+        return cleaned_data

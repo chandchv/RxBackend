@@ -3,70 +3,115 @@
 {% block title %}Schedule Appointment{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto px-4 py-8">
-    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <h1 class="text-2xl font-bold text-gray-900">Schedule New Appointment</h1>
-        </div>
-
-        <div class="px-6 py-4">
-            <form method="POST" class="space-y-6">
-                {% csrf_token %}
+{% if doctor %}
+    <div class="max-w-2xl mx-auto px-4 py-8">
+        <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h1 class="text-2xl font-bold text-gray-900">Schedule New Appointment</h1>
                 
-                {% if messages %}
-                <div class="mb-4">
-                    {% for message in messages %}
-                    <div class="p-4 {% if message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %} rounded-lg">
-                        {{ message }}
+            </div>
+
+            <div class="px-6 py-4">
+                <form method="POST" class="max-w-lg">
+                    {% csrf_token %}
+                    <input type="hidden" name="doctor" value="{{ doctor.id }}">
+                    
+                    <div class="mb-4">
+                        {{ form.patient.errors }}
+                        <label for="{{ form.patient.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            Select Patient
+                        </label>
+                        {{ form.patient }}
                     </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-
-                {% if form.errors %}
-                <div class="mb-4">
-                    <div class="p-4 bg-red-100 text-red-700 rounded-lg">
-                        <ul>
-                            {% for field in form %}
-                                {% for error in field.errors %}
-                                    <li>{{ error }}</li>
-                                {% endfor %}
-                            {% endfor %}
-                        </ul>
-                    </div>
-                </div>
-                {% endif %}
-
-                <div>
-                    <label for="id_patient" class="block text-sm font-medium text-gray-700">Select Patient</label>
-                    {{ form.patient }}
-                </div>
-
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2">Appointment Date and Time</label>
-                    <div class="flex items-center space-x-2">
+                    
+                    <div class="mb-4">
+                        {{ form.appointment_date.errors }}
+                        <label for="{{ form.appointment_date.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            Appointment Date
+                        </label>
                         {{ form.appointment_date }}
-                        <span class="text-gray-600">at</span>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Available Time Slots</label>
+                        <div id="time-slots" class="grid grid-cols-4 gap-2">
+                            <!-- Slots will be populated here -->
+                        </div>
                         {{ form.appointment_time }}
                     </div>
-                </div>
-                
-
-                <div>
-                    <label for="id_reason" class="block text-sm font-medium text-gray-700">
-                        Reason for Visit
-                    </label>
-                    {{ form.reason }}
-                </div>
-
-                <div class="flex justify-end">
-                    <button type="submit"
-                            class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    
+                    <div class="mb-4">
+                        {{ form.reason.errors }}
+                        <label for="{{ form.reason.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            Reason for Visit
+                        </label>
+                        {{ form.reason }}
+                    </div>
+                    
+                    <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
                         Schedule Appointment
                     </button>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     </div>
-</div>
+{% else %}
+    <div class="max-w-2xl mx-auto px-4 py-8">
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+            <strong class="font-bold">Error!</strong>
+            <span class="block sm:inline">Doctor profile not found. Please complete your profile setup.</span>
+            <a href="{% url 'users:doctor_profile' %}" class="block mt-2 underline">Go to Profile Setup</a>
+        </div>
+    </div>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dateInput = document.getElementById('id_appointment_date');
+    const timeInput = document.getElementById('id_appointment_time');
+    const slotsContainer = document.getElementById('time-slots');
+    const doctorId = {{ request.user.doctor.id }};  // Get doctor ID from context
+
+    dateInput.addEventListener('change', function() {
+        const selectedDate = this.value;
+        if (!selectedDate) return;
+        
+        slotsContainer.innerHTML = '<p>Loading available slots...</p>';
+        
+        fetch(`/api/available-slots/doctor/${doctorId}/${selectedDate}/`)
+            .then(response => response.json())
+            .then(data => {
+                slotsContainer.innerHTML = '';
+                if (data.slots && data.slots.length > 0) {
+                    data.slots.forEach(slot => {
+                        const button = document.createElement('button');
+                        button.type = 'button';
+                        button.className = 'slot-button bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded m-1';
+                        button.textContent = slot.time;
+                        button.onclick = function() {
+                            // Remove active class from all buttons
+                            document.querySelectorAll('.slot-button').forEach(btn => {
+                                btn.classList.remove('bg-green-500');
+                                btn.classList.add('bg-blue-500');
+                            });
+                            // Add active class to clicked button
+                            this.classList.remove('bg-blue-500');
+                            this.classList.add('bg-green-500');
+                            // Set the time value
+                            timeInput.value = slot.time;
+                        };
+                        slotsContainer.appendChild(button);
+                    });
+                } else {
+                    slotsContainer.innerHTML = '<p>No available slots for this date</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                slotsContainer.innerHTML = '<p class="text-red-500">Error loading slots</p>';
+            });
+    });
+});
+
+</script>
 {% endblock %} 

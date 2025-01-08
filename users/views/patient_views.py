@@ -3,12 +3,16 @@ from django.shortcuts import render, redirect, get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from ..models import Patient, Doctor, Appointment, Prescription, PatientVitals
+from ..models import DoctorAvailability, Patient, Doctor, Appointment, Prescription, PatientVitals
 from ..forms import AppointmentForm, PatientForm, AppointmentForm_patient
 from ..serializers import PatientSerializer
 from django.contrib import messages
 from ..models import Patient, UserProfile
 from django.utils import timezone
+from datetime import datetime
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from datetime import timedelta
 
 @login_required
 def create_patient(request):
@@ -174,13 +178,19 @@ def patient_create_appointment(request):
                 appointment.patient = patient
                 appointment.status = 'scheduled'
                 
+                # Get form data
+                appointment_date = form.cleaned_data['appointment_date']
+                appointment_time = form.cleaned_data['appointment_time']
+                
                 # Check if the selected time slot is available
-                if Appointment.objects.filter(
+                existing_appointment = Appointment.objects.filter(
                     doctor=appointment.doctor,
-                    appointment_date=appointment.appointment_date,
-                    appointment_time=appointment.appointment_time,  # Add time check
+                    appointment_date=appointment_date,
+                    appointment_time=appointment_time,
                     status='scheduled'
-                ).exists():
+                ).exists()
+                
+                if existing_appointment:
                     messages.error(request, 'This time slot is already booked. Please select another time.')
                 else:
                     appointment.save()
@@ -188,7 +198,7 @@ def patient_create_appointment(request):
                     return redirect('users:patient_dashboard')
             else:
                 messages.error(request, 'Invalid form submission. Please check the data.')
-                print(form.errors)  # For debugging
+                print("Form errors:", form.errors)  # For debugging
         else:
             form = AppointmentForm_patient()
 
@@ -384,4 +394,61 @@ def patient_profile(request):
     except Patient.DoesNotExist:
         messages.error(request, 'Patient profile not found')
         return redirect('users:dashboard')
+
+@login_required
+@require_http_methods(["GET"])
+def get_available_slots_patient(request, doctor_id, date):
+    """API endpoint to get available slots for a doctor on a specific date"""
+    try:
+        doctor = get_object_or_404(Doctor, id=doctor_id)
+        selected_date = datetime.strptime(date, '%Y-%m-%d').date()
+        
+        # Get doctor's availability for the selected day
+        day_of_week = selected_date.weekday()
+        availability = DoctorAvailability.objects.filter(
+            doctor=doctor,
+            day_of_week=day_of_week,
+            is_available=True
+        ).first()
+        
+        if not availability:
+            return JsonResponse({
+                'slots': [],
+                'message': 'Doctor not available on this day'
+            })
+        
+        # Get booked appointments for this date
+        booked_slots = Appointment.objects.filter(
+            doctor=doctor,
+            appointment_date=selected_date,
+            status='scheduled'
+        ).values_list('appointment_time', flat=True)
+        
+        # Generate available slots
+        available_slots = []
+        start_time = availability.start_time
+        end_time = availability.end_time
+        
+        # Generate slots in 30-minute intervals
+        current_slot = datetime.combine(selected_date, start_time)
+        end_datetime = datetime.combine(selected_date, end_time)
+        
+        while current_slot < end_datetime:
+            slot_time = current_slot.time()
+            if slot_time not in booked_slots:
+                available_slots.append({
+                    'time': slot_time.strftime('%H:%M'),
+                    'available': True
+                })
+            current_slot += timedelta(minutes=30)
+        
+        return JsonResponse({
+            'slots': available_slots,
+            'doctor_name': doctor.name,
+            'date': date
+        })
+        
+    except Exception as e:
+        print(f"Error generating slots: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=400)
 

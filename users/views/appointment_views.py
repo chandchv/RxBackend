@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from ..models import Appointment, Patient, Doctor
+from ..models import Appointment, Patient, Doctor, DoctorAvailability
 from ..serializers import AppointmentSerializer
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpResponse, JsonResponse
@@ -10,9 +10,13 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib.auth.decorators import login_required
 from users.forms import AppointmentForm
 from django.contrib import messages
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.core.mail import send_mail
 from django.views.decorators.http import require_POST
+from rest_framework.decorators import api_view
+from django.utils.dateparse import parse_date
+from django.utils import timezone
+from django.views.decorators.http import require_http_methods
 
 class AppointmentView(APIView):
     permission_classes = [IsAuthenticated]
@@ -59,16 +63,8 @@ class AppointmentCreateView(APIView):
     def post(self, request):
         serializer = AppointmentSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(doctor=request.user)
-            if request.headers.get('HX-Request'):
-                return HttpResponse(
-                    '<div class="alert alert-success">Appointment created successfully!</div>'
-                )
+            serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        if request.headers.get('HX-Request'):
-            return HttpResponse(
-                '<div class="alert alert-danger">Error creating appointment</div>'
-            )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 @login_required
@@ -317,3 +313,108 @@ def appointment_edit(request, appointment_id):
     
     # Render edit form
     return render(request, 'appointment_edit_modal.html', {'appointment': appointment})
+
+@login_required
+@require_http_methods(["GET"])
+def get_available_slots(request, doctor_id, date):
+    """API endpoint to get available slots for a doctor on a specific date"""
+    try:
+        doctor = get_object_or_404(Doctor, id=doctor_id)
+        selected_date = datetime.strptime(date, '%Y-%m-%d').date()  # Convert to date object
+        
+        # Get doctor's availability for the selected day
+        day_of_week = selected_date.weekday()
+        availability = DoctorAvailability.objects.filter(
+            doctor=doctor,
+            day_of_week=day_of_week,
+            is_available=True
+        ).first()
+        
+        if not availability:
+            return JsonResponse({
+                'slots': [],
+                'message': 'Doctor not available on this day'
+            })
+        
+        # Get booked appointments
+        booked_slots = Appointment.objects.filter(
+            doctor=doctor,
+            appointment_date=selected_date,  # Use date object here
+            status='scheduled'
+        ).values_list('appointment_time', flat=True)
+        
+        # Generate available slots
+        available_slots = []
+        current_time = datetime.combine(selected_date, availability.start_time)
+        end_time = datetime.combine(selected_date, availability.end_time)
+        
+        while current_time < end_time:
+            slot_time = current_time.time()
+            if slot_time not in booked_slots:
+                available_slots.append({
+                    'time': slot_time.strftime('%H:%M'),
+                    'available': True
+                })
+            current_time += timedelta(minutes=30)
+        
+        return JsonResponse({
+            'slots': available_slots,
+            'doctor_name': doctor.name,
+            'date': date
+        })
+        
+    except Exception as e:
+        print(f"Error generating slots: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=400)
+
+@api_view(['GET'])
+def get_doctor_slots(request, doctor_id, date):
+    try:
+        doctor = get_object_or_404(Doctor, id=doctor_id)
+        selected_date = datetime.strptime(date, '%Y-%m-%d').date()
+        
+        # Get doctor's availability for the selected day
+        day_of_week = selected_date.weekday()
+        availability = DoctorAvailability.objects.filter(
+            doctor=doctor,
+            day_of_week=day_of_week,
+            is_available=True
+        ).first()
+        
+        if not availability:
+            return Response({
+                'slots': [],
+                'message': 'Doctor not available on this day'
+            })
+            
+        # Get booked appointments
+        booked_slots = Appointment.objects.filter(
+            doctor=doctor,
+            appointment_date=selected_date,
+            status='scheduled'
+        ).values_list('appointment_time', flat=True)
+        
+        # Generate available slots
+        available_slots = []
+        current_time = datetime.combine(selected_date, availability.start_time)
+        end_time = datetime.combine(selected_date, availability.end_time)
+        
+        while current_time < end_time:
+            slot_time = current_time.time()
+            if slot_time not in booked_slots:
+                available_slots.append({
+                    'time': slot_time.strftime('%H:%M'),
+                    'available': True
+                })
+            current_time += timedelta(minutes=30)  # 30-minute slots
+            
+        return Response({
+            'slots': available_slots,
+            'doctor_name': doctor.name,
+            'date': date
+        })
+        
+    except Exception as e:
+        return Response({
+            'error': str(e)
+        }, status=400)

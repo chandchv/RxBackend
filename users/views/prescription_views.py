@@ -104,7 +104,7 @@ def create_prescription(request, patient_id):
             return redirect('users:patient_detail', patient_id=patient_id)
 
     # Get latest vitals for pre-filling the form
-    latest_vitals = PatientVitals.objects.filter(patient=patient).order_by('-recorded_at').first()
+    latest_vitals = PatientVitals.objects.filter(patient=patient).order_by('-created_at').first()
 
     context = {
         'patient': patient,
@@ -148,7 +148,7 @@ def prescription_detail(request, pk):
         # Get patient vitals
         vitals = PatientVitals.objects.filter(
             patient=prescription.patient
-        ).order_by('-recorded_at').first()
+        ).order_by('-created_at').first()
         
         context = {
             'prescription': prescription,
