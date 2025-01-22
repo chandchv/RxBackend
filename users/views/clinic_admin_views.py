@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.db.models import Count
 from django.utils import timezone
@@ -15,26 +15,62 @@ import json
 import string
 import random
 from django.db import transaction, IntegrityError
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from ..models import Patient, Staff, Appointment, Doctor
+from ..permissions import IsClinicAdmin
 
-@login_required
+
+
+def is_superuser(user):
+    return user.is_superuser
+
 def clinic_admin_dashboard(request):
     """Main clinic administration dashboard view"""
-    if not request.user.is_staff:
+    if not request.user.is_staff and not request.user.is_superuser:
         messages.error(request, "You don't have permission to access the admin panel.")
         return redirect('users:dashboard')
         
     today = timezone.now().date()
     
-    context = {
-        'doctors_count': Doctor.objects.count(),
-        'staff_count': Staff.objects.count(),
-        # Remove or comment out the patients count for now
-        # 'patients_count': Patient.objects.count(),
-        # Remove appointments count as well if Appointment model doesn't exist
-        # 'todays_appointments': Appointment.objects.filter(
-         #   appointment_date__date=today
-        #).count(),
-    }
+    # Get current clinic
+    if request.user.is_superuser:
+        current_clinic_id = request.session.get('current_clinic_id')
+        if not current_clinic_id:
+            # Default to first clinic if none selected
+            first_clinic = Clinic.objects.first()
+            if first_clinic:
+                current_clinic_id = first_clinic.id
+                request.session['current_clinic_id'] = current_clinic_id
+    else:
+        # Non-superuser sees their assigned clinic
+        current_clinic_id = request.user.profile.clinic.id if hasattr(request.user, 'profile') else None
+
+    if current_clinic_id:
+        clinic = get_object_or_404(Clinic, id=current_clinic_id)
+        # Get doctors for this clinic
+        clinic_doctors = Doctor.objects.filter(clinic=clinic)
+        
+        context = {
+            'doctors_count': clinic_doctors.count(),
+            'staff_count': Staff.objects.filter(clinic=clinic).count(),
+            'patients_count': Patient.objects.filter(clinic=clinic).count(),
+            'todays_appointments': Appointment.objects.filter(
+                doctor__in=clinic_doctors,  # Filter appointments by clinic's doctors
+                appointment_date=today
+            ).count(),
+            'clinic_name': clinic.name,
+            'clinic_logo': clinic.logo.url if clinic.logo else None,
+            'current_clinic_id': current_clinic_id,
+        }
+        
+        if request.user.is_superuser:
+            context['clinic_list'] = Clinic.objects.all()
+    else:
+        messages.error(request, "No clinic assigned.")
+        return redirect('users:dashboard')
     
     return render(request, 'clinic_admin/admin_dashboard.html', context)
 
@@ -384,3 +420,138 @@ def doctor_details(request, doctor_id):
         'initial_password': request.session.pop('initial_password', None)  # Get and remove password from session
     }
     return render(request, 'clinic_admin/doctor_details.html', context)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsClinicAdmin])
+def dashboard_stats(request):
+    try:
+        clinic = request.user.clinic
+        today = timezone.now().date()
+        
+        # Get counts
+        doctor_count = Doctor.objects.filter(clinic=clinic).count()
+        patient_count = Patient.objects.filter(clinic=clinic).count()
+        staff_count = Staff.objects.filter(clinic=clinic).count()
+        appointment_count = Appointment.objects.filter(clinic=clinic).count()
+        
+        # Get today's stats
+        today_appointments = Appointment.objects.filter(
+            clinic=clinic,
+            appointment_date__date=today
+        ).count()
+        
+        today_patients = Patient.objects.filter(
+            clinic=clinic,
+            created_at__date=today
+        ).count()
+
+        return Response({
+            'doctorCount': doctor_count,
+            'patientCount': patient_count,
+            'staffCount': staff_count,
+            'appointmentCount': appointment_count,
+            'todayAppointments': today_appointments,
+            'todayPatients': today_patients
+        })
+        
+    except Exception as e:
+        return Response({
+            'error': str(e)
+        }, status=400)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsClinicAdmin])
+def clinic_admin_dashboard_api(request):
+    """API endpoint for clinic administration dashboard"""
+    try:
+        today = timezone.now().date()
+        
+        # Get counts
+        doctors_count = Doctor.objects.count()
+        staff_count = Staff.objects.count()
+        patients_count = Patient.objects.count()
+        todays_appointments = Appointment.objects.filter(
+            appointment_date=today
+        ).count()
+        pending_appointments = Appointment.objects.filter(
+            status='PENDING'
+        ).count()
+
+        # Prepare response data
+        dashboard_data = {
+            'totalDoctors': doctors_count,
+            'totalStaff': staff_count,
+            'totalPatients': patients_count,
+            'todayAppointments': todays_appointments,
+            'pendingAppointments': pending_appointments,
+            'lastUpdated': timezone.now().isoformat()
+        }
+        
+        return Response(dashboard_data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        print(f"Dashboard API error: {str(e)}")  # Debug print
+        return Response({
+            'error': 'Failed to fetch dashboard data',
+            'detail': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsClinicAdmin])
+def doctor_list_api(request):
+    """API endpoint to list all doctors"""
+    try:
+        doctors = Doctor.objects.all()
+        doctor_data = []
+        
+        for doctor in doctors:
+            doctor_data.append({
+                'id': doctor.id,
+                'user_id': doctor.user.id,
+                'first_name': doctor.user.first_name,
+                'last_name': doctor.user.last_name,
+                'email': doctor.user.email,
+                'specialization': doctor.specialization,
+                'phone_number': doctor.phone_number,
+                'status': doctor.status,
+                'clinic': doctor.clinic.name if doctor.clinic else None,
+            })
+        
+        return Response(doctor_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Doctor list API error: {str(e)}")  # Debug print
+        return Response({
+            'error': 'Failed to fetch doctors',
+            'detail': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@require_POST
+@user_passes_test(is_superuser)
+def change_clinic(request, clinic_id):
+    """Change the current clinic for superuser"""
+    try:
+        clinic = get_object_or_404(Clinic, id=clinic_id)
+        request.session['current_clinic_id'] = clinic_id
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+@user_passes_test(is_superuser)
+def edit_clinic_profile(request, clinic_id):
+    """Edit clinic profile view"""
+    clinic = get_object_or_404(Clinic, id=clinic_id)
+    
+    if request.method == 'POST':
+        form = ClinicProfileForm(request.POST, request.FILES, instance=clinic)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Clinic profile updated successfully.")
+            return redirect('users:clinic_admin_dashboard')
+    else:
+        form = ClinicProfileForm(instance=clinic)
+    
+    return render(request, 'clinic_admin/edit_clinic_profile.html', {
+        'form': form,
+        'clinic': clinic
+    })

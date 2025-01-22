@@ -68,9 +68,13 @@ class UserProfileAdmin(admin.ModelAdmin):
 
 @admin.register(Patient)
 class PatientAdmin(admin.ModelAdmin):
-    list_display = ('patient_id', 'first_name', 'last_name', 'phone_number', 'email')
-    search_fields = ('patient_id', 'first_name', 'last_name', 'phone_number')
-    list_filter = ('gender',)
+    list_display = ['get_full_name', 'email', 'phone_number', 'clinic', 'doctor']
+    list_filter = ['clinic', 'doctor']
+    search_fields = ['first_name', 'last_name', 'email', 'phone_number']
+    
+    def get_full_name(self, obj):
+        return obj.get_full_name()
+    get_full_name.short_description = 'Name'
 
 @admin.register(Appointment)
 class AppointmentAdmin(admin.ModelAdmin):

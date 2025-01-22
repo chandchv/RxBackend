@@ -28,9 +28,9 @@
             <p class="text-sm text-gray-600">{{ bill.doctor.specialization }}</p>
         </div>
         <div>
-            <h3 class="text-lg font-medium text-gray-900 mb-2">Patient Details</h3>
-            <p class="text-sm text-gray-600">{{ bill.patient.get_full_name }}</p>
-            <p class="text-sm text-gray-600">ID: {{ bill.patient.id }}</p>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">Clinic Details</h3>
+            <p class="text-sm text-gray-600">{{ bill.clinic.name }}</p>
+            <p class="text-sm text-gray-600">{{ bill.clinic.address }}</p>
         </div>
     </div>
 
@@ -118,15 +118,6 @@
                 {% endfor %}
             </tbody>
         </table>
-    </div>
-    {% endif %}
-
-    {% if user_type == 'admin' and bill.status != 'paid' %}
-    <div class="mt-8 flex justify-end">
-        <a href="{% url 'users:record_payment' bill.id %}" 
-           class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
-            Record Payment
-        </a>
     </div>
     {% endif %}
 </div>

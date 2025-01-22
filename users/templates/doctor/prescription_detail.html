@@ -15,7 +15,7 @@
                        class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 no-print">
                         Back to Patient
                     </a>
-                    <button onclick="printPrescription()" 
+                    <button onclick="handlePrint('{{ prescription.id }}')" 
                             class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 no-print">
                         <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
@@ -23,12 +23,12 @@
                         </svg>
                         Print
                     </button>
-                    <a href="{% url 'users:prescription_pdf' prescription.id %}" 
-                       class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 no-print">
-                        Download PDF
-                    </a>
-                    <button onclick="sharePrescription('{{ prescription.id }}')" 
+                    <button onclick="handleShare('{{ prescription.id }}')" 
                             class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 no-print">
+                        <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                        </svg>
                         Share
                     </button>
                 </div>
@@ -185,36 +185,109 @@
         return age;
     }
 
-    function printPrescription() {
-        window.print();
-    }
-    
-    async function sharePrescription(prescriptionId) {
+    async function getPrescriptionPDF(prescriptionId) {
         try {
             const response = await fetch(`/doctor/prescriptions/${prescriptionId}/pdf/`);
-            const blob = await response.blob();
-            const file = new File([blob], `prescription_${prescriptionId}.pdf`, { type: 'application/pdf' });
-    
-            if (navigator.share) {
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to generate PDF');
+            }
+            return await response.blob();
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            throw error;
+        }
+    }
+
+    async function handlePrint(prescriptionId) {
+        try {
+            const loadingToast = showToast('Generating PDF for printing...');
+            const pdfBlob = await getPrescriptionPDF(prescriptionId);
+            hideToast(loadingToast);
+            
+            // Create a temporary URL for the PDF
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            
+            // Create a hidden iframe for printing
+            const printFrame = document.createElement('iframe');
+            printFrame.style.display = 'none';
+            printFrame.src = pdfUrl;
+            
+            document.body.appendChild(printFrame);
+            printFrame.onload = function() {
+                try {
+                    printFrame.contentWindow.print();
+                } catch (e) {
+                    console.error('Print error:', e);
+                    showToast('Error printing. Please try again.', 'error');
+                } finally {
+                    // Cleanup
+                    setTimeout(() => {
+                        document.body.removeChild(printFrame);
+                        URL.revokeObjectURL(pdfUrl);
+                    }, 1000);
+                }
+            };
+        } catch (error) {
+            console.error('Print error:', error);
+            showToast('Error preparing document for print. Please try again.', 'error');
+        }
+    }
+
+    async function handleShare(prescriptionId) {
+        try {
+            const loadingToast = showToast('Preparing prescription for sharing...');
+            const pdfBlob = await getPrescriptionPDF(prescriptionId);
+            hideToast(loadingToast);
+
+            const file = new File([pdfBlob], `prescription_${prescriptionId}.pdf`, {
+                type: 'application/pdf'
+            });
+
+            if (navigator.share && navigator.canShare({ files: [file] })) {
                 await navigator.share({
                     files: [file],
                     title: 'Medical Prescription',
                     text: 'Here is your prescription'
                 });
+                showToast('Prescription shared successfully!', 'success');
             } else {
                 // Fallback for browsers that don't support sharing
-                const url = window.URL.createObjectURL(blob);
+                const url = URL.createObjectURL(pdfBlob);
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = `prescription_${prescriptionId}.pdf`;
                 document.body.appendChild(a);
                 a.click();
-                window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast('Prescription downloaded successfully!', 'success');
             }
         } catch (error) {
-            console.error('Error sharing prescription:', error);
-            alert('Error sharing prescription. Please try downloading instead.');
+            console.error('Share error:', error);
+            showToast('Error sharing prescription. Please try again.', 'error');
+        }
+    }
+
+    // Toast notification helper functions
+    function showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg text-white ${
+            type === 'error' ? 'bg-red-500' : 
+            type === 'success' ? 'bg-green-500' : 
+            'bg-blue-500'
+        } transition-opacity duration-300`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        return toast;
+    }
+
+    function hideToast(toast) {
+        if (toast) {
+            toast.style.opacity = '0';
+            setTimeout(() => {
+                document.body.removeChild(toast);
+            }, 300);
         }
     }
 </script>

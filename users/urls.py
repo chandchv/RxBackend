@@ -27,6 +27,7 @@ from .views import (
 
 from .views.drugs_views import (
     drug_suggestions,
+    api_drug_suggestions,
 )
 
 from .views.template_views import (
@@ -93,6 +94,8 @@ from .views.clinic_admin_views import (
     edit_staff,
     toggle_staff_status,
     doctor_details,
+    clinic_admin_dashboard_api,
+    doctor_list_api,
 )
 
 from .views.auth_views import (
@@ -240,7 +243,7 @@ urlpatterns = [
     path('doctors/verify/', verify_doctor_api_view, name='verify_doctor'),
     
     path('doctors/appointments/create/', doctor_views.create_appointment, name='create_appointment'),
-    path('doctors/appointments/<int:appointment_id>/', doctor_views.appointment_detail, name='appointment_detail'),
+    path('doctors/appointments/doctor/<int:appointment_id>/', doctor_views.appointment_detail_doctor, name='appointment_detail_doctor'),
 
     
     # Patient URLs
@@ -272,6 +275,7 @@ urlpatterns = [
     path('api/appointments/', api_views.appointment_list, name='api_appointments'),
     path('api/appointments/<int:appointment_id>/status/', 
          api_views.update_appointment_status, name='api_update_appointment_status'),
+    path('api/doctor/appointments/<int:appointment_id>/update-status/', appointment_views.update_appointment_status_api, name='update_appointment_status_api'),
     
     # Default dashboard
     #path('dashboard/', doctor_views.doctor_dashboard, name='dashboard'),
@@ -300,6 +304,7 @@ urlpatterns = [
     
     # Clinic Profile endpoints
     path('api/clinic/profile/', api_views.clinic_profile_api, name='clinic_profile_api'),
+    path('api/clinic-admin/dashboard-stats/', clinic_admin_views.dashboard_stats, name='dashboard_stats'),
     
     # Superuser Admin endpoints
     path('api/admin/clinics/', api_views.admin_clinics_api, name='admin_clinics_api'),
@@ -327,10 +332,10 @@ urlpatterns = [
     path('staff/billing/', staff_views.billing_overview, name='staff_billing_overview'),
     path('admin/billing/', admin_views.billing_overview, name='admin_billing_overview'),
     path('clinic_admin/appointments/create/', appointment_views.admin_create_appointment, name='admin_create_appointment'),
-    path('appointments/<int:appointment_id>/update-status/', 
-         appointment_views.update_appointment_status, 
-         name='update_appointment_status'),
-    path('appointments/<int:appointment_id>/', appointment_views.appointment_detail, name='appointment_detail'),
+    #path('appointments/<int:appointment_id>/update-status/', appointment_views.update_appointment_status, 
+         #name='update_appointment_status'),
+    #path('appointments/<int:appointment_id>/', appointment_views.appointment_detail, name='appointment_detail'),
+    path('appointments/<int:appointment_id>/update-status/', appointment_views.update_appointment_status, name='appointment_update_status'),
     path('appointments/<int:appointment_id>/delete/', appointment_views.appointment_delete, name='appointment_delete'),
     path('appointments/<int:appointment_id>/edit/', appointment_views.appointment_edit, name='appointment_edit'),
     path('doctor/<int:doctor_id>/details/', 
@@ -342,5 +347,43 @@ urlpatterns = [
     path('api/available-slots/doctor/<int:doctor_id>/<str:date>/', 
             doctor_views.get_available_slots_doctor, 
          name='get_available_slots_doctor'),
+
     path('doctor/appointments/create/', doctor_views.create_appointment, name='create_appointment'),
+    path('doctor/appointments/<int:appointment_id>/status/', doctor_views.update_appointment_status, name='update_appointment_status'),
+    path('doctor/appointments/<int:appointment_id>/edit/', doctor_views.edit_appointment, name='edit_appointment'),
+    
+    # Patient billing URLs
+    path('patient/billing/', billing_views.patient_billing_history, name='patient_billing_history'),
+    path('patient/billing/<int:bill_id>/', billing_views.patient_bill_detail, name='patient_bill_detail'),
+    
+    # Doctor billing URLs
+    path('doctor/billing/', billing_views.doctor_billing_summary, name='doctor_billing_summary'),
+    path('doctor/billing/create/<int:appointment_id>/', billing_views.create_bill, name='create_bill'),
+    
+    # Admin billing URLs
+    path('admin/billing/', billing_views.admin_billing_dashboard, name='admin_billing_dashboard'),
+    path('admin/billing/payment/<int:bill_id>/', billing_views.record_payment, name='record_payment'),
+    #path('api/doctor/appointments/create/', api_views.create_appointment, name='create-appointment'),
+    path('api/doctor/appointments/create/', doctor_views.api_create_appointment, name='api_create_appointment'),
+
+    # API endpoints for patient details
+    path('api/doctor/patients/<int:patient_id>/', doctor_views.api_patient_details, name='api_patient_details'),
+    path('api/doctor/patients/<int:patient_id>/prescriptions/', doctor_views.api_patient_prescriptions, name='api_patient_prescriptions'),
+    path('api/doctor/patients/<int:patient_id>/appointments/', doctor_views.api_patient_appointments, name='api_patient_appointments'),
+    path('api/doctor/patients/<int:patient_id>/medical-history/', doctor_views.api_patient_medical_history, name='api_patient_medical_history'),
+
+    # Add this URL pattern
+    path('api/doctor/patient/<int:patient_id>/', doctor_views.get_patient_details, name='get_patient_details'),
+
+    path('api/doctor/appointments/<int:appointment_id>/', doctor_views.api_appointment_detail, name='api_appointment_detail'),
+
+    # Add this to your urlpatterns
+    path('api/drugs/suggestions/', api_drug_suggestions, name='api_drug_suggestions'),
+
+    path('api/doctor/prescriptions/create/', doctor_views.create_prescription_api, name='create_prescription_api'),
+    path('api/auth/login/', auth_views.login_api, name='login_api'),
+    path('clinic-admin/dashboard/', clinic_admin_dashboard_api, name='clinic_admin_dashboard_api'),
+    path('clinic-admin/doctors/', doctor_list_api, name='doctor_list_api'),
+    path('change-clinic/<int:clinic_id>/', clinic_admin_views.change_clinic, name='change_clinic'),
+    path('edit-clinic-profile/<int:clinic_id>/', clinic_admin_views.edit_clinic_profile, name='edit_clinic_profile'),
 ]

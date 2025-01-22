@@ -60,6 +60,10 @@
                 class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
             Mark as Completed
         </button>
+        <button onclick="editAppointment('{{ appointment.id }}')"
+                class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+            Reschedule
+        </button>
         <button onclick="updateAppointmentStatus('{{ appointment.id }}', 'cancelled')"
                 class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
             Cancel Appointment
@@ -67,9 +71,3 @@
     </div>
     {% endif %}
 </div>
-
-<script>
-function closeModal() {
-    document.getElementById('modal').style.display = 'none';
-}
-</script>

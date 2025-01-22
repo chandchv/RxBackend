@@ -7,7 +7,21 @@
     <div class="bg-white shadow-lg rounded-lg">
         <!-- Header -->
         <div class="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
-            <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Clinic Administration</h1>
+            <img src="{{ clinic_logo }}" alt="Clinic Logo" class="w-30 h-10 inline-block align-right">
+            <h1 class="text-xl sm:text-2xl font-bold text-gray-900 inline-block align-middle mr-4">{{ clinic_name }} Clinic</h1>
+            {% if user.is_superuser %}
+            <select id="clinicSelector" class="inline-block align-right px-4 py-2 border rounded-lg" onchange="changeClinic(this.value)">
+                {% for clinic in clinic_list %}
+                    <option value="{{ clinic.id }}" {% if clinic.id == current_clinic_id %}selected{% endif %}>
+                        {{ clinic.name }}
+                    </option>
+                {% endfor %}
+            </select>
+            <a href="{% url 'users:edit_clinic_profile' current_clinic_id %}" 
+               class="inline-block px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 ml-2">
+                Edit Clinic Profile
+            </a>
+            {% endif %}
         </div>
 
         <!-- Quick Stats -->
@@ -78,4 +92,28 @@
         </div>
     </div>
 </div>
+
+<script>
+function changeClinic(clinicId) {
+    fetch(`/api/change-clinic/${clinicId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Failed to change clinic');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while changing clinic');
+    });
+}
+</script>
 {% endblock %} 

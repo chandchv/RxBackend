@@ -43,7 +43,7 @@
                     {% for role, display in staff.ROLE_CHOICES %}
                     <option value="{{ role }}" {% if staff.role == role %}selected{% endif %}>
                         {{ display }}
-                    </option>
+                    </option>  
                     {% endfor %}
                 </select>
             </div>

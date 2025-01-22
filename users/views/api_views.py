@@ -672,3 +672,42 @@ def patient_medical_history_api(request):
     medical_history = MedicalHistory.objects.filter(patient=patient)
     serializer = MedicalHistorySerializer(medical_history, many=True)
     return Response(serializer.data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_appointment(request):
+    try:
+        # Get the doctor instance for the logged-in user
+        doctor = Doctor.objects.get(user=request.user)
+        
+        # Add doctor to the request data
+        data = request.data.copy()
+        data['doctor'] = doctor.id
+        
+        # Validate patient exists
+        try:
+            patient = Patient.objects.get(id=data.get('patient'))
+        except Patient.DoesNotExist:
+            return Response(
+                {'error': 'Patient not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Create appointment using serializer
+        serializer = AppointmentSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+    except Doctor.DoesNotExist:
+        return Response(
+            {'error': 'Doctor profile not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

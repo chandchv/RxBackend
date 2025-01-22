@@ -13,10 +13,11 @@ from django.contrib import messages
 from datetime import datetime, timedelta
 from django.core.mail import send_mail
 from django.views.decorators.http import require_POST
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from django.utils.dateparse import parse_date
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 
 class AppointmentView(APIView):
     permission_classes = [IsAuthenticated]
@@ -229,6 +230,7 @@ def send_appointment_notifications(appointment):
         print(f"Error sending notifications: {str(e)}")
 
 @login_required
+@csrf_exempt
 @require_POST
 def update_appointment_status(request, appointment_id):
     try:
@@ -418,3 +420,45 @@ def get_doctor_slots(request, doctor_id, date):
         return Response({
             'error': str(e)
         }, status=400)
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_appointment_status_api(request, appointment_id):
+    try:
+        appointment = get_object_or_404(Appointment, id=appointment_id)
+        new_status = request.data.get('status')
+        
+        # Verify the user has permission to update this appointment
+        if not hasattr(request.user, 'doctor') or request.user.doctor != appointment.doctor:
+            return Response({
+                'success': False,
+                'message': 'Permission denied'
+            }, status=403)
+            
+        if new_status not in dict(Appointment.STATUS_CHOICES):
+            return Response({
+                'success': False,
+                'message': 'Invalid status'
+            }, status=400)
+            
+        # Update the appointment status
+        appointment.status = new_status
+        appointment.save()
+        
+        # Send notification to patient
+        try:
+            send_status_update_notification(appointment)
+        except Exception as e:
+            print(f"Error sending notification: {str(e)}")
+        
+        return Response({
+            'success': True,
+            'message': f'Appointment marked as {new_status}',
+            'new_status': new_status
+        })
+        
+    except Exception as e:
+        print(f"Error updating appointment status: {str(e)}")
+        return Response({
+            'success': False,
+            'message': 'Error updating appointment status'
+        }, status=500)

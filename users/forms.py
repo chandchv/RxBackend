@@ -1,7 +1,7 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
-from .models import Patient, Appointment, Doctor, DoctorAvailability
+from .models import Patient, Appointment, Doctor, DoctorAvailability, Bill, BillItem, Payment, BillingItem, Clinic
 from django.utils import timezone
 
 class PatientSignupForm(UserCreationForm):
@@ -197,3 +197,86 @@ class StaffAppointmentForm(forms.ModelForm):
         appointment_date = cleaned_data.get('appointment_date')
         appointment_time = cleaned_data.get('appointment_time')
         return cleaned_data
+
+class BillForm(forms.ModelForm):
+    class Meta:
+        model = Bill
+        fields = ['due_date', 'discount', 'notes', 'payment_method']
+        widgets = {
+            'due_date': forms.DateInput(attrs={'type': 'date'}),
+        }
+
+class BillItemForm(forms.ModelForm):
+    class Meta:
+        model = BillItem
+        fields = ['billing_item', 'quantity']
+        
+    def __init__(self, *args, clinic=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if clinic:
+            self.fields['billing_item'].queryset = BillingItem.objects.filter(clinic=clinic)
+
+class PaymentForm(forms.ModelForm):
+    class Meta:
+        model = Payment
+        fields = ['amount', 'payment_method', 'payment_date', 'transaction_id', 'notes']
+        widgets = {
+            'payment_date': forms.DateInput(attrs={'type': 'date'}),
+        }
+
+class CustomAuthenticationForm(AuthenticationForm):
+    username = forms.CharField(
+        widget=forms.TextInput(
+            attrs={
+                'class': 'appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm',
+                'placeholder': 'Username'
+            }
+        )
+    )
+    
+    password = forms.CharField(
+        widget=forms.PasswordInput(
+            attrs={
+                'class': 'appearance-none block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm',
+                'placeholder': 'Password',
+                'id': 'password'
+            }
+        )
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.error_messages['invalid_login'] = 'Please enter a correct username and password.'
+        
+    def is_valid(self):
+        valid = super().is_valid()
+        if not valid:
+            if 'password' in self.errors:
+                self.fields['password'].widget.attrs.update({
+                    'class': 'appearance-none block w-full px-3 py-2 border border-red-500 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm bg-red-50',
+                })
+            if 'username' in self.errors:
+                self.fields['username'].widget.attrs.update({
+                    'class': 'appearance-none block w-full px-3 py-2 border border-red-500 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm bg-red-50',
+                })
+        return valid
+
+class ClinicProfileForm(forms.ModelForm):
+    class Meta:
+        model = Clinic
+        fields = ['name', 'email', 'registration_number', 'logo', 'phone_number']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-input rounded-lg'}),
+            'email': forms.EmailInput(attrs={'class': 'form-input rounded-lg'}),
+            'registration_number': forms.TextInput(attrs={'class': 'form-input rounded-lg'}),
+            'phone_number': forms.TextInput(attrs={'class': 'form-input rounded-lg'}),
+            'logo': forms.FileInput(attrs={'class': 'form-input rounded-lg'}),
+        }
+
+    def clean_logo(self):
+        logo = self.cleaned_data.get('logo')
+        if logo:
+            # Add image validation if needed
+            if logo.size > 5 * 1024 * 1024:  # 5MB limit
+                raise forms.ValidationError("Image file too large ( > 5MB )")
+        return logo

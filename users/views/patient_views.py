@@ -13,7 +13,7 @@ from datetime import datetime
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from datetime import timedelta
-
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 @login_required
 def create_patient(request):
     try:
@@ -90,7 +90,7 @@ def patients_list(request):
         else:
             messages.error(request, 'Doctor profile not found')
             return redirect('users:dashboard')
-
+@csrf_exempt
 @login_required
 def patient_detail(request, patient_id):
     try:

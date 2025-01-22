@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator, MinValueValidator, MaxValueValidator
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from elasticsearch_dsl import Q
 
@@ -133,6 +134,13 @@ class Patient(TimeStampedModel):
         on_delete=models.CASCADE,
         related_name='patients'
     )
+    doctor = models.ForeignKey(
+        'Doctor',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_patients'
+    )
     
     # Medical history fields
     existing_diseases = models.TextField(blank=True, help_text="List any existing medical conditions")
@@ -140,16 +148,20 @@ class Patient(TimeStampedModel):
     allergies = models.TextField(blank=True, help_text="List any known allergies")
 
     class Meta:
-        ordering = ['first_name', 'last_name']
+        ordering = ['user__first_name', 'user__last_name']
         indexes = [
             models.Index(fields=['patient_id']),
             models.Index(fields=['clinic', 'phone_number']),
         ]
 
     def __str__(self):
-        return self.get_full_name()
+        if self.user:
+            return self.user.get_full_name()
+        return f"{self.first_name} {self.last_name}"
 
     def get_full_name(self):
+        if self.user:
+            return self.user.get_full_name()
         return f"{self.first_name} {self.last_name}"
 
     def save(self, *args, **kwargs):
@@ -611,3 +623,98 @@ def save_user_profile(sender, instance, **kwargs):
     if not hasattr(instance, 'profile'):
         UserProfile.objects.create(user=instance)
     instance.profile.save()
+
+class BillingItem(models.Model):
+    ITEM_TYPES = [
+        ('consultation', 'Consultation'),
+        ('procedure', 'Medical Procedure'),
+        ('medicine', 'Medicine'),
+        ('lab_test', 'Laboratory Test'),
+        ('other', 'Other'),
+    ]
+    
+    name = models.CharField(max_length=200)
+    item_type = models.CharField(max_length=20, choices=ITEM_TYPES)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    description = models.TextField(blank=True)
+    clinic = models.ForeignKey('Clinic', on_delete=models.CASCADE)
+    
+    def __str__(self):
+        return f"{self.name} - {self.get_item_type_display()}"
+
+class Bill(models.Model):
+    PAYMENT_STATUS = [
+        ('pending', 'Pending'),
+        ('partial', 'Partially Paid'),
+        ('paid', 'Paid'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    PAYMENT_METHODS = [
+        ('cash', 'Cash'),
+        ('card', 'Credit/Debit Card'),
+        ('insurance', 'Insurance'),
+        ('upi', 'UPI'),
+        ('bank_transfer', 'Bank Transfer'),
+    ]
+    
+    patient = models.ForeignKey('Patient', on_delete=models.CASCADE, related_name='bills')
+    doctor = models.ForeignKey('Doctor', on_delete=models.CASCADE, related_name='bills')
+    appointment = models.OneToOneField('Appointment', on_delete=models.CASCADE, related_name='bill')
+    clinic = models.ForeignKey('Clinic', on_delete=models.CASCADE)
+    
+    bill_date = models.DateField(default=timezone.now)
+    due_date = models.DateField()
+    
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    tax = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    
+    status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default='pending')
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, null=True, blank=True)
+    
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Bill #{self.id} - {self.patient.get_full_name()}"
+    
+    def calculate_total(self):
+        """Calculate total bill amount including tax and discount"""
+        self.subtotal = sum(item.total for item in self.items.all())
+        self.tax = self.subtotal * Decimal('0.18')  # 18% tax
+        self.total = self.subtotal + self.tax - self.discount
+        self.save()
+
+class BillItem(models.Model):
+    bill = models.ForeignKey(Bill, on_delete=models.CASCADE, related_name='items')
+    billing_item = models.ForeignKey(BillingItem, on_delete=models.PROTECT)
+    quantity = models.PositiveIntegerField(default=1)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    total = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    def save(self, *args, **kwargs):
+        self.total = self.quantity * self.price
+        super().save(*args, **kwargs)
+        self.bill.calculate_total()
+
+class Payment(models.Model):
+    bill = models.ForeignKey(Bill, on_delete=models.CASCADE, related_name='payments')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_date = models.DateField(default=timezone.now)
+    payment_method = models.CharField(max_length=20, choices=Bill.PAYMENT_METHODS)
+    transaction_id = models.CharField(max_length=100, blank=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Update bill status based on payments
+        total_paid = sum(payment.amount for payment in self.bill.payments.all())
+        if total_paid >= self.bill.total:
+            self.bill.status = 'paid'
+        elif total_paid > 0:
+            self.bill.status = 'partial'
+        self.bill.save()

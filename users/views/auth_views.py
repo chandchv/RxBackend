@@ -14,73 +14,129 @@ from ..scripts import scrapeGpt01 as scrapper
 from django.db import transaction, IntegrityError
 from django.contrib import messages
 from rest_framework.authtoken.models import Token
-from ..forms import PatientSignupForm, DoctorSignupForm
-from django.db.models import Max
+from ..forms import PatientSignupForm, DoctorSignupForm, CustomAuthenticationForm
+from django.db.models import Max, Q
+from django.contrib.auth.forms import AuthenticationForm
 
 @ensure_csrf_cookie
 def login_view(request):
     """Handle user login through web interface"""
     if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-        print(f"Login attempt for user: {username}")  # Debug print
-        
-        user = authenticate(request, username=username, password=password)
-        
-        if user is not None:
-            login(request, user)
-            print(f"User authenticated successfully: {user.username}")  # Debug print
-            
-            # Create or get token for API authentication
-            token, _ = Token.objects.get_or_create(user=user)
-            request.session['auth_token'] = token.key
-
-            try:
-                # First check if user is admin/staff
-                if user.is_staff or user.is_superuser:
-                    print(f"User {username} is admin/staff")  # Debug print
-                    return redirect('users:clinic_admin_dashboard')
-                
-                # Then check if the user is a doctor
-                elif Doctor.objects.filter(user=user).exists():
-                    print(f"User {username} is a doctor")  # Debug print
-                    return redirect('users:doctor_dashboard')
-                
-                # Then check if the user is a patient
-                elif Patient.objects.filter(user=user).exists():
-                    print(f"User {username} is a patient")  # Debug print
-                    return redirect('users:patient_dashboard')
-                
-                else:
-                    print(f"User {username} has no specific role")  # Debug print
-                    messages.warning(request, 'User has no assigned role.')
-                    return redirect('users:login')
-
-            except Exception as e:
-                print(f"Error during login redirection: {str(e)}")  # Debug print
-                messages.error(request, f'Error during login: {str(e)}')
-                return redirect('users:login')
+        form = CustomAuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            username = form.cleaned_data.get('username')
+            password = form.cleaned_data.get('password')
+            user = authenticate(username=username, password=password)
+            if user is not None:
+                login(request, user)
+                next_url = request.POST.get('next', 'users:dashboard')
+                return redirect(next_url)
+            else:
+                messages.error(request, 'Invalid username or password.')
+                form.fields['password'].widget.attrs.update({
+                    'class': 'appearance-none block w-full px-3 py-2 border border-red-500 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm bg-red-50',
+                })
         else:
-            print(f"Authentication failed for user: {username}")  # Debug print
-            messages.error(request, 'Invalid username or password.')
-    
-    # Show any messages in the template
-    return render(request, 'login.html', {
-        'next': request.GET.get('next', '')
-    })
+            # Get specific error messages from the form
+            for field, errors in form.errors.items():
+                for error in errors:
+                    if 'password' in field.lower():
+                        messages.error(request, 'Incorrect password. Please try again.')
+                    elif 'username' in field.lower():
+                        messages.error(request, 'Username not found.')
+                    else:
+                        messages.error(request, error)
+    else:
+        form = CustomAuthenticationForm()
+    return render(request, 'login.html', {'form': form})
+@csrf_exempt
+@api_view(['POST'])
+def login(request):
+    try:
+        username_or_email = request.data.get('username')  # Can be either username or email
+        password = request.data.get('password')
 
+        print(f"Login attempt for: {username_or_email}")  # Debug print
+
+        if not username_or_email or not password:
+            return Response({
+                'error': 'Please provide both username/email and password'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Try to authenticate with username first
+        user = authenticate(username=username_or_email, password=password)
+        print(f"Username auth result: {user}")  # Debug print
+        
+        # If username auth fails, try email
+        if not user:
+            try:
+                user_obj = User.objects.get(email=username_or_email)
+                print(f"Found user by email: {user_obj.username}")  # Debug print
+                user = authenticate(username=user_obj.username, password=password)
+                print(f"Email auth result: {user}")  # Debug print
+            except User.DoesNotExist:
+                print("User not found by email")  # Debug print
+                pass
+
+        if not user:
+            return Response({
+                'error': 'Invalid credentials. Please check your username/email and password.'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not user.is_active:
+            return Response({
+                'error': 'This account is inactive.'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+        refresh = RefreshToken.for_user(user)
+
+        # Get user role and additional info
+        user_data = {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'is_superuser': user.is_superuser,
+            'role': 'SUPERUSER' if user.is_superuser else None,
+        }
+
+        if not user.is_superuser:
+            if hasattr(user, 'doctor'):
+                user_data['role'] = 'DOCTOR' 
+                user_data['doctor_id'] = user.doctor.id
+            elif hasattr(user, 'patient'):
+                user_data['role'] = 'PATIENT'
+                user_data['patient_id'] = user.patient.id
+            elif hasattr(user, 'staff'):
+                user_data['role'] = user.staff.role
+                user_data['staff_id'] = user.staff.id
+
+        print(f"Login successful for user: {user.username}, role: {user_data['role']}")  # Debug print
+
+        return Response({
+            'token': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': user_data
+        })
+
+    except Exception as e:
+        print(f"Login error: {str(e)}")  # Debug print
+        return Response({
+            'error': f'Login failed: {str(e)}'
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_api(request):
     try:
-        print("Received login request:", request.data)  # Debug print
+        print("Received login request:", request.data)
         
         username = request.data.get('username')
         password = request.data.get('password')
         
-        print(f"Attempting login for user: {username}")  # Debug print
+        print(f"Attempting login for user: {username}")
         
         if not username or not password:
             return Response({
@@ -88,7 +144,7 @@ def login_api(request):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         user = authenticate(username=username, password=password)
-        print(f"Authentication result: {user}")  # Debug print
+        print(f"Authentication result: {user}")
         
         if user is not None:
             refresh = RefreshToken.for_user(user)
@@ -97,7 +153,9 @@ def login_api(request):
             user_type = 'unknown'
             additional_data = {}
             
-            if hasattr(user, 'doctor'):
+            if user.is_superuser:
+                user_type = 'superuser'
+            elif hasattr(user, 'doctor'):
                 user_type = 'doctor'
                 additional_data = {
                     'doctor_id': user.doctor.id,
@@ -106,7 +164,7 @@ def login_api(request):
             elif hasattr(user, 'patient'):
                 user_type = 'patient'
                 additional_data = {
-                    'patient_id': user.patient.patient_id,  # Use patient_id instead of id
+                    'patient_id': user.patient.patient_id,
                 }
             
             response_data = {
@@ -120,11 +178,12 @@ def login_api(request):
                     'email': user.email,
                     'first_name': user.first_name,
                     'last_name': user.last_name,
+                    'is_superuser': user.is_superuser,
                 },
                 **additional_data
             }
             
-            print("Sending successful response:", response_data)  # Debug print
+            print("Sending successful response:", response_data)
             return Response(response_data, status=status.HTTP_200_OK)
         
         return Response({
@@ -133,7 +192,7 @@ def login_api(request):
         }, status=status.HTTP_401_UNAUTHORIZED)
         
     except Exception as e:
-        print(f"Login error: {str(e)}")  # Debug print
+        print(f"Login error: {str(e)}")
         return Response({
             'status': 'error',
             'error': 'An error occurred during login',

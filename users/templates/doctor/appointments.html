@@ -3,8 +3,8 @@
 {% block title %}Appointments{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 py-8">
-    <div class="bg-white shadow-lg rounded-lg p-6">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold">Appointments</h2>
             <a href="{% url 'users:create_appointment' %}" 
@@ -32,6 +32,9 @@
                         </th>
                         <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Status
+                        </th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Billing
                         </th>
                         <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Actions
@@ -66,12 +69,39 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <a href="{% url 'users:patient_detail' appointment.patient.id %}" 
-                               class="text-indigo-600 hover:text-indigo-900 mr-3">View Patient</a>
-                            {% if appointment.status == 'scheduled' %}
-                            <a href="#" onclick="updateStatus('{{ appointment.id }}', 'completed')"
-                               class="text-green-600 hover:text-green-900">Complete</a>
+                            {% if appointment.bill %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                    {% if appointment.bill.status == 'paid' %}bg-green-100 text-green-800
+                                    {% elif appointment.bill.status == 'pending' %}bg-red-100 text-red-800
+                                    {% elif appointment.bill.status == 'partial' %}bg-yellow-100 text-yellow-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {{ appointment.bill.get_status_display }}
+                                </span>
+                                <a href="{% url 'users:patient_bill_detail' appointment.bill.id %}" 
+                                   class="ml-2 text-indigo-600 hover:text-indigo-900">View</a>
+                            {% elif appointment.status == 'completed' %}
+                                <a href="{% url 'users:create_bill' appointment.id %}" 
+                                   class="text-indigo-600 hover:text-indigo-900">Generate Bill</a>
+                            {% else %}
+                                <span class="text-gray-500">Pending</span>
                             {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div class="flex space-x-2">
+                                <a href="{% url 'users:patient_detail' appointment.patient.id %}" 
+                                   class="text-indigo-600 hover:text-indigo-900">View Patient</a>
+                                
+                                {% if appointment.status == 'scheduled' %}
+                                <button onclick="updateAppointmentStatus('{{ appointment.id }}', 'completed')"
+                                        class="text-green-600 hover:text-green-900">Complete</button>
+                                
+                                <button onclick="editAppointment('{{ appointment.id }}')"
+                                        class="text-blue-600 hover:text-blue-900">Edit</button>
+                                
+                                <button onclick="updateAppointmentStatus('{{ appointment.id }}', 'cancelled')"
+                                        class="text-red-600 hover:text-red-900">Cancel</button>
+                                {% endif %}
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -84,45 +114,55 @@
     </div>
 </div>
 
+<div id="modal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center hidden">
+    <!-- Modal content will be loaded here -->
+</div>
+
 <script>
-function updateStatus(appointmentId, status) {
-    if (confirm('Are you sure you want to mark this appointment as ' + status + '?')) {
-        fetch(`/doctor/appointments/${appointmentId}/status/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
-            },
-            body: JSON.stringify({ status: status })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                window.location.reload();
-            } else {
-                alert('Error updating appointment status');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error updating appointment status');
-        });
+function updateAppointmentStatus(appointmentId, status) {
+    if (!confirm(`Are you sure you want to mark this appointment as ${status}?`)) {
+        return;
     }
+    
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch(`/doctor/appointments/${appointmentId}/status/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrftoken
+        },
+        body: `status=${status}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating appointment status');
+    });
 }
 
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
+function editAppointment(appointmentId) {
+    const modal = document.getElementById('modal');
+    modal.classList.remove('hidden');
+    
+    // Updated URL name to match the view
+    htmx.ajax('GET', `/doctor/appointments/${appointmentId}/edit/`, {
+        target: '#modal',
+        swap: 'innerHTML'
+    });
+}
+
+function closeModal() {
+    document.getElementById('modal').classList.add('hidden');
 }
 </script>
+
+{% csrf_token %}
 {% endblock %} 

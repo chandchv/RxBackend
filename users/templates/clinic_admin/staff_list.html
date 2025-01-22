@@ -99,7 +99,7 @@
 <script>
 function toggleStaffStatus(staffId) {
     if (confirm('Are you sure you want to change this staff member\'s status?')) {
-        fetch(`/users/staff/${staffId}/toggle-status/`, {
+        fetch(`/clinic-admin/staff/${staffId}/toggle-status/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': getCookie('csrftoken'),

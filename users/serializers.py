@@ -1,3 +1,4 @@
+import datetime
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
@@ -55,6 +56,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
         model = Appointment
         fields = [
             'id',
+            'patient',
+            'doctor',
             'patient_name',
             'doctor_name',
             'appointment_date',
@@ -65,8 +68,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
     
     def get_patient_name(self, obj):
         try:
-            if obj.patient and obj.patient.user:
-                return f"{obj.patient.user.first_name} {obj.patient.user.last_name}".strip()
+            if obj.patient:
+                return f"{obj.patient.first_name} {obj.patient.last_name}".strip()
             return "Unknown Patient"
         except AttributeError:
             return "Unknown Patient"
@@ -74,10 +77,21 @@ class AppointmentSerializer(serializers.ModelSerializer):
     def get_doctor_name(self, obj):
         try:
             if obj.doctor:
-                return obj.doctor.name or "Unknown Doctor"
+                return f"Dr. {obj.doctor.user.first_name} {obj.doctor.user.last_name}".strip()
             return "Unknown Doctor"
         except AttributeError:
             return "Unknown Doctor"
+    def validate_appointment_date(self, value):
+        """
+        Validate the appointment date format and ensure it's not in the past
+        """
+        if value < datetime.datetime.now():
+            raise serializers.ValidationError("Appointment date cannot be in the past")
+        return value
+
+    def create(self, validated_data):
+        # Add any additional logic needed for appointment creation
+        return Appointment.objects.create(**validated_data)
 
 class PrescriptionItemSerializer(serializers.ModelSerializer):
     class Meta:
@@ -110,7 +124,7 @@ class DoctorSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Doctor
-        fields = ['id', 'user_name', 'specialization', 'clinic', 'medical_council']
+        fields = ['id', 'user_name', 'specialization', 'clinic', 'medical_council', 'license_number']
 
 class ClinicSerializer(serializers.ModelSerializer):
     class Meta:
@@ -165,5 +179,22 @@ class MedicalHistorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
         fields = ['id', 'patient_name', 'doctor_name', 'appointment', 'diagnosis', 'treatment', 'created_at']
+
+class ClinicSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Clinic
+        fields = [
+            'clinic_name',
+            'address',
+            'phone',
+            'email',
+            'working_hours',
+            'appointment_duration',
+            'break_duration',
+            'online_booking',
+            'sms_reminders',
+            'email_notifications',
+            'logo'
+        ]
     
    

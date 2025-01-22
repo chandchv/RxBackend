@@ -2,22 +2,74 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from ..models import Doctor, Appointment, Patient, DoctorAvailability, AppointmentSlot, DoctorLeave, Billing
+from ..models import Doctor, Appointment, Patient, DoctorAvailability, AppointmentSlot, DoctorLeave, Billing, Bill, Prescription, PatientVitals, PrescriptionItem
 from ..serializers import DoctorSerializer
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from ..scripts.scrapeGpt01 import verify_doctor as verify_doctor_api
 import json
 from django.db.models import Q
 from datetime import date, datetime, timedelta
 from django.utils import timezone
-from django.db.models import Count
+from django.db.models import Count, Avg
 from ..forms import AppointmentForm, DoctorAvailabilityForm
 from django.core.exceptions import ValidationError
 from ..decorators import user_is_doctor
 from django.db import models
+from django.core.mail import send_mail
+from django.conf import settings
+from django.urls import reverse
+from rest_framework.decorators import api_view, permission_classes
+
+def send_appointment_update_notification(appointment):
+    try:
+        subject = 'Appointment Update Notification'
+        message = f"""
+        Dear {appointment.patient.get_full_name()},
+
+        Your appointment with Dr. {appointment.doctor.name} has been updated.
+
+        New Details:
+        Date: {appointment.appointment_date}
+        Time: {appointment.appointment_time}
+        
+        If you have any questions, please contact the clinic.
+
+        Best regards,
+        {appointment.doctor.clinic.name}
+        """
+        
+        print(f"Sending notification for appointment update to {appointment.patient.email}")
+        return True
+    except Exception as e:
+        print(f"Error in notification: {str(e)}")
+        return False
+
+def send_status_update_notification(appointment):
+    try:
+        subject = 'Appointment Status Update'
+        message = f"""
+        Dear {appointment.patient.get_full_name()},
+
+        Your appointment status has been updated to: {appointment.get_status_display()}
+
+        Appointment Details:
+        Date: {appointment.appointment_date}
+        Time: {appointment.appointment_time}
+        
+        If you have any questions, please contact the clinic.
+
+        Best regards,
+        {appointment.doctor.clinic.name}
+        """
+        
+        print(f"Sending status update notification to {appointment.patient.email}")
+        return True
+    except Exception as e:
+        print(f"Error in status notification: {str(e)}")
+        return False
 
 class DoctorCreateView(APIView):
     permission_classes = [IsAuthenticated]
@@ -224,43 +276,39 @@ def doctor_appointments_view(request):
 @login_required
 def create_appointment(request):
     try:
-        print(f"User ID: {request.user.id}")  # Debug print
         doctor = Doctor.objects.filter(user=request.user).first()
         
         if not doctor:
-            print("Doctor not found for user")  # Debug print
             messages.error(request, 'Doctor profile not found. Please complete your profile setup.')
             return redirect('users:doctor_profile')
-            
-        print(f"Doctor found: {doctor.name}")  # Debug print
         
         # Check if doctor has availability set up
         has_availability = DoctorAvailability.objects.filter(doctor=doctor).exists()
         if not has_availability:
-            print("No availability found for doctor")  # Debug print
             messages.warning(request, 'Please set up your availability schedule first.')
             return redirect('users:manage_availability')
         
-        print("Doctor has availability")  # Debug print
+        # Get patient_id from URL parameters
+        patient_id = request.GET.get('patient')
+        selected_patient = None
+        if patient_id:
+            try:
+                selected_patient = Patient.objects.get(id=patient_id, clinic=doctor.clinic)
+            except Patient.DoesNotExist:
+                messages.warning(request, 'Selected patient not found')
         
         if request.method == 'POST':
             form = AppointmentForm(request.POST)
-            # Remove doctor field validation temporarily
             form.fields['doctor'].required = False
             
             if form.is_valid():
                 appointment = form.save(commit=False)
-                # Explicitly set the doctor
                 appointment.doctor = doctor
                 appointment.status = 'scheduled'
                 
-                # Get form data
                 appointment_date = form.cleaned_data['appointment_date']
                 appointment_time = form.cleaned_data['appointment_time']
                 
-                print(f"Creating appointment for date: {appointment_date}, time: {appointment_time}")  # Debug print
-                
-                # Check if the selected time slot is available
                 existing_appointment = Appointment.objects.filter(
                     doctor=doctor,
                     appointment_date=appointment_date,
@@ -273,31 +321,37 @@ def create_appointment(request):
                 else:
                     try:
                         appointment.save()
-                        print(f"Appointment saved successfully: {appointment.id}")  # Debug print
                         messages.success(request, 'Appointment scheduled successfully')
                         return redirect('users:doctor_dashboard')
                     except Exception as save_error:
-                        print(f"Error saving appointment: {str(save_error)}")  # Debug print
                         messages.error(request, f'Error saving appointment: {str(save_error)}')
             else:
-                print("Form errors:", form.errors)  # Debug print
                 messages.error(request, 'Please check the form data')
         else:
-            # Pre-fill the doctor in the form
-            form = AppointmentForm(initial={'doctor': doctor})
+            # Pre-fill both doctor and patient if available
+            initial_data = {'doctor': doctor}
+            if selected_patient:
+                initial_data['patient'] = selected_patient
+            
+            form = AppointmentForm(initial=initial_data)
             form.fields['doctor'].initial = doctor
             form.fields['doctor'].widget.attrs['disabled'] = True
             
+            # If patient is pre-selected, disable the patient field
+            if selected_patient:
+                form.fields['patient'].initial = selected_patient
+                form.fields['patient'].widget.attrs['disabled'] = True
+        
         context = {
             'form': form,
             'patients': Patient.objects.filter(clinic=doctor.clinic),
             'doctor_id': doctor.id,
-            'doctor': doctor
+            'doctor': doctor,
+            'selected_patient': selected_patient
         }
         return render(request, 'doctor/create_appointment.html', context)
         
     except Exception as e:
-        print(f"Error in create_appointment: {str(e)}")  # Debug print
         messages.error(request, 'Error scheduling appointment')
         return redirect('users:doctor_dashboard')
 
@@ -362,16 +416,25 @@ def doctor_dashboard(request):
         messages.error(request, 'Error accessing dashboard')
         return redirect('users:login')
 
-@login_required
-def appointment_detail(request, appointment_id):
+
+def appointment_detail_doctor(request, appointment_id):
     try:
         doctor = Doctor.objects.get(user=request.user)
         appointment = get_object_or_404(Appointment, id=appointment_id, doctor=doctor)
         
+        # Check if bill exists for this appointment
+        bill = Bill.objects.filter(appointment=appointment).first()
+        
         context = {
             'appointment': appointment,
             'patient': appointment.patient,
+            'min_date': timezone.now().date(),
+            'bill': bill  # Add bill to context
         }
+        
+        if request.headers.get('HX-Request'):
+            return render(request, 'doctor/appointment_edit_modal.html', context)
+        
         return render(request, 'doctor/appointment_detail.html', context)
         
     except Doctor.DoesNotExist:
@@ -677,6 +740,11 @@ def doctor_create_appointment(request):
                     print(f"Appointment saved with doctor: {appointment.doctor.id}")  # Debug print
                     messages.success(request, 'Appointment scheduled successfully!')
                     return redirect('users:doctor_dashboard')
+                    print("POST Data:", request.POST)
+                    print("Appointment Date:", appointment_date_str)
+                    print("Parsed Date:", appointment_date)
+                    print("Stored Datetime:", stored_datetime, type(stored_datetime))
+                    print("Comparison Result:", stored_datetime.date() == appointment_date)
                 else:
                     messages.error(request, 'Please select an appointment time.')
             else:
@@ -690,6 +758,7 @@ def doctor_create_appointment(request):
             'doctor': doctor,
             'min_date': timezone.now().date().isoformat(),
         }
+
         
         return render(request, 'doctor/create_appointment.html', context)
 
@@ -701,7 +770,8 @@ def doctor_create_appointment(request):
         messages.error(request, f'Error creating appointment: {str(e)}')
         return redirect('users:dashboard')
 
-@login_required
+
+
 def get_available_slots_doctor(request, doctor_id, date):
     try:
         doctor = Doctor.objects.get(id=doctor_id)
@@ -752,7 +822,7 @@ def get_available_slots_doctor(request, doctor_id, date):
             'slots': available_slots,
             'doctor_name': doctor.name,
             'date': date
-            
+
         })
         
     except Exception as e:
@@ -762,3 +832,457 @@ def get_available_slots_doctor(request, doctor_id, date):
             'slots': []
         }, status=400)
 
+@login_required
+def update_appointment_status(request, appointment_id):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        appointment = get_object_or_404(Appointment, id=appointment_id, doctor=doctor)
+        
+        if request.method == 'POST':
+            new_status = request.POST.get('status')
+            if new_status in dict(Appointment.STATUS_CHOICES):
+                appointment.status = new_status
+                appointment.save()
+                
+                # If appointment is completed and no bill exists, redirect to create bill
+                if new_status == 'completed' and not Bill.objects.filter(appointment=appointment).exists():
+                    return JsonResponse({
+                        'success': True,
+                        'message': f'Appointment marked as {new_status}',
+                        'redirect_url': reverse('users:create_bill', args=[appointment_id])
+                    })
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Appointment marked as {new_status}'
+                })
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid status'
+            }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
+        }, status=500)
+
+@login_required
+def edit_appointment(request, appointment_id):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        appointment = get_object_or_404(Appointment, id=appointment_id, doctor=doctor)
+        
+        if request.method == 'POST':
+            # Handle the form submission
+            appointment.appointment_date = request.POST.get('appointment_date')
+            appointment.appointment_time = request.POST.get('appointment_time')
+            appointment.reason = request.POST.get('reason')
+            appointment.save()
+            
+            # Send appointment update notification
+            try:
+                send_appointment_update_notification(appointment)
+            except Exception as e:
+                print(f"Error sending update notification: {str(e)}")
+            
+            messages.success(request, 'Appointment updated successfully')
+            return redirect('users:doctor_appointments')
+            
+        context = {
+            'appointment': appointment,
+            'min_date': timezone.now().date(),
+        }
+        return render(request, 'doctor/appointment_edit_modal.html', context)
+        
+    except Exception as e:
+        messages.error(request, f'Error updating appointment: {str(e)}')
+        return redirect('users:doctor_appointments')
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def api_create_appointment(request):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        
+        # Parse the date and time from request data
+        appointment_date = datetime.strptime(request.data['appointment_date'], '%Y-%m-%d').date()
+        appointment_time = datetime.strptime(request.data['appointment_time'], '%H:%M').time()
+        
+        # Create appointment
+        appointment = Appointment(
+            doctor=doctor,
+            patient_id=request.data['patient'],
+            appointment_date=appointment_date,
+            appointment_time=appointment_time,
+            reason=request.data.get('reason', ''),
+            status='scheduled'
+        )
+        
+        # Manual validation
+        if appointment_date < timezone.now().date():
+            return Response({"error": "Cannot schedule appointments in the past"}, status=400)
+            
+        # Check for conflicts
+        conflicts = Appointment.objects.filter(
+            doctor=doctor,
+            appointment_date=appointment_date,
+            appointment_time=appointment_time,
+            status='scheduled'
+        )
+        
+        if conflicts.exists():
+            return Response({"error": "This time slot is already booked"}, status=400)
+            
+        appointment.save()
+        return Response({"message": "Appointment created successfully"}, status=201)
+        
+    except KeyError as e:
+        return Response({"error": f"Missing required field: {str(e)}"}, status=400)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_patient_details(request, patient_id):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        patient = Patient.objects.get(id=patient_id)
+        
+        # Check if this patient has any appointments with the doctor
+        if not Appointment.objects.filter(doctor=doctor, patient=patient).exists():
+            return Response({'error': 'Unauthorized access'}, status=403)
+        
+        # Check if patient.user exists before accessing
+        if not patient.user:
+            return Response({'error': 'Patient user data not found'}, status=404)
+            
+        data = {
+            'id': patient.id,
+            'first_name': patient.user.first_name,
+            'last_name': patient.user.last_name,
+            'email': patient.user.email,
+            'age': getattr(patient, 'age', 'N/A'),  # Safe attribute access
+            'gender': getattr(patient, 'gender', 'N/A'),
+            'phone_number': getattr(patient, 'phone_number', 'N/A')
+        }
+        return Response(data)
+    except Doctor.DoesNotExist:
+        return Response({'error': 'Doctor not found'}, status=404)
+    except Patient.DoesNotExist:
+        return Response({'error': 'Patient not found'}, status=404)
+    except Exception as e:
+        print(f"Error in patient details: {str(e)}")
+        return Response({'error': 'Internal server error'}, status=500)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_patient_prescriptions(request, patient_id):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        patient = Patient.objects.get(id=patient_id)
+        
+        if not Appointment.objects.filter(doctor=doctor, patient=patient).exists():
+            return Response({'error': 'Unauthorized access'}, status=403)
+        
+        prescriptions = Prescription.objects.filter(patient=patient)
+        data = [{
+            'id': p.id,
+            'medication': p.medication,
+            'dosage': p.dosage,
+            'duration': p.duration,
+            'date_prescribed': p.created.strftime('%Y-%m-%d'),
+            'notes': p.notes or ''
+        } for p in prescriptions]
+        return Response(data)
+    except (Doctor.DoesNotExist, Patient.DoesNotExist):
+        return Response({'error': 'Not found'}, status=404)
+    except Exception as e:
+        print(f"Error in prescriptions: {str(e)}")
+        return Response({'error': 'Internal server error'}, status=500)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_patient_appointments(request, patient_id):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        patient = Patient.objects.get(id=patient_id)
+        
+        appointments = Appointment.objects.filter(
+            doctor=doctor,
+            patient=patient
+        ).order_by('-appointment_date', '-appointment_time')
+        
+        data = [{
+            'id': a.id,
+            'appointment_date': a.appointment_date.strftime('%Y-%m-%d'),
+            'appointment_time': a.appointment_time.strftime('%H:%M'),
+            'status': a.status,
+            'notes': a.reason or ''
+        } for a in appointments]
+        return Response(data)
+    except (Doctor.DoesNotExist, Patient.DoesNotExist):
+        return Response({'error': 'Not found'}, status=404)
+    except Exception as e:
+        print(f"Error in appointments: {str(e)}")  # Debug log
+        return Response({'error': 'Internal server error'}, status=500)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_patient_medical_history(request, patient_id):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        patient = Patient.objects.get(id=patient_id)
+        
+        if not Appointment.objects.filter(doctor=doctor, patient=patient).exists():
+            return Response({'error': 'Unauthorized access'}, status=403)
+        
+        history = MedicalHistory.objects.filter(patient=patient)
+        data = [{
+            'id': h.id,
+            'condition': h.condition,
+            'date': h.date.strftime('%Y-%m-%d') if h.date else None,
+            'notes': h.notes or ''
+        } for h in history]
+        return Response(data)
+    except (Doctor.DoesNotExist, Patient.DoesNotExist):
+        return Response({'error': 'Not found'}, status=404)
+    except Exception as e:
+        print(f"Error in medical history: {str(e)}")
+        return Response({'error': 'Internal server error'}, status=500)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_patient_details(request, patient_id):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        patient = get_object_or_404(Patient, id=patient_id)
+        
+        # Calculate age from date_of_birth
+        today = timezone.now().date()
+        age = today.year - patient.date_of_birth.year - (
+            (today.month, today.day) < (patient.date_of_birth.month, patient.date_of_birth.day)
+        )
+        
+        data = {
+            'patient': {
+                'id': patient.id,
+                'first_name': patient.first_name,
+                'last_name': patient.last_name,
+                'email': patient.email,
+                'phone_number': patient.phone_number,
+                'date_of_birth': patient.date_of_birth.isoformat(),
+                'age': age,
+                'gender': patient.gender
+            }
+        }
+        return Response(data)
+        
+    except Doctor.DoesNotExist:
+        return Response({'error': 'Doctor not found'}, status=404)
+    except Patient.DoesNotExist:
+        return Response({'error': 'Patient not found'}, status=404)
+    except Exception as e:
+        print(f"Error in get_patient_details: {str(e)}")
+        return Response({'error': 'Internal server error'}, status=500)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_appointment_detail(request, appointment_id):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        appointment = get_object_or_404(Appointment, id=appointment_id, doctor=doctor)
+        
+        data = {
+            'id': appointment.id,
+            'appointment_date': appointment.appointment_date,
+            'appointment_time': appointment.appointment_time.strftime('%H:%M'),
+            'status': appointment.status,
+            'notes': appointment.reason or '',
+            'patient_name': f"{appointment.patient.first_name} {appointment.patient.last_name}",
+            'patient_id': appointment.patient.id,
+        }
+        
+        return Response(data)
+        
+    except Doctor.DoesNotExist:
+        return Response({'error': 'Doctor not found'}, status=404)
+    except Appointment.DoesNotExist:
+        return Response({'error': 'Appointment not found'}, status=404)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_prescription_api(request):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        data = request.data
+        
+        # Convert vital values to proper types
+        def convert_to_decimal(value):
+            try:
+                return float(value) if value and value.strip() else None
+            except (ValueError, AttributeError):
+                return None
+
+        # Handle follow_up_date
+        follow_up_date = data.get('follow_up_date')
+        if follow_up_date and follow_up_date.strip():
+            try:
+                follow_up_date = datetime.strptime(follow_up_date, '%Y-%m-%d').date()
+            except ValueError:
+                return Response({'error': 'Invalid follow-up date format. Use YYYY-MM-DD'}, status=400)
+        else:
+            follow_up_date = None
+
+        # Create patient vitals first
+        vitals = PatientVitals.objects.create(
+            patient_id=data['patient_id'],
+            weight=convert_to_decimal(data.get('weight')),
+            height=convert_to_decimal(data.get('height')),
+            blood_pressure=data.get('blood_pressure'),
+            temperature=convert_to_decimal(data.get('temperature')),
+            heart_rate=convert_to_decimal(data.get('heart_rate')),
+            oxygen_saturation=convert_to_decimal(data.get('oxygen_saturation')),
+            recorded_by=request.user
+        )
+
+        # Create prescription
+        prescription = Prescription.objects.create(
+            patient_id=data['patient_id'],
+            doctor=doctor,
+            vitals=vitals,
+            chief_complaints=data.get('chief_complaints'),
+            clinical_findings=data.get('clinical_findings'),
+            diagnosis=data.get('diagnosis'),
+            advice=data.get('advice'),
+            follow_up_date=follow_up_date
+        )
+
+        # Create prescription items
+        medicines = data.get('medicines', [])
+        for medicine in medicines:
+            PrescriptionItem.objects.create(
+                prescription=prescription,
+                medicine=medicine['name'],
+                dosage=medicine['dosage'],
+                duration=medicine['duration'],
+                duration_unit=medicine.get('duration_unit', 'days'),
+                instructions=medicine.get('instructions', '')
+            )
+
+        return Response({
+            'message': 'Prescription created successfully',
+            'id': prescription.id
+        }, status=201)
+        
+    except Doctor.DoesNotExist:
+        return Response({'error': 'Doctor not found'}, status=404)
+    except ValueError as e:
+        return Response({'error': f'Invalid value: {str(e)}'}, status=400)
+    except Exception as e:
+        print(f"Error creating prescription: {str(e)}")
+        return Response({'error': str(e)}, status=400)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_patient_latest_vitals(request, patient_id):
+    try:
+        # Get the most recent vitals for the patient
+        latest_vitals = PatientVitals.objects.filter(
+            patient_id=patient_id
+        ).select_related('patient').order_by('-created_at').first()
+
+        if latest_vitals:
+            data = {
+                'weight': str(latest_vitals.weight) if latest_vitals.weight else '',
+                'height': str(latest_vitals.height) if latest_vitals.height else '',
+                'blood_pressure': latest_vitals.blood_pressure or '',
+                'temperature': str(latest_vitals.temperature) if latest_vitals.temperature else '',
+                'heart_rate': str(latest_vitals.heart_rate) if latest_vitals.heart_rate else '',
+                'oxygen_saturation': str(latest_vitals.oxygen_saturation) if latest_vitals.oxygen_saturation else '',
+                'bmi': str(latest_vitals.bmi) if latest_vitals.bmi else '',
+                'recorded_at': latest_vitals.created_at.strftime('%Y-%m-%d %H:%M'),
+                'recorded_by': latest_vitals.recorded_by.get_full_name() if latest_vitals.recorded_by else 'Unknown'
+            }
+            return Response(data)
+        return Response({
+            'message': 'No previous vitals found'
+        }, status=200)
+        
+    except Exception as e:
+        print(f"Error fetching patient vitals: {str(e)}")
+        return Response({'error': str(e)}, status=400)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_doctor_reports(request):
+    try:
+        period = request.GET.get('period', 'week')
+        doctor = request.user.doctor
+        today = timezone.now()
+
+        # Set time period
+        if period == 'week':
+            start_date = today - timedelta(days=7)
+            date_format = '%a'
+        elif period == 'month':
+            start_date = today - timedelta(days=30)
+            date_format = '%d'
+        else:  # year
+            start_date = today - timedelta(days=365)
+            date_format = '%b'
+
+        # Get appointments in period
+        appointments = Appointment.objects.filter(
+            doctor=doctor,
+            appointment_date__gte=start_date,
+            appointment_date__lte=today
+        )
+
+        # Get new patients in period
+        new_patients = Patient.objects.filter(
+            created_at__gte=start_date,
+            created_at__lte=today,
+            appointments__doctor=doctor
+        ).distinct().count()
+
+        # Get prescriptions in period
+        prescriptions = Prescription.objects.filter(
+            doctor=doctor,
+            created_at__gte=start_date,
+            created_at__lte=today
+        )
+
+        # Calculate appointment trend
+        appointment_trend = appointments.extra(
+            select={'date': f"DATE_FORMAT(appointment_date, '{date_format}')"}).\
+            values('date').annotate(count=Count('id')).order_by('appointment_date')
+
+        # Calculate completion rate
+        completed = appointments.filter(status='COMPLETED').count()
+        total = appointments.count()
+        completion_rate = (completed / total * 100) if total > 0 else 0
+
+        data = {
+            'total_appointments': appointments.count(),
+            'new_patients': new_patients,
+            'total_prescriptions': prescriptions.count(),
+            'revenue': calculate_revenue(appointments),  # Implement based on your billing logic
+            'appointment_trend': {
+                'labels': [item['date'] for item in appointment_trend],
+                'data': [item['count'] for item in appointment_trend]
+            },
+            'avg_daily_appointments': round(appointments.count() / 7, 1),
+            'completion_rate': round(completion_rate, 1),
+            'patient_satisfaction': 95  # Implement based on your feedback system
+        }
+
+        return Response(data)
+
+    except Exception as e:
+        return Response({
+            'error': str(e)
+        }, status=400)
+
+def calculate_revenue(appointments):
+    # Implement your revenue calculation logic here
+    return sum(appointment.fee for appointment in appointments if appointment.fee)

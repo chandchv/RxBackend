@@ -1,7 +1,7 @@
 from django.http import HttpResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
-from ..models import Prescription
+from ..models import Clinic, Prescription
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -31,28 +31,32 @@ def generate_prescription_pdf(request, pk):
             doctor=doctor
         )
         
-        # Get vitals
+        # Get vitals - using created_at instead of recorded_at
         vitals = PatientVitals.objects.filter(
             patient=prescription.patient,
-            recorded_at__lte=prescription.created_at
-        ).order_by('-recorded_at').first()
+            created_at__lte=prescription.created_at
+        ).order_by('-created_at').first()
         
         # Handle logo path
         logo_path = None
         if doctor.clinic and doctor.clinic.logo:
-            # Convert Windows path to forward slashes and remove drive letter
-            logo_path = str(doctor.clinic.logo.path).replace('\\', '/')
-            if ':' in logo_path:  # Remove drive letter if present
-                logo_path = logo_path.split(':', 1)[1]
-            logo_path = f"file://{logo_path}"
-            print(f"Processed logo path: {logo_path}")
+            try:
+                # Get the absolute URL of the logo
+                logo_path = request.build_absolute_uri(doctor.clinic.logo.url)
+            except Exception as e:
+                print(f"Logo path error: {str(e)}")
+                logo_path = None
         
         context = {
             'prescription': prescription,
             'doctor': doctor,
             'vitals': vitals,
-            'logo_path': logo_path
+            'logo_path': logo_path,
+            'MEDIA_URL': settings.MEDIA_URL,
+            'BASE_DIR': settings.BASE_DIR,
         }
+        
+        print(f"Context data: vitals={vitals}, logo_path={logo_path}")  # Debug print
         
         template = get_template('doctor/prescription_pdf.html')
         html = template.render(context)
@@ -63,7 +67,7 @@ def generate_prescription_pdf(request, pk):
             BytesIO(html.encode("UTF-8")), 
             result,
             encoding='utf-8',
-            link_callback=fetch_resources  # Add this line
+            link_callback=fetch_resources
         )
         
         if not pdf.err:
@@ -75,25 +79,37 @@ def generate_prescription_pdf(request, pk):
         return HttpResponse('Error generating PDF', status=400)
         
     except Exception as e:
-        print(f"Exception: {str(e)}")
+        print(f"Exception in generate_prescription_pdf: {str(e)}")
+        print(f"Prescription ID: {pk}")  # Debug print
+        print(f"Doctor: {doctor}")  # Debug print
         messages.error(request, str(e))
         return redirect('users:prescription_detail', pk=pk)
 
-# Add this function to handle resource fetching
 def fetch_resources(uri, rel):
     """
     Convert HTML URIs to absolute system paths so xhtml2pdf can access those resources
     """
-    if uri.startswith('file:///'):
-        path = uri[8:]  # Remove 'file:///'
-    elif uri.startswith('file://'):
-        path = uri[7:]  # Remove 'file://'
-    else:
-        path = uri
+    try:
+        # If the URI is a URL, leave it unchanged
+        if uri.startswith('http://') or uri.startswith('https://'):
+            return uri
 
-    # Convert path to absolute path
-    if not os.path.isabs(path):
-        base_dir = os.path.join(settings.MEDIA_ROOT)
-        path = os.path.join(base_dir, path)
+        # Convert URI to absolute filepath
+        if uri.startswith('/'):
+            path = uri[1:]  # Remove leading slash
+        else:
+            path = uri
 
-    return path
+        # Join with MEDIA_ROOT for media files
+        abs_path = os.path.join(settings.MEDIA_ROOT, path)
+        
+        # Ensure the file exists
+        if not os.path.exists(abs_path):
+            print(f"Resource not found: {abs_path}")
+            return None
+
+        return abs_path
+
+    except Exception as e:
+        print(f"Error in fetch_resources: {str(e)}")
+        return None

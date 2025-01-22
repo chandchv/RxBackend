@@ -4,8 +4,8 @@
 
 
 {% block content %}
-<div class="max-w-4xl mx-auto px-4 py-8">
-    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
         <div class="px-6 py-4 border-b border-gray-200">
             <div class="flex justify-between items-center">
                 <h1 class="text-2xl font-bold text-gray-900">Appointment Details</h1>
@@ -86,41 +86,82 @@
             </div>
             {% endif %}
         </div>
+
+        <!-- Add Billing Section -->
+        <div class="px-4 py-5 sm:px-6 border-t border-gray-200">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">Billing Information</h3>
+            
+            {% if bill %}
+            <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Bill Status</p>
+                    <p class="mt-1">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                            {% if bill.status == 'paid' %}bg-green-100 text-green-800
+                            {% elif bill.status == 'pending' %}bg-red-100 text-red-800
+                            {% elif bill.status == 'partial' %}bg-yellow-100 text-yellow-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ bill.get_status_display }}
+                        </span>
+                    </p>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Total Amount</p>
+                    <p class="mt-1 text-sm text-gray-900">₹{{ bill.total }}</p>
+                </div>
+                <div class="sm:col-span-2">
+                    <a href="{% url 'users:patient_bill_detail' bill.id %}" 
+                       class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                        View Bill Details
+                    </a>
+                </div>
+            </div>
+            {% else %}
+                {% if appointment.status == 'completed' %}
+                <div class="mt-4">
+                    <a href="{% url 'users:create_bill' appointment.id %}" 
+                       class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                        Generate Bill
+                    </a>
+                </div>
+                {% else %}
+                <p class="mt-4 text-sm text-gray-500">Bill will be generated after appointment completion.</p>
+                {% endif %}
+            {% endif %}
+        </div>
     </div>
 </div>
+
+<!-- Add JavaScript for handling status updates -->
 <script>
-    function updateAppointmentStatus(appointmentId, newStatus) {
-        if (!confirm(`Are you sure you want to mark this appointment as ${newStatus}?`)) {
-            return;
-        }
-        
-        // Get CSRF token
-        const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        
-        fetch(`/users/appointments/${appointmentId}/update-status/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-CSRFToken': csrftoken
-            },
-            body: `status=${newStatus}`
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Show success message
-                alert(data.message);
-                // Reload page to show updated status
-                window.location.reload();
-            } else {
-                alert('Error: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error updating appointment status');
+document.addEventListener('DOMContentLoaded', function() {
+    const statusForm = document.getElementById('status-form');
+    if (statusForm) {
+        statusForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            
+            fetch(this.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.redirect_url) {
+                        window.location.href = data.redirect_url;
+                    } else {
+                        location.reload();
+                    }
+                }
+            });
         });
     }
-    </script>
+});
+</script>
+
 {% csrf_token %}
 {% endblock %} 

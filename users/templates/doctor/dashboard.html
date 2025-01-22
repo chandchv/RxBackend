@@ -81,8 +81,13 @@
                                 </span>
                             </td>
                             <td class="px-6 py-4">
-                                <a href="{% url 'users:appointment_detail' appointment.id %}" 
-                                   class="text-blue-600 hover:text-blue-900">View</a>
+                                <a href="{% url 'users:appointment_detail_doctor' appointment.id %}"
+                                class="text-blue-600 hover:text-blue-900"
+                                hx-get="{% url 'users:appointment_detail_doctor' appointment.id %}"
+                                hx-target="#modal"
+                                hx-trigger="click">
+                                    View
+                                </a>
                             </td>
                         </tr>
                         {% endfor %}
@@ -105,4 +110,69 @@
         </ul>
     </nav>
 </div>
+
+<!-- Add modal container at the bottom of the page -->
+<div id="modal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center hidden">
+    <!-- Modal content will be loaded here -->
+</div>
+
+<script>
+document.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.target.id === 'modal') {
+        evt.target.classList.remove('hidden');
+    }
+});
+
+// Close modal when clicking outside
+document.getElementById('modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        this.classList.add('hidden');
+    }
+});
+
+function closeModal() {
+    document.getElementById('modal').classList.add('hidden');
+}
+
+function updateAppointmentStatus(appointmentId, newStatus) {
+    if (!confirm(`Are you sure you want to mark this appointment as ${newStatus}?`)) {
+        return;
+    }
+    
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch(`/api/appointments/${appointmentId}/update-status/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrftoken
+        },
+        body: `status=${newStatus}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            closeModal();
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating appointment status');
+    });
+}
+
+function editAppointment(appointmentId) {
+    // Load edit modal using HTMX
+    htmx.ajax('GET', `/doctors/appointments/${appointmentId}/edit/`, {
+        target: '#modal',
+        swap: 'innerHTML'
+    });
+}
+</script>
+
+{% csrf_token %}
 {% endblock %} 

@@ -1,0 +1,135 @@
+{% extends 'billing/base_billing.html' %}
+{% load static %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/vue@2.6.14"></script>
+{% endblock %}
+
+{% block billing_content %}
+<div class="p-6" id="billing-app">
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold text-gray-900">Create New Bill</h1>
+        <p class="text-sm text-gray-600">Appointment Date: {{ appointment.appointment_date }}</p>
+        <p class="text-sm text-gray-600">Patient: {{ appointment.patient.get_full_name }}</p>
+    </div>
+
+    <form method="POST" @submit.prevent="submitForm">
+        {% csrf_token %}
+        
+        <!-- Bill Items -->
+        <div class="mb-8">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Bill Items</h3>
+            <div class="space-y-4">
+                <div v-for="(item, index) in items" :key="index" class="flex space-x-4 items-center">
+                    <div class="flex-1">
+                        <select v-model="item.id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">Select Item</option>
+                            {% for billing_item in billing_items %}
+                            <option value="{{ billing_item.id }}" 
+                                    data-price="{{ billing_item.price }}">
+                                {{ billing_item.name }} - ₹{{ billing_item.price }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="w-32">
+                        <input type="number" v-model="item.quantity" min="1" 
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                               placeholder="Qty">
+                    </div>
+                    <div class="w-32">
+                        <span class="text-gray-700">₹[[ item.total ]]</span>
+                    </div>
+                    <button type="button" @click="removeItem(index)" 
+                            class="text-red-600 hover:text-red-900">Remove</button>
+                </div>
+            </div>
+            <button type="button" @click="addItem" 
+                    class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-600 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                Add Item
+            </button>
+        </div>
+
+        <!-- Bill Details -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div>
+                {{ form.as_p }}
+            </div>
+            <div class="text-right">
+                <p class="text-sm text-gray-600">Subtotal: ₹[[ subtotal ]]</p>
+                <p class="text-sm text-gray-600">Tax (18%): ₹[[ tax ]]</p>
+                <p class="text-sm text-gray-600">Discount: ₹[[ discount ]]</p>
+                <p class="text-lg font-bold text-gray-900 mt-2">Total: ₹[[ total ]]</p>
+            </div>
+        </div>
+
+        <div class="flex justify-end space-x-4">
+            <button type="button" onclick="history.back()" 
+                    class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                Cancel
+            </button>
+            <button type="submit" 
+                    class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                Create Bill
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+new Vue({
+    delimiters: ['[[', ']]'],
+    el: '#billing-app',
+    data: {
+        items: [{
+            id: '',
+            quantity: 1,
+            price: 0
+        }],
+        discount: 0
+    },
+    computed: {
+        subtotal() {
+            return this.items.reduce((sum, item) => sum + item.total, 0);
+        },
+        tax() {
+            return this.subtotal * 0.18;
+        },
+        total() {
+            return this.subtotal + this.tax - this.discount;
+        }
+    },
+    methods: {
+        addItem() {
+            this.items.push({
+                id: '',
+                quantity: 1,
+                price: 0
+            });
+        },
+        removeItem(index) {
+            this.items.splice(index, 1);
+        },
+        submitForm() {
+            const form = event.target;
+            const itemsData = JSON.stringify(this.items);
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'items_data';
+            input.value = itemsData;
+            form.appendChild(input);
+            form.submit();
+        }
+    },
+    watch: {
+        'items.*.id'(newVal, oldVal) {
+            const item = this.items.find(i => i.id === newVal);
+            if (item) {
+                const option = document.querySelector(`option[value="${newVal}"]`);
+                item.price = parseFloat(option.dataset.price);
+            }
+        }
+    }
+});
+</script>
+{% endblock %} 
