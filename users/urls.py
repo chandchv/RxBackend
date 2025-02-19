@@ -2,6 +2,7 @@ from django.urls import path, include
 
 from .views import doctor_views, staff_views, admin_views
 from .views import auth_views
+from .views import utils
 from .views import (
     signup_view,
     login_view,
@@ -57,6 +58,7 @@ from .views.appointment_views import (
     appointments_view,
     appointment_detail,
     appointment_delete,
+    get_available_slots,
     update_appointment_status,
     appointment_edit,
 )
@@ -96,6 +98,11 @@ from .views.clinic_admin_views import (
     doctor_details,
     clinic_admin_dashboard_api,
     doctor_list_api,
+    create_clinic_api,
+    update_current_clinic,
+    get_clinics_api,
+    get_current_clinic,
+    doctor_detail_api,
 )
 
 from .views.auth_views import (
@@ -107,8 +114,7 @@ from .views.auth_views import (
     patient_signup_api,
     doctor_signup_view,
     patient_signup_view,
-    
-    
+    verify_firebase_token,
 )
 
 from .views.api_views import (
@@ -117,6 +123,10 @@ from .views.api_views import (
     get_clinic_appointments,
     get_clinic_doctors,
     get_clinic_staff,
+    update_staff_role,
+    get_available_slots,
+    get_clinics,
+    get_clinic_patients,
 )
 
 from .views import dashboard_views
@@ -185,7 +195,7 @@ urlpatterns = [
        # path('clinics/', get_clinics_list, name='get_clinics_list'),
         #path('staff/', get_staff_list, name='get_staff_list'),
        # path('users/', get_users_list, name='get_users_list'),
-        path('login/', login_api, name='login'),
+        path('login/', login_api, name='login'), 
         path('logout/', logout_api, name='logout'),
         path('signup/', signup_api, name='signup'),
         path('doctor/signup/', doctor_signup_api, name='doctor_signup'),
@@ -297,7 +307,7 @@ urlpatterns = [
     
     # Doctor API endpoints
     path('api/doctor/me/', api_views.doctor_me, name='doctor_me'),
-    path('api/doctor/appointments/', api_views.doctor_appointments, name='doctor_appointments'),
+    path('api/doctor-dashboard/appointments/', api_views.doctor_appointments, name='doctor_appointments'),
     
     # Patient API endpoints
     path('api/patient/appointments/', api_views.patient_appointments, name='patient_appointments'),
@@ -319,6 +329,7 @@ urlpatterns = [
     path('doctor/create-patient/', doctor_views.create_patient_doctor, name='create_patient_doctor'),
     path('doctor/availability/', doctor_views.manage_availability, name='manage_availability'),
     path('doctor/generate-slots/', doctor_views.generate_slots, name='generate_slots'),
+    path('api/doctor/generate-slots/', doctor_views.generate_slots_api, name='generate_slots_api'),
     path('doctor/leaves/', doctor_views.manage_leaves, name='manage_leaves'),
     path('profile/setup/', dashboard_views.profile_setup, name='profile_setup'),
     path('patient/medical-history/', 
@@ -371,7 +382,7 @@ urlpatterns = [
     path('api/doctor/patients/<int:patient_id>/prescriptions/', doctor_views.api_patient_prescriptions, name='api_patient_prescriptions'),
     path('api/doctor/patients/<int:patient_id>/appointments/', doctor_views.api_patient_appointments, name='api_patient_appointments'),
     path('api/doctor/patients/<int:patient_id>/medical-history/', doctor_views.api_patient_medical_history, name='api_patient_medical_history'),
-
+ 
     # Add this URL pattern
     path('api/doctor/patient/<int:patient_id>/', doctor_views.get_patient_details, name='get_patient_details'),
 
@@ -382,8 +393,43 @@ urlpatterns = [
 
     path('api/doctor/prescriptions/create/', doctor_views.create_prescription_api, name='create_prescription_api'),
     path('api/auth/login/', auth_views.login_api, name='login_api'),
-    path('clinic-admin/dashboard/', clinic_admin_dashboard_api, name='clinic_admin_dashboard_api'),
-    path('clinic-admin/doctors/', doctor_list_api, name='doctor_list_api'),
+    path('clinic-admin/dashboard/', clinic_admin_views.clinic_admin_dashboard_api, name='clinic_admin_dashboard_api'),
+    path('api/clinic-admin/doctors/', clinic_admin_views.doctor_list_api, name='doctor_list_api'),
+    path('api/clinic-admin/doctors/<int:clinic_id>/', clinic_admin_views.doctor_list_api, name='doctor_list_api_with_id'),
     path('change-clinic/<int:clinic_id>/', clinic_admin_views.change_clinic, name='change_clinic'),
     path('edit-clinic-profile/<int:clinic_id>/', clinic_admin_views.edit_clinic_profile, name='edit_clinic_profile'),
-]
+    path('api/clinics/', get_clinics_api, name='get_clinics_api'),
+    path('api/clinics/create/', create_clinic_api, name='create_clinic_api'),
+    path('api/clinics/current/', update_current_clinic, name='update_current_clinic'),
+    path('api/clinic-admin/dashboard/<int:clinic_id>/', clinic_admin_views.clinic_admin_dashboard_api, name='clinic_admin_dashboard_api_with_id'),
+    path('api/clinics/current/', clinic_admin_views.get_current_clinic, name='get_current_clinic'),
+    path('api/clinic-admin/patients/', clinic_admin_views.patient_list_api, name='patient_list_api'),
+    path('api/clinic-admin/patients/<int:clinic_id>/', clinic_admin_views.patient_list_api, name='patient_list_api_with_id'),
+    path('api/clinic-admin/doctors/<int:doctor_id>/', clinic_admin_views.edit_doctor_api, name='edit_doctor_api'),
+    path('api/clinic-admin/doctors/<int:doctor_id>/detail/', 
+         clinic_admin_views.doctor_detail_api, 
+         name='doctor_detail_api'),
+    path('api/clinic-admin/doctors/<int:doctor_id>/status/', 
+         clinic_admin_views.doctor_status_api, 
+         name='doctor_status_api'),
+    path('api/doctor/create-patient/', doctor_views.create_patient_api, name='create_patient_api'),
+    path('api/doctor/profile/', doctor_views.doctor_profile_api, name='doctor_profile_api'),
+    path('api/doctor/available-slots/', doctor_views.get_available_slots_doctor, name='get_available_slots_doctor'),
+    path('api/doctor/appointments/list/', doctor_views.doctor_appointments_api, name='doctor_appointments_api'),
+    path('api/doctor/prescriptions/patient/<int:patient_id>/', doctor_views.patient_prescriptions_api, name='patient_prescriptions_api'),
+    path('admin/clinics/<int:clinic_id>/staff/<int:staff_id>/role/', update_staff_role, name='update_staff_role'),
+    path('api/appointments/available-slots/<int:doctor_id>/<str:date>/', get_available_slots, name='get_available_slots'),
+    path('api/appointments/create/', api_views.create_appointment, name='create_appointment'),
+    path('api/clinic-admin/clinics/', get_clinics, name='get_clinics'),
+    path('api/clinic-admin/patients/list/<int:clinic_id>/', get_clinic_patients, name='get_clinic_patients'),
+    path('api/admin/patient-edit/<int:patient_id>/', api_views.edit_patient_details, name='edit_patient_details'),
+    path('api/admin/patient-update/<int:patient_id>/', api_views.update_patient_details, name='update_patient_details'),
+    path('api/clinic-admin/doctors/<int:clinic_id>/', api_views.clinic_doctors, name='clinic_doctors'),
+    path(
+        'api/doctor/patients/<int:patient_id>/latest-vitals/',
+        doctor_views.get_patient_latest_vitals,
+        name='patient-latest-vitals'
+    ),
+    path('auth/google/', verify_firebase_token, name='verify_firebase_token'),
+    path('social-auth/', include('social_django.urls', namespace='social')),
+] 

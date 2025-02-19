@@ -1,12 +1,13 @@
 from datetime import timedelta, timezone
 import datetime
+from django.http import JsonResponse
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404      
 from ..models import Doctor, Appointment, Patient, Prescription, Clinic, Staff, ClinicAdmin
-from ..serializers import AppointmentSerializer,PatientSerializer, PatientListSerializer, PrescriptionSerializer, DoctorSerializer, ClinicSerializer, MedicalHistorySerializer
+from ..serializers import AppointmentSerializer, DoctorSerializer1,PatientSerializer, PatientDetailsSerializer, PatientListSerializer, PrescriptionSerializer, DoctorSerializer, ClinicSerializer, MedicalHistorySerializer
 import logging
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from ..models import Patient, Prescription
@@ -19,8 +20,15 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.parsers import MultiPartParser, FormParser
 import json
+from django.contrib.auth import get_user_model
+import datetime as dt
+from django.db.models import Case, When, Value, IntegerField
+from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import Group
 
 logger = logging.getLogger(__name__)
+
+User = get_user_model()
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -59,34 +67,61 @@ def update_appointment_status(request, appointment_id):
         )
 
 @api_view(['GET'])
-def available_slots(request, doctor_id, date):
+@permission_classes([IsAuthenticated])
+def get_available_slots(request, doctor_id, date):
+    """Get available slots for a doctor on a specific date"""
     try:
+        # Get the doctor instance directly from Doctor model
         doctor = Doctor.objects.get(id=doctor_id)
-        selected_date = datetime.strptime(date, '%Y-%m-%d').date()
         
-        # Get all booked appointments for the selected date
-        booked_slots = Appointment.objects.filter(
+        # Parse the date string using datetime.strptime
+        try:
+            appointment_date = dt.datetime.strptime(date, '%Y-%m-%d').date()
+        except ValueError:
+            return Response(
+                {'error': 'Invalid date format. Use YYYY-MM-DD'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get all existing appointments for this doctor on this date
+        existing_appointments = Appointment.objects.filter(
             doctor=doctor,
-            appointment_date__date=selected_date
-        ).values_list('appointment_date__time', flat=True)
+            appointment_date=appointment_date
+        ).values_list('appointment_time', flat=True)
         
-        # Generate available time slots (example: 9 AM to 5 PM, 30-minute intervals)
-        all_slots = []
-        start_time = timezone.datetime.combine(selected_date, timezone.datetime.min.time().replace(hour=9))
-        end_time = timezone.datetime.combine(selected_date, timezone.datetime.min.time().replace(hour=17))
+        # Define all possible slots (9 AM to 5 PM)
+        all_slots = [
+            '09:00', '09:30', 
+            '10:00', '10:30', 
+            '11:00', '11:30',
+            '14:00', '14:30',
+            '15:00', '15:30',
+            '16:00', '16:30'
+        ]
         
-        current_slot = start_time
-        while current_slot < end_time:
-            if current_slot.time() not in booked_slots:
-                all_slots.append(current_slot.strftime('%H:%M'))
-            current_slot += timedelta(minutes=30)
+        # Remove booked slots
+        available_slots = [
+            slot for slot in all_slots 
+            if slot not in existing_appointments
+        ]
         
-        return Response({'slots': all_slots})
+        return Response({
+            'available_slots': available_slots,
+            'doctor_id': doctor_id,
+            'date': date
+        })
         
     except Doctor.DoesNotExist:
-        return Response({'error': 'Doctor not found'}, status=404)
+        return Response(
+            {'error': 'Doctor not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
     except Exception as e:
-        return Response({'error': str(e)}, status=400) 
+        print(f"Error in get_available_slots: {str(e)}")  # Debug log
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -184,6 +219,13 @@ def doctor_me(request):
 def doctor_appointments(request):
     """Get doctor's appointments"""
     try:
+        # Verify user is a doctor
+        if not request.user.groups.filter(name='Doctor').exists():
+            return Response(
+                {'error': 'User is not authorized as a doctor'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
         logger.info(f"Fetching appointments for doctor user: {request.user.username}")
         
         # Get the doctor from the authenticated user
@@ -193,8 +235,6 @@ def doctor_appointments(request):
         appointments = Appointment.objects.filter(
             doctor=doctor
         ).order_by('appointment_date')
-        
-        logger.info(f"Found {appointments.count()} appointments for doctor")
         
         serializer = AppointmentSerializer(appointments, many=True)
         return Response(serializer.data)
@@ -222,10 +262,39 @@ def patient_appointments(request):
         # Get the patient from the authenticated user
         patient = Patient.objects.get(user=request.user)
         
-        # Get appointments
+        # Get current date
+        today = timezone.now().date()
+        
+        # Get appointments with custom ordering
         appointments = Appointment.objects.filter(
             patient=patient
-        ).order_by('appointment_date')
+        ).annotate(
+            # Custom ordering field
+            order=Case(
+                # Upcoming scheduled appointments first
+                When(
+                    appointment_date__gte=today,
+                    status='scheduled',
+                    then=Value(1)
+                ),
+                # Past scheduled appointments second
+                When(
+                    appointment_date__lt=today,
+                    status='scheduled',
+                    then=Value(2)
+                ),
+                # Completed appointments third
+                When(status='completed', then=Value(3)),
+                # Cancelled appointments last
+                When(status='cancelled', then=Value(4)),
+                default=Value(5),
+                output_field=IntegerField(),
+            )
+        ).order_by(
+            'order',
+            '-appointment_date',  # Most recent dates first within each status group
+            'appointment_time'
+        )
         
         logger.info(f"Found {appointments.count()} appointments for patient")
         
@@ -410,29 +479,49 @@ def admin_staff_api(request, clinic_id):
         clinic = Clinic.objects.get(id=clinic_id)
         
         if request.method == 'GET':
-            staff = clinic.staff_set.all()
+            # Get all users who are staff members for this clinic
+            staff_users = User.objects.filter(
+                is_staff=True,
+                staff__clinic=clinic
+            ).select_related('staff', 'profile')
+            
             data = [{
-                'id': staff_member.id,
-                'name': staff_member.name,
-                'role': staff_member.role,
-                'phone_number': staff_member.phone_number,
-                'email': staff_member.email
-            } for staff_member in staff]
+                'id': user.id,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'email': user.email,
+                'is_active': user.is_active,
+                'role': user.staff.role if hasattr(user, 'staff') else None,
+                'phone_number': user.profile.phone_number if hasattr(user, 'profile') else None
+            } for user in staff_users]
+            
             return Response(data)
             
         elif request.method == 'POST':
-            # Create new staff member
-            staff = Staff.objects.create(
+            # Create new staff user
+            user_data = {
+                'email': request.data.get('email'),
+                'first_name': request.data.get('first_name'),
+                'last_name': request.data.get('last_name'),
+                'is_staff': True,
+                'is_active': True
+            }
+            
+            user = User.objects.create_user(**user_data)
+            
+            # Create staff record
+            Staff.objects.create(
+                user=user,
                 clinic=clinic,
-                name=request.data.get('name'),
-                role=request.data.get('role'),
-                phone_number=request.data.get('phone_number'),
-                email=request.data.get('email')
+                role=request.data.get('role')
             )
             
             return Response({
-                'id': staff.id,
-                'name': staff.name,
+                'id': user.id,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'email': user.email,
+                'role': request.data.get('role'),
                 'message': 'Staff member added successfully'
             }, status=status.HTTP_201_CREATED)
             
@@ -550,7 +639,7 @@ def get_clinic_doctors(request, clinic_id):
 def get_clinic_staff(request, clinic_id):
     """Get all staff for a specific clinic"""
     staff = Staff.objects.filter(clinic_id=clinic_id)
-    return Response(staff.values())
+    return JsonResponse(staff.values())
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -566,105 +655,128 @@ def get_doctors(request):
     doctors = Doctor.objects.all()
     return Response(doctors.values())
 
-
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-@parser_classes([MultiPartParser, FormParser])
 def create_doctor_profile(request):
-    """
-    Create a new doctor profile after verification
-    """
-    logger.info("Received doctor profile creation request")
-    
     try:
-        # Get the clinic
-        clinic_id = request.data.get('clinic')
-        clinic = Clinic.objects.get(id=clinic_id)
+        # Get clinic_id from request data
+        clinic_id = request.data.get('clinic_id')
+        if not clinic_id:
+            return Response(
+                {'error': 'Clinic ID is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # Create or get user for the doctor
-        email = request.data.get('email', '').lower()
-        user, created = User.objects.get_or_create(
+        # Get the clinic
+        try:
+            clinic = Clinic.objects.get(id=clinic_id)
+        except Clinic.DoesNotExist:
+            return Response(
+                {'error': 'Clinic not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Create user for doctor
+        username = f"dr_{request.data.get('license_number')}"
+        email = request.data.get('email', '')
+        
+        # Create User instance
+        user = User.objects.create_user(
+            username=username,
             email=email,
-            defaults={
-                'username': email,
-                'first_name': request.data.get('name', '').split()[0],
-                'last_name': ' '.join(request.data.get('name', '').split()[1:]),
-                'is_active': True
-            }
+            password=make_password(request.data.get('license_number'))  # Temporary password
         )
+        
+        # Add to doctor group - with error handling
+        doctor_group, created = Group.objects.get_or_create(name='Doctor')
+        user.groups.add(doctor_group)
 
         # Create doctor profile
-        doctor = Doctor.objects.create(
-            user=user,
-            clinic=clinic,
-            name=request.data.get('name'),
-            specialization=request.data.get('specialization', ''),
-            license_number=request.data.get('license_number'),
-            medical_council=request.data.get('medical_council'),
-            consultation_fee=request.data.get('consultation_fee', 0),
-            verified=True,
-            verification_details=json.loads(request.data.get('verification_details', '{}')),
-        )
+        doctor_data = {
+            'user': user,
+            'clinic': clinic,
+            'name': request.data.get('name'),
+            'license_number': request.data.get('license_number'),
+            'medical_council': request.data.get('medical_council'),
+            'specialization': request.data.get('specialization'),
+            'consultation_fee': request.data.get('consultation_fee'),
+            'verification_details': request.data.get('verification_details', {}),
+        }
 
         # Handle profile picture if provided
         if 'profile_picture' in request.FILES:
-            doctor.profile_picture = request.FILES['profile_picture']
-            doctor.save()
+            doctor_data['profile_picture'] = request.FILES['profile_picture']
 
-        logger.info(f"Doctor profile created successfully: {doctor.name}")
-        return Response({
-            'id': doctor.id,
-            'name': doctor.name,
-            'message': 'Doctor profile created successfully'
-        }, status=status.HTTP_201_CREATED)
+        doctor = Doctor.objects.create(**doctor_data)
 
-    except Clinic.DoesNotExist:
-        logger.error("Clinic not found")
-        return Response({
-            'message': 'Clinic not found'
-        }, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            DoctorSerializer(doctor).data,
+            status=status.HTTP_201_CREATED
+        )
+
     except Exception as e:
-        logger.error(f"Error creating doctor profile: {str(e)}", exc_info=True)
-        return Response({
-            'message': f'Failed to create doctor profile: {str(e)}'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logger.error(f"Error creating doctor profile: {str(e)}")
+        # If user was created but doctor profile failed, cleanup
+        if 'user' in locals():
+            user.delete()
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
-@api_view(['GET', 'POST'])
+@api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def doctor_patients(request):
+    """Get doctor's patients"""
     try:
-        # Get the doctor's clinic
-        doctor = Doctor.objects.get(user=request.user)
-        clinic = doctor.clinic
-    except Doctor.DoesNotExist:
-        return Response(
-            {"error": "Doctor profile not found"}, 
-            status=status.HTTP_404_NOT_FOUND
-        )
-    except Clinic.DoesNotExist:
-        return Response(
-            {"error": "Clinic not found"}, 
-            status=status.HTTP_404_NOT_FOUND
-        )
-
-    if request.method == 'GET':
-        # Get all patients in the doctor's clinic
-        patients = Patient.objects.filter(clinic=clinic)
-        serializer = PatientListSerializer(patients, many=True)
-        return Response(serializer.data)
-
-    elif request.method == 'POST':
-        # Add the clinic to the request data
-        data = request.data.copy()
-        data['clinic'] = clinic.id
+        logger.info(f"Doctor patients request from user: {request.user.username}")
+        logger.info(f"User groups: {[g.name for g in request.user.groups.all()]}")
         
-        serializer = PatientListSerializer(data=data)
-        if serializer.is_valid():
-            patient = serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+        # Get the doctor profile
+        try:
+            doctor = Doctor.objects.get(user=request.user)
+        except Doctor.DoesNotExist:
+            logger.error(f"No doctor profile found for user: {request.user.username}")
+            return Response(
+                {'error': 'Doctor profile not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Get all patients for this doctor using the appointments relationship
+        patients = Patient.objects.filter(
+            appointments__doctor=doctor
+        ).distinct()
+        
+        logger.info(f"Found {patients.count()} patients for doctor {doctor.name}")
+        
+        patient_data = [{
+            'id': patient.id,
+            'first_name': patient.first_name,
+            'last_name': patient.last_name,
+            'age': patient.get_age(),  # Use get_age() method instead of age attribute
+            'gender': patient.gender,
+            'phone': patient.phone_number,
+            'email': patient.email,
+            'address': patient.address,
+            'blood_group': patient.blood_group,
+            'allergies': patient.allergies,
+            'existing_diseases': patient.existing_diseases,
+            'created_at': patient.created_at.isoformat() if patient.created_at else None,
+        } for patient in patients]
+        
+        # Debug log
+        logger.info(f"Sample patient data: {patient_data[0] if patient_data else 'No patients'}")
+        
+        return Response(patient_data)
+        
+    except Exception as e:
+        logger.error(f"Error fetching patients: {str(e)}")
+        logger.exception("Full traceback:")  # Add full traceback logging
+        return Response(
+            {'error': 'Failed to fetch patients'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def patient_medical_history_api(request):
@@ -673,37 +785,147 @@ def patient_medical_history_api(request):
     serializer = MedicalHistorySerializer(medical_history, many=True)
     return Response(serializer.data)
 
+@csrf_exempt  # Only if absolutely necessary
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_appointment(request):
+    """Create a new appointment"""
     try:
-        # Get the doctor instance for the logged-in user
-        doctor = Doctor.objects.get(user=request.user)
-        
-        # Add doctor to the request data
-        data = request.data.copy()
-        data['doctor'] = doctor.id
-        
-        # Validate patient exists
-        try:
-            patient = Patient.objects.get(id=data.get('patient'))
-        except Patient.DoesNotExist:
-            return Response(
-                {'error': 'Patient not found'}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        # Create appointment using serializer
-        serializer = AppointmentSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-    except Doctor.DoesNotExist:
+        data = request.data
+        patient = get_object_or_404(Patient, user=request.user)
+        doctor = get_object_or_404(Doctor, id=data.get('doctor'))
+
+        appointment = Appointment.objects.create(
+            patient=patient,
+            doctor=doctor,
+            appointment_date=data.get('appointment_date'),
+            appointment_time=data.get('appointment_time'),
+            reason=data.get('reason'),
+            status='scheduled'
+        )
+
+        return Response({
+            'message': 'Appointment created successfully',
+            'id': appointment.id
+        }, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
         return Response(
-            {'error': 'Doctor profile not found'}, 
+            {'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def update_staff_role(request, clinic_id, staff_id):
+    """Update staff role for a specific clinic"""
+    try:
+        clinic = Clinic.objects.get(id=clinic_id)
+        staff_user = User.objects.get(
+            id=staff_id,
+            is_staff=True,
+            staff__clinic=clinic
+        )
+        
+        new_role = request.data.get('role')
+        if not new_role:
+            return Response(
+                {'error': 'Role is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        staff_user.staff.role = new_role
+        staff_user.staff.save()
+        
+        return Response({
+            'id': staff_user.id,
+            'first_name': staff_user.first_name,
+            'last_name': staff_user.last_name,
+            'role': new_role,
+            'message': 'Staff role updated successfully'
+        })
+        
+    except Clinic.DoesNotExist:
+        return Response(
+            {'error': 'Clinic not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except User.DoesNotExist:
+        return Response(
+            {'error': 'Staff member not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.error(f"Error updating staff role: {str(e)}")
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_clinics(request):
+    """Get all clinics for clinic admin"""
+    try:
+        # Get clinics where the user is an admin
+        clinics = Clinic.objects.filter(clinic_admin=request.user)
+        
+        clinic_data = [{
+            'id': clinic.id,
+            'name': clinic.name,
+            'address': clinic.address,
+            'phone_number': clinic.phone_number,
+            'email': clinic.email,
+            'registration_number': clinic.registration_number,
+            'logo': clinic.logo.url if clinic.logo else None,
+            
+        } for clinic in clinics]
+         
+        return Response(clinic_data)
+    except Exception as e:
+        print(f"Error fetching clinics: {str(e)}")  # Debug log
+        return Response(
+            {'error': 'Failed to fetch clinics'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_clinic_patients(request, clinic_id):
+    """Get all patients for a specific clinic"""
+    try:
+        # Verify clinic exists and user has access
+        clinic = get_object_or_404(Clinic, id=clinic_id)
+        
+        # Get patients for this clinic with related doctor info
+        patients = Patient.objects.filter(clinic=clinic).select_related('doctor')
+        
+        # Serialize the data
+        serializer = PatientListSerializer(patients, many=True)
+        
+        return Response(serializer.data)
+    
+    except Clinic.DoesNotExist:
+        return Response(
+            {'error': 'Clinic not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        print(f"Patient list API error: {str(e)}")
+        return Response(
+            {'error': 'Failed to fetch patients'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+@api_view(['GET', 'PUT'])  
+@permission_classes([IsAuthenticated])
+def edit_patient_details(request, patient_id):
+    try:    
+        patient = get_object_or_404(Patient, id=patient_id)
+        serializer = PatientDetailsSerializer(patient)
+        return Response(serializer.data)
+    except Patient.DoesNotExist:
+        return Response(
+            {'error': 'Patient not found'}, 
             status=status.HTTP_404_NOT_FOUND
         )
     except Exception as e:
@@ -711,3 +933,46 @@ def create_appointment(request):
             {'error': str(e)}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+    
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_patient_details(request, patient_id):
+    patient = get_object_or_404(Patient, id=patient_id)
+    serializer = PatientDetailsSerializer(patient, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def clinic_doctors(request, clinic_id):
+    """Get doctors for a specific clinic"""
+    try:
+        logger.info(f"Fetching doctors for clinic: {clinic_id}")
+        
+        # Verify the clinic exists and user has access
+        try:
+            clinic = Clinic.objects.get(id=clinic_id)
+        except Clinic.DoesNotExist:
+            logger.error(f"Clinic {clinic_id} not found")
+            return Response(
+                {'error': 'Clinic not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Get all doctors for this clinic
+        doctors = Doctor.objects.filter(clinic=clinic)
+        logger.info(f"Found {doctors.count()} doctors for clinic {clinic_id}")
+
+        # Serialize the data
+        serializer = DoctorSerializer(doctors, many=True)
+        return Response(serializer.data)
+
+    except Exception as e:
+        logger.error(f"Error fetching clinic doctors: {str(e)}")
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+

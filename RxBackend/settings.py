@@ -13,6 +13,10 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 from pathlib import Path
 import os
 import sys
+import firebase_admin
+from firebase_admin import credentials, firestore
+import json
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -43,7 +47,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
-    'users'
+    'users',
+    'social_django',
 ]
 
 MIDDLEWARE = [
@@ -174,11 +179,11 @@ CLINIC_LOGOS_ROOT = os.path.join(MEDIA_ROOT, 'clinic_logos')
 # JWT Settings
 from datetime import timedelta
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'UPDATE_LAST_LOGIN': False,
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),  # Token expires after 60 minutes
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),     # Refresh token expires after 7 days
+    'ROTATE_REFRESH_TOKENS': True,                   # Get new refresh token when refreshing access token
+    'BLACKLIST_AFTER_ROTATION': True,               # Blacklist old refresh tokens
+    'UPDATE_LAST_LOGIN': True,                      # Update last login timestamp
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
     'VERIFYING_KEY': None,
@@ -204,5 +209,28 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:8081",
     "http://10.0.2.2:8081",
-    "http://192.168.56.1:8081",
+    "http://192.168.29.57:8081",
+    "http://192.168.56.1:19006",
+
 ]
+load_dotenv()
+
+FIREBASE_CONFIG = {
+    "apiKey": "REMOVED",
+    "authDomain": "REMOVED",
+    "projectId": "REMOVED",
+    "storageBucket": "REMOVED.firebasestorage.app",
+    "messagingSenderId": "REMOVED",
+    "appId": "1:REMOVED:web:dce2f4264333d6bd5cb21a",
+    "measurementId": "REMOVED"
+}
+
+# Add authentication backends
+AUTHENTICATION_BACKENDS = (
+    'django.contrib.auth.backends.ModelBackend',
+    'social_core.backends.google.GoogleOAuth2',
+)
+
+# Add social auth settings
+SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = 'your-google-oauth2-key'
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = 'your-google-oauth2-secret'

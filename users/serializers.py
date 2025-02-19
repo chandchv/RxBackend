@@ -126,6 +126,21 @@ class DoctorSerializer(serializers.ModelSerializer):
         model = Doctor
         fields = ['id', 'user_name', 'specialization', 'clinic', 'medical_council', 'license_number']
 
+class DoctorSerializer1(serializers.ModelSerializer):
+    class Meta:
+        model = Doctor
+        fields = [
+            'id',
+            'name',
+            'specialization',
+            'license_number',
+            'email',
+            'phone',
+            'status',
+            'consultation_fee',
+            'profile_picture',
+            'clinic'
+        ]
 class ClinicSerializer(serializers.ModelSerializer):
     class Meta:
         model = Clinic
@@ -140,38 +155,35 @@ class ClinicSerializer(serializers.ModelSerializer):
         ]
 
 class PatientListSerializer(serializers.ModelSerializer):
-    id = serializers.IntegerField(read_only=True)
-    created_at = serializers.DateTimeField(read_only=True)
-    
+    assigned_doctor = serializers.SerializerMethodField()
+    age = serializers.SerializerMethodField()
+    gender_display = serializers.CharField(source='get_gender_display')
+
     class Meta:
         model = Patient
         fields = [
-            'id',
+            'id', 
             'patient_id',
-            'first_name',
+            'first_name', 
             'last_name',
-            'date_of_birth',    
-            'gender',
-            'blood_group',
-            'phone_number',
             'email',
+            'phone_number',
             'address',
-            'pincode',
-            'clinic',
-            'created_at',
-            'updated_at'
+            'gender_display',
+            'age',
+            'blood_group',
+            'assigned_doctor',
+            'pincode'
         ]
 
-    def create(self, validated_data):
-        # Generate a unique patient ID if not provided
-        if 'patient_id' not in validated_data:
-            # You can implement your own patient ID generation logic
-            last_patient = Patient.objects.order_by('-id').first()
-            patient_id = f'P{str(last_patient.id + 1).zfill(6)}' if last_patient else 'P000001'
-            validated_data['patient_id'] = patient_id
-        
-        return Patient.objects.create(**validated_data)
-    
+    def get_assigned_doctor(self, obj):
+        if obj.doctor:
+            return f"Dr. {obj.doctor.name}"
+        return None
+
+    def get_age(self, obj):
+        return obj.get_age()
+
 class MedicalHistorySerializer(serializers.ModelSerializer):
     patient_name = serializers.CharField(source='patient.user.get_full_name', read_only=True)
     doctor_name = serializers.CharField(source='doctor.name', read_only=True)
@@ -197,4 +209,8 @@ class ClinicSettingsSerializer(serializers.ModelSerializer):
             'logo'
         ]
     
-   
+class PatientDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Patient
+        fields = ['id', 'patient_id', 'first_name', 'last_name', 'date_of_birth', 'gender', 'blood_group', 'phone_number', 'email', 'address', 'pincode', 'clinic', 'created_at', 'updated_at']
+

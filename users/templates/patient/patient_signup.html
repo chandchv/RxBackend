@@ -68,6 +68,34 @@
                     </div>
                 </div>
 
+                <!-- Add this after phone number input -->
+                <div class="mt-4">
+                    <div id="recaptcha-container"></div>
+                    <button
+                        type="button"
+                        id="send-otp"
+                        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                    >
+                        Send OTP
+                    </button>
+                    
+                    <div id="otp-input" class="mt-4 hidden">
+                        <input
+                            type="text"
+                            id="otp-code"
+                            placeholder="Enter OTP"
+                            class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
+                        >
+                        <button
+                            type="button"
+                            id="verify-otp"
+                            class="mt-2 w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+                        >
+                            Verify OTP
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Date of Birth and Gender -->
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -186,54 +214,40 @@
     </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-auth.js"></script>
 <script>
-    document.getElementById('signupForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const formData = new FormData(this);
-        const data = {
-            username: formData.get('username'),
-            password: formData.get('password'),
-            password2: formData.get('password2'),
-            email: formData.get('email'),
-            first_name: formData.get('first_name'),
-            last_name: formData.get('last_name'),
-            phone_number: formData.get('phone_number'),
-            date_of_birth: formData.get('date_of_birth'),
-            gender: formData.get('gender'),
-            address: formData.get('address'),
-            blood_group: formData.get('blood_group'),
-            clinic: formData.get('clinic')
-        };
+    // Initialize Firebase
+    const firebaseConfig = JSON.parse('{{ FIREBASE_CONFIG|safe }}');
+    firebase.initializeApp(firebaseConfig);
 
+    // Set up reCAPTCHA verifier
+    window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container');
+
+    document.getElementById('send-otp').addEventListener('click', async () => {
+        const phoneNumber = document.getElementById('phone_number').value;
         try {
-            const response = await fetch('{% url "users:patient_signup_api" %}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                body: JSON.stringify(data)
-            });
-
-            const result = await response.json();
-
-            if (response.ok) {
-                // Store tokens
-                localStorage.setItem('access_token', result.access);
-                localStorage.setItem('refresh_token', result.refresh);
-                
-                // Show success message
-           alert('Registration successful! Please login.');
-           
-           // Redirect to login page
-           window.location.href = '{% url "users:login" %}';
-            } else {
-                alert(result.error || 'Registration failed. Please try again.');
-            }
+            const confirmationResult = await firebase.auth().signInWithPhoneNumber(
+                phoneNumber, 
+                window.recaptchaVerifier
+            );
+            window.confirmationResult = confirmationResult;
+            document.getElementById('otp-input').classList.remove('hidden');
         } catch (error) {
-            console.error('Error:', error);
-            alert('Registration failed. Please try again.');
+            console.error(error);
+            alert('Error sending OTP');
+        }
+    });
+
+    document.getElementById('verify-otp').addEventListener('click', async () => {
+        const code = document.getElementById('otp-code').value;
+        try {
+            await window.confirmationResult.confirm(code);
+            // Enable form submission after OTP verification
+            document.getElementById('signupForm').querySelector('button[type="submit"]').disabled = false;
+        } catch (error) {
+            console.error(error);
+            alert('Invalid OTP');
         }
     });
 </script>

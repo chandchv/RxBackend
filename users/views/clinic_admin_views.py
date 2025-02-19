@@ -3,14 +3,16 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.db.models import Count
 from django.utils import timezone
+
+from users.forms import ClinicProfileForm
 from ..models import Clinic, Doctor, Staff, UserProfile
 from datetime import datetime
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
-from ..scripts.scrapeGpt01 import verify_doctor as verify_doctor_api
-from ..constants import MEDICAL_COUNCILS  # Import the constants
+from ..scripts.scrapeGpt1 import verify_doctor as verify_doctor_api
+from ..constants import MEDICAL_COUNCILS  # Import the constants 
 import json
 import string
 import random
@@ -343,9 +345,6 @@ def doctor_verification_details(request, doctor_id):
 def verify_doctor_credentials(request):
     """Verify doctor credentials during addition"""
     try:
-        import json
-        import re
-        from datetime import datetime
         data = json.loads(request.body)
         
         # Format the data for verification
@@ -362,40 +361,40 @@ def verify_doctor_credentials(request):
         success, result = verify_doctor_api(doctor_details)
         
         if success and isinstance(result, dict):
-            # Parse license number and registration date
-            license_info = result.get('registration_number', '')
+            print("Raw verification result:", result)
             
-            # Extract license number and date using regex
-            license_match = re.search(r'(\d+)\s+Date of Reg\.\s+(\d{2}/\d{2}/\d{4})', license_info)
-            
-            if license_match:
-                license_number = license_match.group(1)
-                reg_date = license_match.group(2)
-                
-                # Convert date string to proper format
-                try:
+            # Format registration date
+            reg_date = result.get('registration_date')
+            try:
+                if reg_date:
                     reg_date_obj = datetime.strptime(reg_date, '%d/%m/%Y')
                     formatted_reg_date = reg_date_obj.strftime('%Y-%m-%d')
-                except ValueError:
+                else:
                     formatted_reg_date = None
-            else:
-                license_number = license_info
+            except ValueError:
                 formatted_reg_date = None
+            
+            # Format verification response
+            verification_data = {
+                'name': result.get('name', ''),
+                'registration_number': result.get('registration', ''),  # Changed from registration_number
+                'council': result.get('council', ''),  # Added council
+                'qualification': result.get('qualification', ''),
+                'registration_date': formatted_reg_date,
+                'father_name': result.get('father_name', ''),
+                'date_of_birth': result.get('date_of_birth', ''),
+                'university': result.get('university', ''),
+                'permanent_address': result.get('permanent_address', ''),
+                'qualification_year': result.get('qualification_year', ''),
+                'verification_status': result.get('verification_status', 'VERIFIED'),
+                'verification_timestamp': result.get('verification_timestamp', '')
+            }
+            
+            print("Formatted verification data:", verification_data)
             
             return JsonResponse({
                 'verified': True,
-                'verification_data': {
-                    'name': result.get('name', ''),
-                    'father_name': result.get('father_name', ''),
-                    'date_of_birth': result.get('date_of_birth', ''),
-                    'registration_number': license_number.strip(),  # Clean license number
-                    'registration_date': formatted_reg_date,  # Add parsed registration date
-                    'state_council': result.get('state_council', ''),
-                    'qualification': result.get('qualification', ''),
-                    'qualification_year': result.get('qualification_year', ''),
-                    'university': result.get('university', ''),
-                    'permanent_address': result.get('permanent_address', '')
-                }
+                'verification_data': verification_data
             })
         else:
             return JsonResponse({
@@ -459,72 +458,150 @@ def dashboard_stats(request):
             'error': str(e)
         }, status=400)
 
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
+def update_current_clinic(request):
+    """API endpoint to get or update current clinic"""
+    try:
+        if request.method == 'GET':
+            clinic_id = request.session.get('current_clinic_id')
+            if not clinic_id and request.user.is_superuser:
+                clinic = Clinic.objects.first()
+                clinic_id = clinic.id if clinic else None
+            elif not clinic_id:
+                clinic_id = request.user.profile.clinic.id
+            return Response({'clinic_id': clinic_id})
+            
+        elif request.method == 'PUT':
+            clinic_id = request.data.get('clinic_id')
+            if clinic_id:
+                request.session['current_clinic_id'] = clinic_id
+                return Response({'clinic_id': clinic_id})
+            return Response({'error': 'No clinic_id provided'}, status=400)
+            
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsClinicAdmin])
-def clinic_admin_dashboard_api(request):
+@permission_classes([IsAuthenticated])
+def clinic_admin_dashboard_api(request, clinic_id=None):
     """API endpoint for clinic administration dashboard"""
     try:
+        # Get the specified clinic or user's clinic
+        if clinic_id and request.user.is_superuser:
+            clinic = get_object_or_404(Clinic, id=clinic_id)
+        else:
+            clinic = request.user.profile.clinic
+            
+        if not clinic:
+            return Response({
+                'error': 'No clinic found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        # Get today's date
         today = timezone.now().date()
         
-        # Get counts
-        doctors_count = Doctor.objects.count()
-        staff_count = Staff.objects.count()
-        patients_count = Patient.objects.count()
+        # Get all related data for the clinic
+        doctors = Doctor.objects.filter(clinic=clinic)
+        patients = Patient.objects.filter(clinic=clinic)
+        staff = Staff.objects.filter(clinic=clinic)
+        
+        # Get appointments for today
         todays_appointments = Appointment.objects.filter(
+            doctor__in=doctors,
             appointment_date=today
-        ).count()
+        )
+        
+        # Get pending appointments
         pending_appointments = Appointment.objects.filter(
+            doctor__in=doctors,
             status='PENDING'
-        ).count()
-
-        # Prepare response data
+        )
+        
+        print(f"Fetching data for clinic {clinic.id}: {clinic.name}")
+        print(f"Found: {doctors.count()} doctors, {patients.count()} patients")
+        
         dashboard_data = {
-            'totalDoctors': doctors_count,
-            'totalStaff': staff_count,
-            'totalPatients': patients_count,
-            'todayAppointments': todays_appointments,
-            'pendingAppointments': pending_appointments,
-            'lastUpdated': timezone.now().isoformat()
+            'totalDoctors': doctors.count(),
+            'totalPatients': patients.count(),
+            'todayAppointments': todays_appointments.count(),
+            'pendingAppointments': pending_appointments.count(),
+            'totalStaff': staff.count(),
+            'clinicName': clinic.name,
+            'clinicId': clinic.id,
         }
         
         return Response(dashboard_data, status=status.HTTP_200_OK)
-
+        
     except Exception as e:
-        print(f"Dashboard API error: {str(e)}")  # Debug print
+        print(f"Dashboard API error: {str(e)}")
         return Response({
             'error': 'Failed to fetch dashboard data',
             'detail': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsClinicAdmin])
-def doctor_list_api(request):
-    """API endpoint to list all doctors"""
+@permission_classes([IsAuthenticated])
+def doctor_list_api(request, clinic_id=None):
     try:
-        doctors = Doctor.objects.all()
-        doctor_data = []
+        if clinic_id and request.user.is_superuser:
+            clinic = get_object_or_404(Clinic, id=clinic_id)
+        elif request.user.is_superuser:
+            clinic = Clinic.objects.first()
+        else:
+            clinic = request.user.profile.clinic
+
+        doctors = Doctor.objects.filter(clinic=clinic)
         
+        doctor_data = []
         for doctor in doctors:
             doctor_data.append({
                 'id': doctor.id,
-                'user_id': doctor.user.id,
-                'first_name': doctor.user.first_name,
-                'last_name': doctor.user.last_name,
-                'email': doctor.user.email,
+                'name': doctor.name,
+                'email': doctor.email,
                 'specialization': doctor.specialization,
-                'phone_number': doctor.phone_number,
-                'status': doctor.status,
-                'clinic': doctor.clinic.name if doctor.clinic else None,
+                'license_number': doctor.license_number,
+                'status': 'Active' if doctor.is_active else 'Inactive'
             })
-        
+
         return Response(doctor_data, status=status.HTTP_200_OK)
-        
+
     except Exception as e:
-        print(f"Doctor list API error: {str(e)}")  # Debug print
-        return Response({
-            'error': 'Failed to fetch doctors',
-            'detail': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        print(f"Doctor list API error: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def patient_list_api(request, clinic_id=None):  
+    try:
+        if clinic_id and request.user.is_superuser:
+            clinic = get_object_or_404(Clinic, id=clinic_id)
+        elif request.user.is_superuser:
+            clinic = Clinic.objects.first()
+        else:
+            clinic = request.user.profile.clinic
+
+        print(f"Fetching patients for clinic {clinic.id}: {clinic.name}")
+
+        patients = Patient.objects.filter(clinic=clinic)
+        
+        patient_data = []
+        for patient in patients:
+            patient_data.append({
+                'id': patient.id,
+                'name': f"{patient.first_name} {patient.last_name}",
+                'phone_number': patient.phone_number,
+                'email': patient.email,
+                'status': 'Active',
+                'doctor': patient.doctor.name if patient.doctor else None,
+            })
+
+        return Response(patient_data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        print(f"Patient list API error: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @require_POST
 @user_passes_test(is_superuser)
@@ -555,3 +632,195 @@ def edit_clinic_profile(request, clinic_id):
         'form': form,
         'clinic': clinic
     })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_clinic_api(request):
+    """API endpoint to create a new clinic"""
+    try:
+        if not request.user.is_superuser:
+            return Response({
+                'error': 'Only superusers can create clinics'
+            }, status=status.HTTP_403_FORBIDDEN)
+            
+        # Get data from request
+        name = request.data.get('name')
+        email = request.data.get('email')
+        phone_number = request.data.get('phone_number')
+        registration_number = request.data.get('registration_number')
+        
+        # Validate required fields
+        if not name:
+            return Response({
+                'error': 'Clinic name is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Create new clinic
+        clinic = Clinic.objects.create(
+            name=name,
+            email=email,
+            phone_number=phone_number,
+            registration_number=registration_number
+        )
+        
+        return Response({
+            'id': clinic.id,
+            'name': clinic.name,
+            'message': 'Clinic created successfully'
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        print(f"Create clinic error: {str(e)}")
+        return Response({
+            'error': 'Failed to create clinic',
+            'detail': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_clinics_api(request):
+    """API endpoint to get list of clinics"""
+    try:
+        # For superuser, get all clinics
+        if request.user.is_superuser:
+            clinics = Clinic.objects.all()
+        else:
+            # For regular users, get only their assigned clinic
+            if hasattr(request.user, 'profile') and request.user.profile.clinic:
+                clinics = [request.user.profile.clinic]
+            else:
+                clinics = []
+
+        clinic_data = []
+        for clinic in clinics:
+            clinic_data.append({
+                'id': clinic.id,
+                'name': clinic.name,
+                'email': clinic.email,
+                'phone_number': clinic.phone_number,
+                'registration_number': clinic.registration_number,
+            })
+
+        print(f"Returning {len(clinic_data)} clinics") # Debug log
+        return Response(clinic_data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        print(f"Get clinics API error: {str(e)}")  # Debug log
+        return Response({
+            'error': 'Failed to fetch clinics',
+            'detail': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
+def edit_doctor_api(request, doctor_id):
+    try:
+        doctor = get_object_or_404(Doctor, id=doctor_id)
+        
+        if request.method == 'GET':
+            data = {
+                'id': doctor.id,
+                'name': doctor.name,
+                'email': doctor.email,
+                'phone_number': doctor.phone_number,
+                'address': doctor.address,
+                'pincode': doctor.pincode,
+                'is_active': doctor.is_active
+            }
+            return Response(data, status=status.HTTP_200_OK)
+            
+        elif request.method == 'PUT':
+            # Update only allowed fields
+            doctor.email = request.data.get('email', doctor.email)
+            doctor.phone_number = request.data.get('phone_number', doctor.phone_number)
+            doctor.address = request.data.get('address', doctor.address)
+            doctor.pincode = request.data.get('pincode', doctor.pincode)
+            doctor.save()
+            
+            return Response({'message': 'Doctor updated successfully'}, status=status.HTTP_200_OK)
+            
+    except Exception as e:
+        print(f"Edit doctor error: {str(e)}")  # Debug print
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
+def doctor_detail_api(request, doctor_id):
+    """API endpoint to get and update doctor details"""
+    try:
+        doctor = get_object_or_404(Doctor, id=doctor_id)
+        
+        if request.method == 'GET':
+            # Return doctor details
+            return Response({
+                'id': doctor.id,
+                'name': doctor.name,
+                'email': doctor.email,
+                'phone_number': doctor.phone_number,
+                'address': doctor.address,
+                'pincode': doctor.pincode,
+                'is_active': doctor.is_active,
+                'specialization': doctor.specialization,
+                'license_number': doctor.license_number
+            }, status=status.HTTP_200_OK)
+            
+        elif request.method == 'PUT':
+            # Update doctor details
+            for field in ['email', 'phone_number', 'address', 'pincode']:
+                if field in request.data:
+                    setattr(doctor, field, request.data[field])
+            doctor.save()
+            
+            return Response({
+                'message': 'Doctor updated successfully'
+            }, status=status.HTTP_200_OK)
+            
+    except Exception as e:
+        print(f"Doctor detail API error: {str(e)}")
+        return Response({
+            'error': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def doctor_status_api(request, doctor_id):
+    """API endpoint to get and update doctor status"""
+    try:
+        doctor = get_object_or_404(Doctor, id=doctor_id)
+        
+        if request.method == 'POST':
+            is_active = request.data.get('is_active')
+            if is_active is not None:  # Check if value was provided
+                doctor.is_active = is_active
+                doctor.save()
+                return Response({'message': 'Doctor status updated successfully'}, status=status.HTTP_200_OK)
+            return Response({'error': 'is_active field is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+    except Exception as e:
+        print(f"Status update error: {str(e)}")  # Debug log
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_current_clinic(request):
+    """API endpoint to get current clinic"""
+    try:
+        if request.user.is_superuser:
+            # For superuser, get from session or first clinic
+            clinic_id = request.session.get('current_clinic_id')
+            if not clinic_id:
+                clinic = Clinic.objects.first()
+                clinic_id = clinic.id if clinic else None
+        else:
+            # For regular users, get their assigned clinic
+            clinic_id = request.user.profile.clinic.id if hasattr(request.user, 'profile') and request.user.profile.clinic else None
+
+        return Response({
+            'clinic_id': clinic_id,
+            'success': True
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        print(f"Get current clinic error: {str(e)}")
+        return Response({
+            'error': 'Failed to fetch current clinic',
+            'detail': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

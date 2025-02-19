@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from ..models import Doctor, Appointment, Patient, DoctorAvailability, AppointmentSlot, DoctorLeave, Billing, Bill, Prescription, PatientVitals, PrescriptionItem
+from ..models import Doctor, Appointment, Patient, DoctorAvailability, AppointmentSlot, DoctorLeave, Billing, Bill, Prescription, PatientVitals, PrescriptionItem, Drug
 from ..serializers import DoctorSerializer
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -22,6 +22,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.urls import reverse
 from rest_framework.decorators import api_view, permission_classes
+from django.db.models import Case, When
 
 def send_appointment_update_notification(appointment):
     try:
@@ -360,7 +361,10 @@ def doctor_dashboard(request):
     try:
         doctor = Doctor.objects.get(user=request.user)
         today = timezone.now().date()
+        doctor_name = doctor.user_name
         current_time = timezone.now().time()
+
+        
 
         # Get today's appointments
         todays_appointments = Appointment.objects.filter(
@@ -461,52 +465,35 @@ def doctors_list(request):
 @login_required
 def create_patient_doctor(request):
     try:
-        # Get the doctor and their associated clinic
         doctor = Doctor.objects.get(user=request.user)
         clinic = doctor.clinic
         
+        print("Received data:", request.data)  # Debug print to see what we're getting
         
-        
-        if request.method == 'POST':
-            try:
-                # Create patient with the data from the form
-                patient = Patient.objects.create(
-                    first_name=request.POST['first_name'],
-                    last_name=request.POST['last_name'],
-                    date_of_birth=request.POST['date_of_birth'],
-                    gender=request.POST['gender'],
-                    blood_group=request.POST.get('blood_group'),
-                    phone_number=request.POST['phone_number'],
-                    email=request.POST.get('email', ''),
-                    address=request.POST.get('address', ''),
-                    pincode=request.POST.get('pincode', ''),
-                    clinic=clinic
-                )
-                messages.success(request, 'Patient added successfully!')
-                return redirect('users:doctor_dashboard')
-            except Exception as e:
-                print(f"Error creating patient: {str(e)}")
-                messages.error(request, f'Error adding patient: {str(e)}')
-        
-        # Create context with debug information
-        context = {
-            'blood_groups': Patient.BLOOD_GROUP_CHOICES,
-            'gender_choices': Patient.GENDER_CHOICES,
-            'debug_blood_groups': str(Patient.BLOOD_GROUP_CHOICES),  # Debug info
-            'debug_gender': str(Patient.GENDER_CHOICES)              # Debug info
+        # Map the incoming data to match Patient model fields
+        patient_data = {
+            'first_name': request.data.get('first_name'),
+            'last_name': request.data.get('last_name'),
+            'email': request.data.get('email', ''),
+            'phone_number': request.data.get('phone', ''),  # Map 'phone' to 'phone_number'
+            'gender': request.data.get('gender', 'M'),
+            'address': request.data.get('address', ''),
+            'clinic': clinic
         }
         
-       
+        # Create patient with mapped data
+        patient = Patient.objects.create(**patient_data)
         
-        return render(request, 'doctor/create_patient.html', context)
-    
-    except Doctor.DoesNotExist:
-        messages.error(request, 'Doctor profile not found')
-        return redirect('users:doctor_dashboard')
+        return Response({
+            'message': 'Patient added successfully!',
+            'patient_id': patient.id
+        }, status=status.HTTP_201_CREATED)
+                
     except Exception as e:
-        print(f"Error in create_patient view: {str(e)}")
-        messages.error(request, 'Error accessing patient creation')
-        return redirect('users:doctor_dashboard')
+        print(f"Error creating patient: {str(e)}")  # Debug print for error
+        return Response({
+            'error': f'Error adding patient: {str(e)}'
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 @login_required
 def create_appointment_doctor(request):
@@ -771,19 +758,23 @@ def doctor_create_appointment(request):
         return redirect('users:dashboard')
 
 
-
-def get_available_slots_doctor(request, doctor_id, date):
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_available_slots_doctor(request):
     try:
-        doctor = Doctor.objects.get(id=doctor_id)
+        doctor = Doctor.objects.get(user=request.user)
+        date = request.GET.get('date')  # Get date from query params
+        
+        if not date:
+            return Response({'error': 'Date parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
         selected_date = datetime.strptime(date, '%Y-%m-%d').date()
         current_date = timezone.now().date()
         current_time = timezone.now().time()
         
-        print(f"Generating slots for doctor: {doctor.name}, date: {date}")  # Debug print
-        
         # Check if selected date is in the past
         if selected_date < current_date:
-            return JsonResponse({
+            return Response({
                 'error': 'Cannot schedule appointments for past dates',
                 'slots': []
             })
@@ -795,42 +786,48 @@ def get_available_slots_doctor(request, doctor_id, date):
             status='scheduled'
         ).values_list('appointment_time', flat=True)
         
-        # Generate time slots (9 AM to 5 PM, 30-minute intervals)
-        available_slots = []
-        slot_time = datetime.strptime('09:00', '%H:%M').time()
-        end_time = datetime.strptime('17:00', '%H:%M').time()
+        # Get doctor's availability for this day
+        availability = DoctorAvailability.objects.filter(
+            doctor=doctor,
+            day_of_week=selected_date.weekday(),
+            is_available=True
+        ).first()
         
-        while slot_time <= end_time:
+        if not availability:
+            return Response({
+                'slots': [],
+                'message': 'Doctor not available on this day'
+            })
+        
+        # Generate time slots based on doctor's availability
+        available_slots = []
+        slot_time = datetime.combine(selected_date, availability.start_time)
+        end_time = datetime.combine(selected_date, availability.end_time)
+        
+        while slot_time.time() <= end_time.time():
             # For current date, only show future time slots
-            if selected_date == current_date and slot_time <= current_time:
-                slot_time = (datetime.combine(datetime.today(), slot_time) + 
-                           timedelta(minutes=30)).time()
+            if selected_date == current_date and slot_time.time() <= current_time:
+                slot_time = slot_time + timedelta(minutes=30)
                 continue
                 
-            if slot_time not in booked_slots:
+            if slot_time.time() not in booked_slots:
                 available_slots.append({
                     'time': slot_time.strftime('%H:%M')
                 })
             
-            # Update slot time
-            slot_time = (datetime.combine(datetime.today(), slot_time) + 
-                        timedelta(minutes=30)).time()
+            slot_time = slot_time + timedelta(minutes=30)
         
-        print(f"Generated {len(available_slots)} available slots")  # Debug print
-        
-        return JsonResponse({
+        return Response({
             'slots': available_slots,
             'doctor_name': doctor.name,
             'date': date
-
         })
         
     except Exception as e:
         print(f"Error generating slots: {str(e)}")
-        return JsonResponse({
-            'error': str(e),
-            'slots': []
-        }, status=400)
+        return Response({
+            'error': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 @login_required
 def update_appointment_status(request, appointment_id):
@@ -945,34 +942,43 @@ def api_create_appointment(request):
 @permission_classes([IsAuthenticated])
 def api_patient_details(request, patient_id):
     try:
+        # Get the requesting doctor
         doctor = Doctor.objects.get(user=request.user)
-        patient = Patient.objects.get(id=patient_id)
         
-        # Check if this patient has any appointments with the doctor
-        if not Appointment.objects.filter(doctor=doctor, patient=patient).exists():
-            return Response({'error': 'Unauthorized access'}, status=403)
+        # Get the patient and verify they belong to the doctor's clinic
+        patient = get_object_or_404(Patient, id=patient_id, clinic=doctor.clinic)
         
-        # Check if patient.user exists before accessing
-        if not patient.user:
-            return Response({'error': 'Patient user data not found'}, status=404)
-            
+        # Return patient details
         data = {
             'id': patient.id,
-            'first_name': patient.user.first_name,
-            'last_name': patient.user.last_name,
-            'email': patient.user.email,
-            'age': getattr(patient, 'age', 'N/A'),  # Safe attribute access
-            'gender': getattr(patient, 'gender', 'N/A'),
-            'phone_number': getattr(patient, 'phone_number', 'N/A')
+            'patient_id': f'PAT{str(patient.id).zfill(6)}',
+            'first_name': patient.first_name,
+            'last_name': patient.last_name,
+            'gender': patient.gender,
+            'phone_number': patient.phone_number,
+            'email': patient.email,
+            'address': patient.address,
+            'pincode': patient.pincode,
+            'blood_group': patient.blood_group,
+            'allergies': patient.allergies,
+            'clinic_id': patient.clinic.id
         }
-        return Response(data)
+        
+        return Response(data, status=status.HTTP_200_OK)
+        
     except Doctor.DoesNotExist:
-        return Response({'error': 'Doctor not found'}, status=404)
+        return Response({
+            'error': 'Doctor profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
     except Patient.DoesNotExist:
-        return Response({'error': 'Patient not found'}, status=404)
+        return Response({
+            'error': 'Patient not found'
+        }, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
-        print(f"Error in patient details: {str(e)}")
-        return Response({'error': 'Internal server error'}, status=500)
+        print(f"Error fetching patient details: {str(e)}")
+        return Response({
+            'error': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -1117,7 +1123,7 @@ def create_prescription_api(request):
         data = request.data
         
         # Convert vital values to proper types
-        def convert_to_decimal(value):
+        def convert_to_decimal(value): 
             try:
                 return float(value) if value and value.strip() else None
             except (ValueError, AttributeError):
@@ -1286,3 +1292,254 @@ def get_doctor_reports(request):
 def calculate_revenue(appointments):
     # Implement your revenue calculation logic here
     return sum(appointment.fee for appointment in appointments if appointment.fee)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_patient_api(request):
+    try:
+        # Get the doctor and their associated clinic
+        doctor = Doctor.objects.get(user=request.user)
+        clinic = doctor.clinic
+        
+        # Create patient with the data from request
+        patient = Patient.objects.create(
+            first_name=request.data.get('first_name'),
+            last_name=request.data.get('last_name'),
+            date_of_birth=request.data.get('date_of_birth'),  # You might want to convert age to date_of_birth
+            gender=request.data.get('gender'),
+            phone_number=request.data.get('phone_number'),
+            email=request.data.get('email', ''),
+            address=request.data.get('address', ''),
+            existing_diseases=request.data.get('existing_diseases', ''),
+            current_medications=request.data.get('current_medications', ''),
+            allergies=request.data.get('allergies', ''),
+            clinic=clinic,
+            doctor=doctor
+        )
+        
+        return Response({
+            'message': 'Patient added successfully',
+            'patient_id': patient.id
+        }, status=status.HTTP_201_CREATED)
+            
+    except Doctor.DoesNotExist:
+        return Response({
+            'error': 'Doctor profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        print(f"Error creating patient: {str(e)}")
+        return Response({
+            'error': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def generate_slots_api(request):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        
+        # Get schedule data from request
+        schedule_data = request.data.get('schedule', {})
+        unavailable_days = request.data.get('unavailable_days', [])
+        
+        # Delete existing availability for this doctor
+        DoctorAvailability.objects.filter(doctor=doctor).delete()
+        
+        # Create new availability for each available day
+        for day in range(7):
+            if day not in unavailable_days:
+                DoctorAvailability.objects.create(
+                    doctor=doctor,
+                    day_of_week=day,
+                    start_time=schedule_data.get('start_time', '09:00'),
+                    end_time=schedule_data.get('end_time', '17:00'),
+                    is_available=True
+                )
+        
+        # Generate slots for next 30 days
+        today = timezone.now().date()
+        end_date = today + timedelta(days=30)
+        slots_created = 0
+        dates_processed = 0
+        
+        current_date = today
+        while current_date <= end_date:
+            # Skip if day is marked as unavailable
+            if current_date.weekday() in unavailable_days:
+                current_date += timedelta(days=1)
+                continue
+            
+            # Get availability for current day
+            availability = DoctorAvailability.objects.filter(
+                doctor=doctor,
+                day_of_week=current_date.weekday(),
+                is_available=True
+            ).first()
+            
+            if availability:
+                # Delete existing slots for this date
+                AppointmentSlot.objects.filter(
+                    doctor=doctor,
+                    date=current_date,
+                    is_booked=False
+                ).delete()
+                
+                # Convert times to datetime for calculations
+                start_time = datetime.strptime(schedule_data.get('start_time', '09:00'), '%H:%M')
+                end_time = datetime.strptime(schedule_data.get('end_time', '17:00'), '%H:%M')
+                lunch_start = datetime.strptime(schedule_data.get('lunch_start', '13:00'), '%H:%M')
+                lunch_end = datetime.strptime(schedule_data.get('lunch_end', '14:00'), '%H:%M')
+                slot_duration = int(schedule_data.get('slot_duration', 30))
+                
+                current_time = start_time
+                while current_time + timedelta(minutes=slot_duration) <= end_time:
+                    # Skip lunch break
+                    if not (lunch_start <= current_time < lunch_end):
+                        try:
+                            AppointmentSlot.objects.create(
+                                doctor=doctor,
+                                date=current_date,
+                                start_time=current_time.time(),
+                                end_time=(current_time + timedelta(minutes=slot_duration)).time(),
+                                is_booked=False
+                            )
+                            slots_created += 1
+                        except Exception as e:
+                            print(f"Error creating slot: {str(e)}")
+                    
+                    current_time += timedelta(minutes=slot_duration)
+                
+                dates_processed += 1
+            
+            current_date += timedelta(days=1)
+        
+        return Response({
+            'message': f'Successfully generated {slots_created} slots across {dates_processed} days',
+            'slots_created': slots_created,
+            'dates_processed': dates_processed
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Error generating slots: {str(e)}")
+        return Response({
+            'error': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def doctor_profile_api(request):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        data = {
+            'id': doctor.id,
+            'name': doctor.name,
+            'email': doctor.email,
+            'phone_number': doctor.phone_number,
+            'specialization': doctor.specialization,
+            'clinic': doctor.clinic.id
+        }
+        return Response(data, status=status.HTTP_200_OK)
+    except Doctor.DoesNotExist:
+        return Response({'error': 'Doctor profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def doctor_appointments_api(request):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        current_datetime = timezone.now()
+
+        # Get all appointments for the doctor
+        appointments = Appointment.objects.filter(
+            doctor=doctor
+        ).select_related('patient').order_by(
+            # Future appointments first, then by date and time in descending order
+            models.Case(
+                When(appointment_date__gt=current_datetime.date(), then=0),
+                When(appointment_date=current_datetime.date(), 
+                     appointment_time__gt=current_datetime.time(), then=1),
+                default=2
+            ),
+            '-appointment_date', 
+            '-appointment_time'
+        )
+
+        appointments_data = []
+        for appointment in appointments:
+            appointments_data.append({
+                'id': appointment.id,
+                'patient_name': f"{appointment.patient.first_name} {appointment.patient.last_name}",
+                'patient_id': appointment.patient.id,
+                'date': appointment.appointment_date.strftime('%Y-%m-%d'),
+                'time': appointment.appointment_time.strftime('%H:%M'),
+                'status': appointment.status,
+                'reason': appointment.reason or '',
+                'is_future': (
+                    appointment.appointment_date > current_datetime.date() or 
+                    (appointment.appointment_date == current_datetime.date() and 
+                     appointment.appointment_time > current_datetime.time())
+                )
+            })
+
+        return Response({
+            'appointments': appointments_data,
+            'total_count': len(appointments_data)
+        }, status=status.HTTP_200_OK)
+
+    except Doctor.DoesNotExist:
+        return Response({
+            'error': 'Doctor profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        print(f"Error fetching appointments: {str(e)}")
+        return Response({
+            'error': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def patient_prescriptions_api(request, patient_id):
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        
+        # Get previous prescriptions
+        prescriptions = Prescription.objects.filter(
+            doctor=doctor,
+            patient_id=patient_id
+        ).select_related('patient').order_by('-date')
+        
+        prescriptions_data = []
+        for prescription in prescriptions:
+            # Use PrescriptionItem instead of PrescriptionMedicine
+            medicines = PrescriptionItem.objects.filter(prescription=prescription)
+            medicines_data = [{
+                'name': med.medicine,
+                'dosage': med.dosage,
+                'duration': f"{med.duration} {med.duration_unit or ''}".strip(),
+                'instructions': med.instructions
+            } for med in medicines]
+            
+            prescriptions_data.append({
+                'id': prescription.id,
+                'created_at': prescription.date,
+                'chief_complaints': prescription.chief_complaints,
+                'clinical_findings': prescription.clinical_findings,
+                'diagnosis': prescription.diagnosis,
+                'advice': prescription.advice,
+                'follow_up_date': prescription.follow_up_date,
+                'medicines': medicines_data
+            })
+        
+        return Response({
+            'prescriptions': prescriptions_data
+        }, status=status.HTTP_200_OK)
+        
+    except Doctor.DoesNotExist:
+        return Response({
+            'error': 'Doctor profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        print(f"Error fetching prescriptions: {str(e)}")
+        return Response({
+            'error': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)

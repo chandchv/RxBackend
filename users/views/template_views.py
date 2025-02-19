@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse
+from django.contrib import messages
 
 
 
@@ -34,11 +35,14 @@ def login_view(request):
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
-        user = authenticate(username=username, password=password)
-        if user:
+        user = authenticate(request, username=username, password=password)
+        
+        if user is not None:
             login(request, user)
             return redirect('users:dashboard')
-        return render(request, 'login.html', {'error': 'Invalid credentials'})
+        else:
+            messages.error(request, 'Invalid username or password')
+    
     return render(request, 'login.html')
 
 @login_required

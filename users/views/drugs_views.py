@@ -13,7 +13,7 @@ def drug_suggestions(request):
             return JsonResponse([])  # Return empty array if no query
 
         # Query the drugs
-        suggestions = Drug.objects.filter(
+        suggestions = Drug.objects.filter( 
             Q(product_name__icontains=query) |
             Q(salt_composition__icontains=query)
         )[:10]  # Limit to 10 suggestions
@@ -33,7 +33,7 @@ def drug_suggestions(request):
         print(f"Error in drug suggestions: {str(e)}")
         return JsonResponse([], safe=False)  # Return empty array on error
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+#@permission_classes([IsAuthenticated])
 def api_drug_suggestions(request):
     try:
         query = request.GET.get('query', '').strip()

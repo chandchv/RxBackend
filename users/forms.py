@@ -264,14 +264,33 @@ class CustomAuthenticationForm(AuthenticationForm):
 class ClinicProfileForm(forms.ModelForm):
     class Meta:
         model = Clinic
-        fields = ['name', 'email', 'registration_number', 'logo', 'phone_number']
+        fields = [
+            'name',
+            'address',
+            'phone_number',
+            'email',
+            'logo', 
+            'registration_number',
+            'website',
+            'description',
+            'specializations',
+            'opening_hours',
+            'emergency_contact'
+        ]
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-input rounded-lg'}),
-            'email': forms.EmailInput(attrs={'class': 'form-input rounded-lg'}),
-            'registration_number': forms.TextInput(attrs={'class': 'form-input rounded-lg'}),
-            'phone_number': forms.TextInput(attrs={'class': 'form-input rounded-lg'}),
-            'logo': forms.FileInput(attrs={'class': 'form-input rounded-lg'}),
+            'description': forms.Textarea(attrs={'rows': 4}),
+            'address': forms.Textarea(attrs={'rows': 3}),
+            'opening_hours': forms.TextInput(attrs={'placeholder': 'e.g., Mon-Fri: 9AM-6PM'}),
         }
+
+    def clean_phone_number(self):
+        phone = self.cleaned_data.get('phone_number')
+        if phone:
+            # Remove any non-digit characters
+            phone = ''.join(filter(str.isdigit, phone))
+            if len(phone) < 10 or len(phone) > 15:
+                raise forms.ValidationError("Phone number must be between 10 and 15 digits")
+        return phone
 
     def clean_logo(self):
         logo = self.cleaned_data.get('logo')

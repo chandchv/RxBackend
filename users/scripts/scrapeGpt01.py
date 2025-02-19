@@ -52,7 +52,7 @@ def verify_doctor(doctor_details):
     chrome_options = Options()
     
     # Browser configuration
-    chrome_options.add_argument("--headless")
+    #chrome_options.add_argument("--headless")
     chrome_options.add_argument("--start-maximized")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
@@ -73,15 +73,15 @@ def verify_doctor(doctor_details):
         print("Filling in doctor details...")
         name_input = wait.until(EC.presence_of_element_located((By.ID, "doctorName")))
         name_input.clear()
-        time.sleep(1)
+        #time.sleep(1)
         name_input.send_keys(doctor_details['name'])
-        time.sleep(1)
+        #time.sleep(1)
 
         reg_input = wait.until(EC.presence_of_element_located((By.ID, "doctorRegdNo")))
         reg_input.clear()
-        time.sleep(1)
+        #time.sleep(1)
         reg_input.send_keys(doctor_details['registration_number'])
-        time.sleep(1)
+        #time.sleep(1)
 
         council_dropdown = wait.until(EC.presence_of_element_located((By.ID, "advsmcId")))
         driver.execute_script("arguments[0].style.display = 'block';", council_dropdown)
@@ -97,12 +97,12 @@ def verify_doctor(doctor_details):
         if not council_found:
             return False, "Medical council not found in dropdown"
 
-        time.sleep(2)
+        #time.sleep(2)
         print("Submitting form...")
         submit_button = wait.until(EC.element_to_be_clickable((By.ID, "doctor_advance_Details")))
         driver.execute_script("arguments[0].click();", submit_button)
         
-        time.sleep(3)
+        time.sleep(12)
 
         print("Waiting for results table...")
         results_table = wait.until(EC.presence_of_element_located((By.ID, "doct_info5")))
@@ -127,11 +127,12 @@ def verify_doctor(doctor_details):
             # Wait for the modal to be present in the DOM
             modal = wait.until(EC.presence_of_element_located((By.ID, "doctorModalBody")))
             biodata_text = modal.find_element(By.ID, "doctorBiodata").text.strip()  # Get the text directly
-
+            
             # Parse the additional details
             parsed_details = parse_additional_details(biodata_text)
-
+            
             # Return the parsed data
+            print(parsed_details)
             return True, parsed_details
 
         else:

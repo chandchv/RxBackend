@@ -1,5 +1,6 @@
-{% extends 'base.html' %}
 
+{% extends 'base.html' %}
+{% load static %}
 {% block title %}Login{% endblock %}
 
 {% block content %}
@@ -92,6 +93,17 @@
                     </button>
                 </div>
             </form>
+            <!-- Social Login Buttons -->
+            <div class="social-login">
+                <a href="{% url 'users:login' %}" class="btn btn-primary">
+                    Regular Login
+                </a>
+                {% if SOCIAL_AUTH_GOOGLE_OAUTH2_KEY %}
+                <a href="{% url 'social:begin' 'google-oauth2' %}" class="btn btn-danger">
+                    Login with Google
+                </a>
+                {% endif %}
+            </div>
 
             <!-- Registration Options -->
             <div class="mt-6">
@@ -119,6 +131,32 @@
                             Sign Up
                         </a>
                     </div>
+                </div>
+            </div>
+
+            <!-- Add this in your login form -->
+            <div class="mt-6">
+                <div class="relative">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div class="relative flex justify-center text-sm">
+                        <span class="px-2 bg-white text-gray-500">
+                            Or continue with
+                        </span>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <button
+                        type="button"
+                        hx-get="{% url 'social:begin' 'google-oauth2' %}"
+                        hx-trigger="click"
+                        class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                        <img src="{% static 'img/google-logo.svg' %}" alt="Google logo" class="h-5 w-5 mr-2">
+                        Sign in with Google
+                    </button>
                 </div>
             </div>
         </div>

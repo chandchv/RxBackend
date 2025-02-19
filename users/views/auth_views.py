@@ -17,6 +17,7 @@ from rest_framework.authtoken.models import Token
 from ..forms import PatientSignupForm, DoctorSignupForm, CustomAuthenticationForm
 from django.db.models import Max, Q
 from django.contrib.auth.forms import AuthenticationForm
+from firebase_admin import auth as firebase_auth
 
 @ensure_csrf_cookie
 def login_view(request):
@@ -677,3 +678,47 @@ def signup_view(request):
             return render(request, 'signup.html', {'error': str(e)})
     
     return render(request, 'signup.html')
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_firebase_token(request):
+    try:
+        id_token = request.data.get('token')
+        if not id_token:
+            return Response({'error': 'No token provided'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Verify the Firebase token
+        decoded_token = firebase_auth.verify_id_token(id_token)
+        
+        # Get or create user
+        firebase_uid = decoded_token['uid']
+        email = decoded_token.get('email', '')
+        name = decoded_token.get('name', '').split()
+        first_name = name[0] if name else ''
+        last_name = name[-1] if len(name) > 1 else ''
+        
+        try:
+            user = User.objects.get(username=firebase_uid)
+        except User.DoesNotExist:
+            user = User.objects.create_user(
+                username=firebase_uid,
+                email=email,
+                first_name=first_name,
+                last_name=last_name
+            )
+            
+        # Create JWT tokens
+        refresh = RefreshToken.for_user(user)
+        
+        return Response({
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'name': user.get_full_name()
+            }
+        })
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

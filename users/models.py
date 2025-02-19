@@ -7,8 +7,12 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator, MinValueValidator, MaxValueValidator
 from datetime import datetime, timedelta
 from decimal import Decimal
+from django.conf import settings
+from django.contrib.auth import get_user_model
 
 from elasticsearch_dsl import Q
+
+User = get_user_model()
 
 # Define the phone number regex validator
 phone_regex = RegexValidator(
@@ -33,8 +37,18 @@ class Clinic(TimeStampedModel):
     )
     phone_number = models.CharField(validators=[phone_regex], max_length=17)
     email = models.EmailField()
+    website = models.URLField(blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+    specializations = models.TextField(blank=True, null=True)
+    opening_hours = models.TextField(blank=True, null=True)
+    emergency_contact = models.CharField(max_length=255, blank=True, null=True)
     registration_number = models.CharField(max_length=50, unique=True, db_index=True)
     logo = models.ImageField(upload_to='clinic_logos/', null=True, blank=True)
+    clinic_admins = models.ManyToManyField(
+        User, 
+        related_name='administered_clinics',
+        through='ClinicAdministrator'
+    )
 
     class Meta:
         ordering = ['name']
@@ -50,8 +64,46 @@ class Clinic(TimeStampedModel):
         if self.email and not self.email.endswith(('.com', '.org', '.net')):
             raise ValidationError('Invalid email domain')
 
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        
+        if is_new:
+            # Get or create superuser
+            superuser = User.objects.filter(is_superuser=True).first()
+            if superuser:
+                ClinicAdministrator.objects.create(
+                    clinic=self,
+                    user=superuser,
+                    is_primary=True
+                )
+
+class ClinicAdministrator(TimeStampedModel):
+    clinic = models.ForeignKey(Clinic, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    is_primary = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ['clinic', 'user']
+        indexes = [
+            models.Index(fields=['clinic', 'user']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.clinic.name}"
+
+    def save(self, *args, **kwargs):
+        if self.is_primary:
+            # Ensure only one primary admin per clinic
+            ClinicAdministrator.objects.filter(
+                clinic=self.clinic, 
+                is_primary=True
+            ).exclude(id=self.id).update(is_primary=False)
+        super().save(*args, **kwargs)
+
 class UserProfile(TimeStampedModel):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
     clinic = models.ForeignKey(Clinic, on_delete=models.SET_NULL, null=True, blank=True)
     phone_number = models.CharField(max_length=17, validators=[phone_regex])
     address = models.TextField(null=True, blank=True)
@@ -59,6 +111,9 @@ class UserProfile(TimeStampedModel):
 
     def __str__(self):
         return f"{self.user.get_full_name()}'s profile"
+
+    class Meta:
+        db_table = 'users_userprofile'
 
 class Doctor(TimeStampedModel):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='doctor')
@@ -74,8 +129,15 @@ class Doctor(TimeStampedModel):
         validators=[MinValueValidator(0)]
     )
     profile_picture = models.ImageField(upload_to='doctor_profiles/', null=True, blank=True)
+    email = models.EmailField(blank=True, null=True)
+    phone_number = models.CharField(max_length=17, validators=[phone_regex], null=True, blank=True)
+    address = models.TextField(null=True, blank=True)
+    pincode = models.CharField(max_length=10, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
     verified = models.BooleanField(default=False)
     verification_details = models.JSONField(null=True, blank=True)
+    qualification = models.CharField(max_length=100, null=True, blank=True)
+    experience = models.IntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ['name']
@@ -83,6 +145,7 @@ class Doctor(TimeStampedModel):
             models.Index(fields=['license_number']),
             models.Index(fields=['clinic', 'specialization']),
         ]
+        db_table = 'users_doctor'
 
     def __str__(self):
         return f"Dr. {self.name}"
@@ -614,15 +677,18 @@ class Staff(TimeStampedModel):
         return f"{self.user.get_full_name()} - {self.role}"
 
 @receiver(post_save, sender=User)
-def create_user_profile(sender, instance, created, **kwargs):
-    if created:
-        UserProfile.objects.create(user=instance)
-
-@receiver(post_save, sender=User)
-def save_user_profile(sender, instance, **kwargs):
-    if not hasattr(instance, 'profile'):
-        UserProfile.objects.create(user=instance)
-    instance.profile.save()
+def save_user_profile(sender, instance, created, **kwargs):
+    """Create or update user profile when user is saved"""
+    try:
+        # Check if profile exists
+        if created:
+            # Only create profile if it doesn't exist and user was just created
+            UserProfile.objects.get_or_create(user=instance)
+        else:
+            # If user exists but profile doesn't, create it
+            UserProfile.objects.get_or_create(user=instance)
+    except Exception as e:
+        print(f"Error creating user profile: {str(e)}")
 
 class BillingItem(models.Model):
     ITEM_TYPES = [

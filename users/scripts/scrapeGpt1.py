@@ -7,50 +7,88 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import time
+from datetime import datetime
 
 def parse_additional_details(html_content):
     """Parse HTML table to extract doctor details."""
     soup = BeautifulSoup(html_content, "html.parser")
     parsed_data = {}
 
-    # Extract rows from the table
-    rows = soup.find_all("tr")
-    for row in rows:
-        cells = row.find_all("td")
-        if len(cells) == 2:  # Rows with one key-value pair
-            key = cells[0].get_text(strip=True)
-            value = cells[1].get_text(strip=True)
-            parsed_data[key] = value
-        elif len(cells) == 4:  # Rows with two key-value pairs
-            key1 = cells[0].get_text(strip=True)
-            value1 = cells[1].get_text(strip=True)
-            key2 = cells[2].get_text(strip=True)
-            value2 = cells[3].get_text(strip=True)
-            parsed_data[key1] = value1
-            parsed_data[key2] = value2
+    try:
+        table = soup.find('table', id='doctorBiodata')
+        if not table:
+            print("Table not found")
+            return {}
 
-    # Map parsed data to the desired format
-    mapped_data = {
-        "name": parsed_data.get("Name", ""),
-        "father_name": parsed_data.get("Father/Husband Name", ""),
-        "date_of_birth": parsed_data.get("Date of Birth", ""),
-        "year_of_info": parsed_data.get("Year of Info", ""),
-        "registration_number": parsed_data.get("Registration No", ""),
-        "registration_date": parsed_data.get("Date of Reg.", ""),
-        "state_council": parsed_data.get("State Medical Council", ""),
-        "qualification": parsed_data.get("Qualification", ""),
-        "qualification_year": parsed_data.get("Qualification Year", ""),
-        "university": parsed_data.get("University Name", ""),
-        "permanent_address": parsed_data.get("Permanent Address", ""),
-    }
+        rows = table.find_all('tr')
+        
+        for row in rows:
+            cells = row.find_all('td')
+            if len(cells) >= 2:
+                key = cells[0].get_text(strip=True)
+                
+                # Special handling for rows with 4 cells
+                if len(cells) == 4:
+                    # First pair
+                    key1 = cells[0].get_text(strip=True)
+                    value1 = cells[1].get_text(strip=True)
+                    # Second pair
+                    key2 = cells[2].get_text(strip=True)
+                    value2 = cells[3].get_text(strip=True)
+                    
+                    # Process first pair
+                    if key1 == 'Registration No':
+                        parsed_data['registration_number'] = value1
+                    elif key1 == 'Date of Birth':
+                        parsed_data['date_of_birth'] = value1
+                    elif key1 == 'Qualification':
+                        parsed_data['qualification'] = value1
+                        
+                    # Process second pair
+                    if key2 == 'Date of Reg.':
+                        parsed_data['registration_date'] = value2
+                    elif key2 == 'State Medical Council':
+                        parsed_data['medical_council'] = value2
+                    elif key2 == 'Qualification Year':
+                        parsed_data['qualification_year'] = value2
+                else:
+                    # Handle rows with colspan
+                    value = cells[1].get_text(strip=True)
+                    if key == 'Name':
+                        parsed_data['full_name'] = value
+                    elif key == 'Father/Husband Name':
+                        parsed_data['father_name'] = value
+                    elif key == 'University Name':
+                        parsed_data['university'] = value
+                    elif key == 'Permanent Address':
+                        parsed_data['permanent_address'] = value
 
-    return mapped_data
+        # Clean the data
+        for key in parsed_data:
+            if parsed_data[key] == 'N/A':
+                parsed_data[key] = ''
+            else:
+                parsed_data[key] = parsed_data[key].strip()
+
+        # Add verification timestamp
+        parsed_data['verification_timestamp'] = datetime.now().isoformat()
+        
+        print("Raw Parsed Data:", parsed_data)
+        return parsed_data
+
+    except Exception as e:
+        print(f"Error parsing details: {str(e)}")
+        print("HTML Content:", html_content)
+        return {}
 
 
 def verify_doctor(doctor_details):
     """Verify doctor details using the NMC website."""
+    print(f"\n=== Starting Verification ===")
+    print(f"Doctor details: {doctor_details}")
+    
     chrome_options = Options()
-    #chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--headless")
     chrome_options.add_argument("--start-maximized")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
@@ -66,85 +104,134 @@ def verify_doctor(doctor_details):
 
         print("Navigating to website...")
         driver.get("https://www.nmc.org.in/information-desk/indian-medical-register")
-        time.sleep(3)
+        time.sleep(5)  # Increased wait time
 
-        print("Filling in doctor details...")
+        print("Filling form fields...")
+        # Fill in doctor details
         name_input = wait.until(EC.presence_of_element_located((By.ID, "doctorName")))
         name_input.clear()
-        time.sleep(1)
         name_input.send_keys(doctor_details['name'])
-        time.sleep(1)
+        print(f"Entered name: {doctor_details['name']}")
 
         reg_input = wait.until(EC.presence_of_element_located((By.ID, "doctorRegdNo")))
         reg_input.clear()
-        time.sleep(1)
         reg_input.send_keys(doctor_details['registration_number'])
-        time.sleep(1)
+        print(f"Entered registration: {doctor_details['registration_number']}")
 
         council_dropdown = wait.until(EC.presence_of_element_located((By.ID, "advsmcId")))
         driver.execute_script("arguments[0].style.display = 'block';", council_dropdown)
-        time.sleep(1)
+        time.sleep(3)
 
+        print("Selecting medical council...")
         council_found = False
         for option in council_dropdown.find_elements(By.TAG_NAME, "option"):
-            if doctor_details['state_council'] in option.text:
+            if doctor_details['state_council'].lower() in option.text.lower():
                 driver.execute_script("arguments[0].selected = true; arguments[0].dispatchEvent(new Event('change'))", option)
                 council_found = True
+                print(f"Selected council: {option.text}")
                 break
 
         if not council_found:
+            print("Error: Medical council not found")
             return False, "Medical council not found in dropdown"
 
-        time.sleep(2)
         print("Submitting form...")
         submit_button = wait.until(EC.element_to_be_clickable((By.ID, "doctor_advance_Details")))
         driver.execute_script("arguments[0].click();", submit_button)
 
-        time.sleep(3)
+        print("Waiting for results...")
+        time.sleep(15)  # Increased wait time
 
-        print("Waiting for results table...")
-        results_table = wait.until(EC.presence_of_element_located((By.ID, "doct_info5")))
+        try:
+            # Wait for results table
+            results_table = wait.until(
+                EC.presence_of_element_located((By.ID, "doct_info5"))
+            )
+            
+            print("Checking results table...")
+            if not results_table.is_displayed():
+                print("Error: Results table not visible")
+                driver.save_screenshot("table_not_visible.png")
+                return False, "Results table not visible"
 
-        if not results_table.is_displayed():
-            return False, "No results found"
+            rows = results_table.find_elements(By.TAG_NAME, "tr")
+            if len(rows) <= 1:
+                print("Error: No results found")
+                driver.save_screenshot("no_results.png")
+                return False, "No results found"
 
-        rows = results_table.find_elements(By.TAG_NAME, "tr")
-        if len(rows) <= 1:  # Only header row
-            return False, "No results found"
+            print(f"Found {len(rows)-1} results")
+            
+            # Get first result row
+            result_row = rows[1]
+            cells = result_row.find_elements(By.TAG_NAME, "td")
 
-        # Click the first result row to show details
-        cells = rows[1].find_elements(By.TAG_NAME, "td")
-        print("Looking for 'View' link...")
-        view_link = cells[-1].find_element(By.TAG_NAME, "a")  # Locate 'View' link
-
-        if view_link:
-            print("Clicking 'View' link to fetch additional details...")
+            print("Clicking view button...")
+            view_link = cells[-1].find_element(By.TAG_NAME, "a")
             driver.execute_script("arguments[0].click();", view_link)
-            time.sleep(3)  # Wait for the detailed view or modal to load
+            time.sleep(5)  # Increased wait time
 
-            # Wait for the modal to be present in the DOM
+            print("Waiting for modal...")
             modal = wait.until(EC.presence_of_element_located((By.ID, "doctorModalBody")))
-            modal_content = modal.get_attribute("innerHTML")  # Get the modal's HTML content
+            time.sleep(3)  # Wait for modal content
 
-            # Parse the additional details
-            parsed_details = parse_additional_details(modal_content)
+            print("Getting modal content...")
+            modal_html = modal.get_attribute('innerHTML')
+            if not modal_html:
+                print("Error: Empty modal content")
+                driver.save_screenshot("empty_modal.png")
+                return False, "Modal content empty"
 
-            # Return the parsed data
-            return True, parsed_details
-        else:
-            print("'View' link not found in the result row.")
-            return False, "No 'View' link available to fetch additional details"
+            print("Parsing doctor details...")
+            detailed_info = parse_additional_details(modal_html)
+            
+            if not detailed_info:
+                print("Error: Failed to parse details")
+                driver.save_screenshot("parse_error.png")
+                return False, "Failed to parse doctor details"
+
+            print("Successfully extracted details:", detailed_info)
+
+            # After getting detailed_info, format the response
+            verification_response = {
+                'name': detailed_info.get('full_name', ''),
+                'registration': detailed_info.get('registration_number', ''),
+                'council': detailed_info.get('medical_council', doctor_details.get('state_council', '')),
+                'qualification': detailed_info.get('qualification', ''),
+                'registration_date': detailed_info.get('registration_date', ''),
+                'father_name': detailed_info.get('father_name', ''),
+                'date_of_birth': detailed_info.get('date_of_birth', ''),
+                'university': detailed_info.get('university', ''),
+                'permanent_address': detailed_info.get('permanent_address', ''),
+                'qualification_year': detailed_info.get('qualification_year', ''),
+                'verification_status': 'VERIFIED',
+                'verification_timestamp': detailed_info.get('verification_timestamp', datetime.now().isoformat())
+            }
+
+            # Debug prints
+            print("Raw Details:", detailed_info)
+            print("Formatted Response:", verification_response)
+            
+            # Validate required fields
+            if not verification_response['registration'] or not verification_response['qualification']:
+                print("Warning: Missing required fields in response")
+            
+            return True, verification_response
+
+        except Exception as e:
+            print(f"Error processing results: {str(e)}")
+            driver.save_screenshot("error_screenshot.png")
+            return False, f"Error processing results: {str(e)}"
 
     except Exception as e:
-        print(f"Error during verification process: {str(e)}")
+        print(f"Verification process failed: {str(e)}")
+        if driver:
+            driver.save_screenshot("error_screenshot.png")
         return False, f"Verification process failed: {str(e)}"
 
     finally:
         if driver:
-            try:
-                driver.quit()
-            except Exception as e:
-                print(f"Error closing browser: {str(e)}")
+            driver.quit()
 
 
 if __name__ == "__main__":

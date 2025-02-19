@@ -21,10 +21,15 @@ from users import views
 from django.shortcuts import redirect
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.http import JsonResponse
 
 def redirect_to_dashboard(request):
     return redirect('users:dashboard' if request.user.is_authenticated else 'users:login')
 
+@ensure_csrf_cookie
+def get_csrf_token(request):
+    return JsonResponse({'detail': 'CSRF cookie set'})
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -34,6 +39,8 @@ urlpatterns = [
     path('dashboard/', views.dashboard_view, name='dashboard'),
     path('', redirect_to_dashboard, name='root'),  # Add this line for root URL
     path('api/', include(('users.urls', 'users_api'), namespace='users_api')),
+    path('api/get-csrf-token/', get_csrf_token),
+    path('social/', include(('social_django.urls', 'social'), namespace='social')),
 ]
 
 # Add static and media URL patterns

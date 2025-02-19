@@ -1,4 +1,6 @@
 from .models import Doctor
+import json
+from django.conf import settings
 
 def doctor_info(request):
     if request.user.is_authenticated and hasattr(request.user, 'is_doctor') and request.user.is_doctor:
@@ -9,4 +11,9 @@ def doctor_info(request):
         except Doctor.DoesNotExist:
             print("Doctor does not exist")  # Debug print
             pass
-    return {'doctor': None} 
+    return {'doctor': None}
+
+def firebase_config(request):
+    return {
+        'FIREBASE_CONFIG': json.dumps(settings.FIREBASE_CONFIG)
+    } 

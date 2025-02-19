@@ -117,9 +117,13 @@ async function verifyDoctor() {
             document.getElementById('verifiedDetailsContent').innerHTML = `
                 <p><strong>Name:</strong> ${details.name}</p>
                 <p><strong>Registration:</strong> ${details.registration_number}</p>
-                <p><strong>Council:</strong> ${details.state_council}</p>
+                <p><strong>Council:</strong> ${details.council}</p>
                 <p><strong>Qualification:</strong> ${details.qualification}</p>
                 <p><strong>Registration Date:</strong> ${details.registration_date}</p>
+                <p><strong>Qualification Year:</strong> ${details.qualification_year}</p>
+                <p><strong>Permanent Address:</strong> ${details.permanent_address}</p>
+                <p><strong>University:</strong> ${details.university}</p>
+                
             `;
             
             // Show doctor form and hide verification
