@@ -6,11 +6,33 @@
 <div class="max-w-7xl mx-auto px-4 py-8">
     <div class="bg-white shadow-lg rounded-lg">
         <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-            <h1 class="text-2xl font-bold text-gray-900">Manage Doctors</h1>
-            <a href="{% url 'users:add_doctor' %}" 
-               class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
-                Add New Doctor
-            </a>
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Manage Doctors</h1>
+                {% if current_clinic %}
+                <p class="text-sm text-gray-500 mt-1">Clinic: {{ current_clinic.name }}</p>
+                {% endif %}
+            </div>
+            <div class="flex items-center space-x-4">
+                {% if clinic_list %}
+                <select id="clinic_filter" class="border rounded-md px-3 py-2 text-sm">
+                    {% for clinic in clinic_list %}
+                    <option value="{{ clinic.id }}" {% if current_clinic.id == clinic.id %}selected{% endif %}>
+                        {{ clinic.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+                <div class="flex space-x-2">
+                    <button onclick="showAddDoctorModal()" 
+                            class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+                        Add New Doctor
+                    </button>
+                    <button onclick="showAssignDoctorModal()" 
+                            class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+                        Assign Existing Doctor
+                    </button>
+                </div>
+            </div>
         </div>
 
         {% if messages %}
@@ -86,12 +108,84 @@
             {% else %}
             <div class="text-center py-8">
                 <p class="text-gray-500">No doctors found.</p>
-                <a href="{% url 'users:add_doctor' %}" 
-                   class="mt-4 inline-block bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
-                    Add Your First Doctor
-                </a>
+                <div class="mt-4 space-x-4">
+                    <button onclick="showAddDoctorModal()" 
+                            class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+                        Add New Doctor
+                    </button>
+                    <button onclick="showAssignDoctorModal()" 
+                            class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+                        Assign Existing Doctor
+                    </button>
+                </div>
             </div>
             {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Add Doctor Modal -->
+<div id="addDoctorModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">Add New Doctor</h3>
+            <form id="addDoctorForm" method="POST" action="{% url 'users:add_doctor' %}" class="mt-4">
+                {% csrf_token %}
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="name">Name</label>
+                    <input type="text" name="name" id="name" required
+                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="email">Email</label>
+                    <input type="email" name="email" id="email" required
+                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="specialization">Specialization</label>
+                    <input type="text" name="specialization" id="specialization"
+                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div class="flex justify-end space-x-4">
+                    <button type="button" onclick="hideAddDoctorModal()"
+                            class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+                        Add Doctor
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Assign Doctor Modal -->
+<div id="assignDoctorModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">Assign Existing Doctor</h3>
+            <form id="assignDoctorForm" method="POST" action="{% url 'users:assign_doctor' %}" class="mt-4">
+                {% csrf_token %}
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="doctor">Select Doctor</label>
+                    <select name="doctor" id="doctor" required
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        <option value="">Select a doctor</option>
+                    </select>
+                </div>
+                <div class="flex justify-end space-x-4">
+                    <button type="button" onclick="hideAssignDoctorModal()"
+                            class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+                        Assign Doctor
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -133,6 +227,72 @@ function getCookie(name) {
         }
     }
     return cookieValue;
+}
+
+// Handle clinic filter change
+document.getElementById('clinic_filter')?.addEventListener('change', function(e) {
+    const clinicId = e.target.value;
+    fetch(`/users/clinics/${clinicId}/change/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+        },
+    })
+    .then(response => {
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            alert('Error changing clinic');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error changing clinic');
+    });
+});
+
+// Modal functions
+function showAddDoctorModal() {
+    document.getElementById('addDoctorModal').classList.remove('hidden');
+}
+
+function hideAddDoctorModal() {
+    document.getElementById('addDoctorModal').classList.add('hidden');
+}
+
+function showAssignDoctorModal() {
+    // Fetch available doctors
+    fetch('/users/doctors/available/')
+        .then(response => response.json())
+        .then(doctors => {
+            const select = document.getElementById('doctor');
+            select.innerHTML = '<option value="">Select a doctor</option>';
+            doctors.forEach(doctor => {
+                const option = document.createElement('option');
+                option.value = doctor.id;
+                option.textContent = `${doctor.name} (${doctor.specialization})`;
+                select.appendChild(option);
+            });
+            document.getElementById('assignDoctorModal').classList.remove('hidden');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading available doctors');
+        });
+}
+
+function hideAssignDoctorModal() {
+    document.getElementById('assignDoctorModal').classList.add('hidden');
+}
+
+// Close modals when clicking outside
+window.onclick = function(event) {
+    if (event.target.id === 'addDoctorModal') {
+        hideAddDoctorModal();
+    }
+    if (event.target.id === 'assignDoctorModal') {
+        hideAssignDoctorModal();
+    }
 }
 </script>
 {% endblock %}

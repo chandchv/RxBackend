@@ -196,22 +196,32 @@ SIMPLE_JWT = {
 CSRF_COOKIE_SAMESITE = 'Lax'  # or 'None' for cross-origin requests
 SESSION_COOKIE_SAMESITE = 'Lax'  # or 'None' for cross-origin requests
 
+# Security Settings
+SECURE_SSL_REDIRECT = False  # Set to True in production
+SESSION_COOKIE_SECURE = False  # Set to True in production
+CSRF_COOKIE_SECURE = False  # Set to True in production
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+
+# For development, allow HTTP
 if DEBUG:
-    CSRF_COOKIE_SECURE = False
+    SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
-    CORS_ALLOW_ALL_ORIGINS = True  # For development only
+    CSRF_COOKIE_SECURE = False
 else:
-    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 # CSRF Settings
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:8081",
     "http://10.0.2.2:8081",
-    "http://192.168.29.57:8081",
+    "http://192.168.29.57:8000",
     "http://192.168.56.1:19006",
-
+    "http://192.168.56.1:8000",
 ]
 load_dotenv()
 
@@ -234,3 +244,6 @@ AUTHENTICATION_BACKENDS = (
 # Add social auth settings
 SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = 'your-google-oauth2-key'
 SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = 'your-google-oauth2-secret'
+
+# Add your domain to allowed hosts
+ALLOWED_HOSTS = ['*', 'localhost', '127.0.0.1', '192.168.29.57']

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Prescription</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1.5cm;
+            @frame header {
+                -pdf-frame-content: headerContent;
+                top: 0.5cm;
+                margin-left: 1cm;
+                margin-right: 1cm;
+                height: 3cm;
+            }
+            @frame content {
+                top: 4cm;
+                margin-left: 1cm;
+                margin-right: 1cm;
+                height: 22cm;
+            }
+            @frame footer {
+                -pdf-frame-content: footerContent;
+                bottom: 0cm;
+                margin-left: 1cm;
+                margin-right: 1cm;
+                height: 3cm;
+            }
+        }
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            font-size: 12px;
+        }
+        .prescription-info {
+            text-align: right;
+            margin-bottom: 1cm;
+        }
+        .patient-info {
+            margin-bottom: 1cm;
+        }
+        .vitals {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 1cm;
+        }
+        .section {
+            margin-bottom: 1cm;
+        }
+        .section-title {
+            font-weight: bold;
+            margin-bottom: 0.3cm;
+            border-bottom: 1px solid #ccc;
+        }
+        .medicine-item, .test-item {
+            margin-bottom: 0.5cm;
+            padding: 0.3cm;
+            border: 1px solid #eee;
+        }
+        .footer {
+            text-align: right;
+            margin-top: 1cm;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header Content - Will be minimal for letterhead -->
+    <div id="headerContent">
+        <div class="prescription-info">
+            <p>Date: {{ prescription.created_at|date:"F j, Y" }}</p>
+            <p>Prescription ID: {{ prescription.id }}</p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="patient-info">
+        <p><strong>Patient Name:</strong> {{ prescription.patient.get_full_name }}</p>
+        <p><strong>Age:</strong> {{ patient_age }} years | <strong>Gender:</strong> {{ prescription.patient.gender }}</p>
+    </div>
+
+    {% if vitals %}
+    <div class="vitals">
+        <p>Weight: {{ vitals.weight|default:'-' }} kg</p>
+        <p>Height: {{ vitals.height|default:'-' }} cm</p>
+        <p>BP: {{ vitals.blood_pressure|default:'-' }}</p>
+        <p>Temp: {{ vitals.temperature|default:'-' }} °F</p>
+        <p>HR: {{ vitals.heart_rate|default:'-' }} bpm</p>
+        <p>SpO2: {{ vitals.oxygen_saturation|default:'-' }} %</p>
+    </div>
+    {% endif %}
+
+    <div class="section">
+        <div class="section-title">Clinical Information</div>
+        <p><strong>Chief Complaints:</strong> {{ prescription.chief_complaints }}</p>
+        <p><strong>Clinical Findings:</strong> {{ prescription.clinical_findings }}</p>
+        <p><strong>Diagnosis:</strong> {{ prescription.diagnosis }}</p>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Rx</div>
+        {% for item in prescription.items.all %}
+        <div class="medicine-item">
+            <p>{{ forloop.counter }}. {{ item.medicine }}</p>
+            <p style="margin-left: 1cm">{{ item.dosage }} - {{ item.duration }} {{ item.duration_unit }}</p>
+            <p style="margin-left: 1cm"><em>{{ item.instructions }}</em></p>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if lab_tests %}
+    <div class="section">
+        <div class="section-title">Lab Tests</div>
+        {% for test in lab_tests %}
+        <div class="test-item">
+            <p>{{ test.test_name }} ({{ test.get_collection_type_display }})</p>
+            <p style="margin-left: 1cm">{{ test.description }}</p>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if prescription.advice %}
+    <div class="section">
+        <div class="section-title">Advice</div>
+        <p>{{ prescription.advice }}</p>
+    </div>
+    {% endif %}
+
+    {% if prescription.follow_up_date %}
+    <div class="section">
+        <div class="section-title">Follow Up</div>
+        <p>Next visit on: {{ prescription.follow_up_date|date:"F j, Y" }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Footer Content - Will be minimal for letterhead -->
+    <div id="footerContent">
+        <div class="footer">
+            <p>Dr. {{ prescription.doctor.name }}</p>
+            <p>{{ prescription.doctor.qualifications }}</p>
+            <p>Reg. No: {{ prescription.doctor.license_number }}</p>
+        </div>
+    </div>
+</body>
+</html> 

@@ -30,8 +30,17 @@ def login_view(request):
             user = authenticate(username=username, password=password)
             if user is not None:
                 login(request, user)
-                next_url = request.POST.get('next', 'users:dashboard')
-                return redirect(next_url)
+                # Check user role and redirect accordingly
+                if hasattr(user, 'staff'):
+                    return redirect('users:staff_dashboard')
+                elif hasattr(user, 'doctor'):
+                    return redirect('users:doctor_dashboard')
+                elif hasattr(user, 'patient'):
+                    return redirect('users:patient_dashboard')
+                elif hasattr(user, 'clinicadmin'):
+                    return redirect('users:clinic_admin_dashboard')
+                else:
+                    return redirect('users:dashboard')
             else:
                 messages.error(request, 'Invalid username or password.')
                 form.fields['password'].widget.attrs.update({
@@ -50,6 +59,7 @@ def login_view(request):
     else:
         form = CustomAuthenticationForm()
     return render(request, 'login.html', {'form': form})
+
 @csrf_exempt
 @api_view(['POST'])
 def login(request):

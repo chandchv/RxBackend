@@ -63,13 +63,17 @@ def dashboard_redirect(request):
     if not request.user.is_authenticated:
         logger.warning("Unauthenticated user attempting to access dashboard")
         return redirect('login')
-    if request.user.is_authenticated:
+        
+    # Check if user is a superuser
+    if request.user.is_superuser:
+        logger.info(f"Superuser {request.user.username} redirecting to admin dashboard")
         return redirect('users:clinic_admin_dashboard')
-    # Check if user is staff/admin
-    if request.user.is_staff:
-        logger.info(f"Staff user {request.user.username} redirecting to admin dashboard")
-        return redirect('users:clinic_admin_dashboard')
-    
+        
+    # Check if user is a staff member
+    if hasattr(request.user, 'staff'):
+        logger.info(f"Staff user {request.user.username} redirecting to staff dashboard")
+        return redirect('users:staff_dashboard')
+        
     # Check if user is a doctor
     try:
         doctor = Doctor.objects.get(user=request.user)
@@ -85,6 +89,11 @@ def dashboard_redirect(request):
         return redirect('users:patient_dashboard')
     except Patient.DoesNotExist:
         logger.warning(f"User {request.user.username} has no associated patient profile")
+    
+    # Check if user is a clinic admin
+    if hasattr(request.user, 'clinicadmin'):
+        logger.info(f"Clinic admin {request.user.username} redirecting to clinic admin dashboard")
+        return redirect('users:clinic_admin_dashboard')
     
     # If no role is found, redirect to a default page
     logger.warning(f"No role found for user {request.user.username}")

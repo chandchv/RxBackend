@@ -483,7 +483,7 @@ def admin_staff_api(request, clinic_id):
             staff_users = User.objects.filter(
                 is_staff=True,
                 staff__clinic=clinic
-            ).select_related('staff', 'profile')
+            ).select_related('staff', 'userprofile')
             
             data = [{
                 'id': user.id,
@@ -492,7 +492,7 @@ def admin_staff_api(request, clinic_id):
                 'email': user.email,
                 'is_active': user.is_active,
                 'role': user.staff.role if hasattr(user, 'staff') else None,
-                'phone_number': user.profile.phone_number if hasattr(user, 'profile') else None
+                'phone_number': user.userprofile.phone_number if hasattr(user, 'userprofile') else None
             } for user in staff_users]
             
             return Response(data)
@@ -786,7 +786,7 @@ def patient_medical_history_api(request):
     return Response(serializer.data)
 
 @csrf_exempt  # Only if absolutely necessary
-@api_view(['POST'])
+@api_view(['POST', 'GET'])
 @permission_classes([IsAuthenticated])
 def create_appointment(request):
     """Create a new appointment"""

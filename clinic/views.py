@@ -4,9 +4,9 @@ from rest_framework.response import Response
 from django.db.models import Count, Q, Sum, F
 from django.utils import timezone
 from datetime import timedelta
-from ..models import Doctor, Patient, Appointment, Staff, Payment
-from ..serializers import DoctorSerializer, PatientSerializer, AppointmentSerializer, StaffSerializer
-from ..permissions import IsClinicAdmin
+from users.models import Doctor, Patient, Appointment, Staff, Payment
+from users.serializers import DoctorSerializer, PatientSerializer, AppointmentSerializer, StaffSerializer
+from users.permissions import IsClinicAdmin
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsClinicAdmin])
@@ -245,7 +245,18 @@ def update_staff_role(request, staff_id):
 @permission_classes([IsAuthenticated, IsClinicAdmin])
 def clinic_reports(request):
     try:
-        clinic = request.user.clinic
+        # Get clinic based on user's role
+        if hasattr(request.user, 'clinic_admin'):
+            clinic = request.user.clinic_admin.clinic
+        elif hasattr(request.user, 'doctor'):
+            clinic = request.user.doctor.clinic
+        elif hasattr(request.user, 'staff'):
+            clinic = request.user.staff.clinic
+        else:
+            return Response({
+                'error': 'User is not authorized to access clinic reports'
+            }, status=400)
+
         period = request.GET.get('period', 'week')
         today = timezone.now()
         
@@ -262,7 +273,7 @@ def clinic_reports(request):
             
         # Get appointments in period
         appointments = Appointment.objects.filter(
-            clinic=clinic,
+            doctor__clinic=clinic,
             appointment_date__gte=start_date,
             appointment_date__lte=today
         )
@@ -274,14 +285,14 @@ def clinic_reports(request):
         
         # Get new patients
         new_patients = Patient.objects.filter(
-            clinic=clinic,
+            doctor__clinic=clinic,
             created_at__gte=start_date,
             created_at__lte=today
         ).count()
         
         # Calculate revenue
         total_revenue = Payment.objects.filter(
-            clinic=clinic,
+            doctor__clinic=clinic,
             created_at__gte=start_date,
             created_at__lte=today
         ).aggregate(total=Sum('amount'))['total'] or 0
@@ -293,7 +304,7 @@ def clinic_reports(request):
         
         # Get revenue distribution
         revenue_distribution = Payment.objects.filter(
-            clinic=clinic,
+            doctor__clinic=clinic,
             created_at__gte=start_date,
             created_at__lte=today
         ).values('payment_type').annotate(

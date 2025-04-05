@@ -2,7 +2,7 @@ import datetime
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
-from users.models import UserProfile, Patient, Appointment, Prescription, Doctor, PrescriptionItem, Clinic
+from users.models import UserProfile, Patient, Appointment, Prescription, Doctor, PrescriptionItem, Clinic, LabTest, LabTechnician, Lab, LabStaff, Staff, Billing
 
 class SignupSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, validators=[validate_password])
@@ -213,4 +213,65 @@ class PatientDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
         fields = ['id', 'patient_id', 'first_name', 'last_name', 'date_of_birth', 'gender', 'blood_group', 'phone_number', 'email', 'address', 'pincode', 'clinic', 'created_at', 'updated_at']
+
+class LabTestSerializer(serializers.ModelSerializer):
+    patient_name = serializers.CharField(source='patient.get_full_name', read_only=True)
+    doctor_name = serializers.CharField(source='doctor.name', read_only=True)
+    technician_name = serializers.CharField(source='technician.user.get_full_name', read_only=True)
+    
+    class Meta:
+        model = LabTest
+        fields = '__all__'
+
+class LabTechnicianSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source='user.get_full_name', read_only=True)
+    
+    class Meta:
+        model = LabTechnician
+        fields = '__all__'
+
+class LabSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Lab
+        fields = '__all__'
+
+class LabStaffSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    email = serializers.EmailField(source='user.email')
+    
+    class Meta:
+        model = LabStaff
+        fields = ['id', 'user_name', 'email', 'role', 'specialization', 'lab', 'is_active']
+
+class StaffSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    email = serializers.EmailField(source='user.email')
+    phone_number = serializers.CharField(source='user.userprofile.phone_number', read_only=True)
+    
+    class Meta:
+        model = Staff
+        fields = ['id', 'user_name', 'email', 'phone_number', 'role', 'clinic', 'is_active']
+
+class BillingSerializer(serializers.ModelSerializer):
+    patient_name = serializers.CharField(source='patient.get_full_name', read_only=True)
+    appointment_date = serializers.DateField(source='appointment.date', read_only=True)
+    appointment_time = serializers.TimeField(source='appointment.time', read_only=True)
+    doctor_name = serializers.CharField(source='appointment.doctor.get_full_name', read_only=True)
+
+    class Meta:
+        model = Billing
+        fields = [
+            'id',
+            'patient',
+            'patient_name',
+            'appointment',
+            'appointment_date',
+            'appointment_time',
+            'doctor_name',
+            'amount',
+            'is_paid',
+            'created_at',
+            'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
 

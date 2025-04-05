@@ -11,105 +11,156 @@ from ..models import Doctor
 from ..models import PatientVitals
 from django.conf import settings
 import os
+from ..models import LabTest
+from datetime import date
+from django.templatetags.static import static
+from django.contrib.staticfiles import finders
 
-def render_to_pdf(template_src, context_dict={}):
-    template = get_template(template_src)
-    html = template.render(context_dict)
-    result = HttpResponse(content_type='application/pdf')
-    pisa_status = pisa.CreatePDF(html, dest=result)
-    if pisa_status.err:
-        return HttpResponse('We had some errors <pre>' + html + '</pre>')
-    return result
-
-@login_required 
-def generate_prescription_pdf(request, pk):
+def calculate_age(birth_date):
+    today = date.today()
     try:
-        doctor = Doctor.objects.get(user=request.user)
-        prescription = get_object_or_404(
-            Prescription.objects.select_related('vitals'),
-            id=pk, 
-            doctor=doctor
-        )
-        
-        # Get vitals - using created_at instead of recorded_at
-        vitals = PatientVitals.objects.filter(
-            patient=prescription.patient,
-            created_at__lte=prescription.created_at
-        ).order_by('-created_at').first()
-        
-        # Handle logo path
-        logo_path = None
-        if doctor.clinic and doctor.clinic.logo:
-            try:
-                # Get the absolute URL of the logo
-                logo_path = request.build_absolute_uri(doctor.clinic.logo.url)
-            except Exception as e:
-                print(f"Logo path error: {str(e)}")
-                logo_path = None
-        
-        context = {
-            'prescription': prescription,
-            'doctor': doctor,
-            'vitals': vitals,
-            'logo_path': logo_path,
-            'MEDIA_URL': settings.MEDIA_URL,
-            'BASE_DIR': settings.BASE_DIR,
-        }
-        
-        print(f"Context data: vitals={vitals}, logo_path={logo_path}")  # Debug print
-        
-        template = get_template('doctor/prescription_pdf.html')
-        html = template.render(context)
-        result = BytesIO()
-        
-        # Configure PDF options
-        pdf = pisa.pisaDocument(
-            BytesIO(html.encode("UTF-8")), 
-            result,
-            encoding='utf-8',
-            link_callback=fetch_resources
-        )
-        
-        if not pdf.err:
-            response = HttpResponse(result.getvalue(), content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="prescription_{pk}.pdf"'
-            return response
-        
-        print(f"PDF Error: {pdf.err}")
-        return HttpResponse('Error generating PDF', status=400)
-        
-    except Exception as e:
-        print(f"Exception in generate_prescription_pdf: {str(e)}")
-        print(f"Prescription ID: {pk}")  # Debug print
-        print(f"Doctor: {doctor}")  # Debug print
-        messages.error(request, str(e))
-        return redirect('users:prescription_detail', pk=pk)
+        age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+        return age
+    except (TypeError, AttributeError):
+        return ''
 
 def fetch_resources(uri, rel):
     """
     Convert HTML URIs to absolute system paths so xhtml2pdf can access those resources
     """
     try:
+        # Handle static files
+        if uri.startswith(settings.STATIC_URL):
+            path = uri.replace(settings.STATIC_URL, '')
+            result = finders.find(path)
+            if result:
+                return os.path.abspath(result)
+
+        # Handle media files
+        if uri.startswith(settings.MEDIA_URL):
+            path = uri.replace(settings.MEDIA_URL, '')
+            media_path = os.path.join(settings.MEDIA_ROOT, path)
+            if os.path.exists(media_path):
+                return os.path.abspath(media_path)
+
         # If the URI is a URL, leave it unchanged
         if uri.startswith('http://') or uri.startswith('https://'):
             return uri
 
         # Convert URI to absolute filepath
         if uri.startswith('/'):
-            path = uri[1:]  # Remove leading slash
+            path = uri[1:]
         else:
             path = uri
 
-        # Join with MEDIA_ROOT for media files
-        abs_path = os.path.join(settings.MEDIA_ROOT, path)
-        
-        # Ensure the file exists
-        if not os.path.exists(abs_path):
-            print(f"Resource not found: {abs_path}")
-            return None
+        # Try both STATIC_ROOT and MEDIA_ROOT
+        for root in [settings.STATIC_ROOT, settings.MEDIA_ROOT]:
+            abs_path = os.path.join(root, path)
+            if os.path.exists(abs_path):
+                return abs_path
 
-        return abs_path
+        print(f"Resource not found: {uri}")
+        return None
 
     except Exception as e:
         print(f"Error in fetch_resources: {str(e)}")
         return None
+
+def render_to_pdf(template_src, context_dict={}):
+    template = get_template(template_src)
+    html = template.render(context_dict)
+    result = BytesIO()
+    
+    # Add custom options for PDF generation
+    pdf_options = {
+        'page-size': 'A4',
+        'margin-top': '0.75in',
+        'margin-right': '0.75in',
+        'margin-bottom': '0.75in',
+        'margin-left': '0.75in',
+        'encoding': 'UTF-8',
+        'no-outline': None,
+    }
+    
+    pisa_status = pisa.CreatePDF(
+        html, 
+        dest=result,
+        link_callback=fetch_resources,
+        show_error_as_pdf=True
+    )
+    
+    if not pisa_status.err:
+        return HttpResponse(result.getvalue(), content_type='application/pdf')
+    return None
+
+@login_required
+def generate_prescription_pdf(request, pk, format_type='digital'):
+    try:
+        prescription = get_object_or_404(
+            Prescription.objects.select_related(
+                'doctor',
+                'doctor__clinic',
+                'patient'
+            ).prefetch_related('items'),
+            id=pk
+        )
+
+        # Get patient vitals
+        vitals = PatientVitals.objects.filter(
+            patient=prescription.patient
+        ).order_by('-created_at').first()
+
+        # Get lab tests
+        lab_tests = LabTest.objects.filter(
+            patient=prescription.patient,
+            doctor=prescription.doctor,
+            created_at__date=prescription.created_at.date()
+        ).order_by('created_at')
+
+        # Calculate patient age
+        patient_age = calculate_age(prescription.patient.date_of_birth)
+
+        # Get clinic logo URL if it exists
+        clinic = prescription.doctor.clinic
+        logo_url = clinic.logo.url if clinic.logo else None
+
+        # Prepare the context for the template
+        context = {
+            'prescription': prescription,
+            'vitals': vitals,
+            'lab_tests': lab_tests,
+            'clinic': clinic,
+            'logo_url': logo_url,
+            'patient_age': patient_age,
+            'format_type': format_type,  # 'digital' or 'letterhead'
+            'STATIC_URL': settings.STATIC_URL,
+            'MEDIA_URL': settings.MEDIA_URL,
+        }
+
+        # Choose template based on format type
+        template_name = 'doctor/prescription_pdf_letterhead.html' if format_type == 'letterhead' else 'doctor/prescription_pdf.html'
+        
+        # Get the template
+        template = get_template(template_name)
+        html = template.render(context)
+
+        # Create PDF
+        result = BytesIO()
+        pdf = pisa.pisaDocument(
+            BytesIO(html.encode("UTF-8")), 
+            result,
+            link_callback=fetch_resources,
+            show_error_as_pdf=True
+        )
+        
+        if not pdf.err:
+            response = HttpResponse(result.getvalue(), content_type='application/pdf')
+            filename = f"prescription_{pk}_{'letterhead' if format_type == 'letterhead' else 'digital'}.pdf"
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+
+        return HttpResponse('Error generating PDF', status=500)
+
+    except Exception as e:
+        print(f"Error generating prescription PDF: {str(e)}")
+        return HttpResponse('Error generating PDF', status=500)

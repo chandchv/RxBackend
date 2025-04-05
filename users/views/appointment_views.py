@@ -18,6 +18,7 @@ from django.utils.dateparse import parse_date
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
+import json
 
 class AppointmentView(APIView):
     permission_classes = [IsAuthenticated]
@@ -52,7 +53,7 @@ class AppointmentListView(APIView):
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-class AppointmentCreateView(APIView):
+class AppointmentCreateView(APIView): 
     permission_classes = [IsAuthenticated]
     template_name = 'create_appointment.html'
 
@@ -235,7 +236,13 @@ def send_appointment_notifications(appointment):
 def update_appointment_status(request, appointment_id):
     try:
         appointment = get_object_or_404(Appointment, id=appointment_id)
-        new_status = request.POST.get('status')
+        
+        # Get status from either POST data or JSON body
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+            new_status = data.get('status')
+        else:
+            new_status = request.POST.get('status')
         
         # Verify the user has permission to update this appointment
         if request.user.doctor != appointment.doctor and not request.user.is_staff:
@@ -244,10 +251,15 @@ def update_appointment_status(request, appointment_id):
                 'message': 'Permission denied'
             }, status=403)
             
-        if new_status not in dict(Appointment.STATUS_CHOICES):
+        # Convert status to lowercase to match model choices
+        new_status = new_status.lower()
+        
+        # Check if status is valid
+        valid_statuses = ['scheduled', 'completed', 'cancelled', 'no_show', 'missed']
+        if new_status not in valid_statuses:
             return JsonResponse({
                 'success': False,
-                'message': 'Invalid status'
+                'message': f'Invalid status. Must be one of: {", ".join(valid_statuses)}'
             }, status=400)
             
         # Update the appointment status

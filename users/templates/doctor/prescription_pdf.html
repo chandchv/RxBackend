@@ -6,214 +6,183 @@
     <style>
         @page {
             size: A4;
-            margin: 2.5cm 2cm;
+            margin: 2cm;
         }
-        
-        #headerContent {
-            position: fixed;
-            top: 0.5cm;
-            left: 2cm;
-            right: 2cm;
-        }
-        
-        #footerContent {
-            position: fixed;
-            bottom: 0.5cm;
-            left: 2cm;
-            right: 2cm;
-        }
-        
-        .content {
-            margin-top: 4cm;
-            margin-bottom: 4cm;
-        }
-        
         body {
             font-family: Arial, sans-serif;
             line-height: 1.6;
-            font-size: 12px;
+            color: #333;
         }
         .header {
-            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
             border-bottom: 2px solid #333;
-            padding-bottom: 10px;
-        }
-        .clinic-logo {
-            max-height: 60px;
-            margin-bottom: 10px;
+            padding-bottom: 20px;
         }
         .clinic-info {
-            text-align: center;
-            margin-bottom: 10px;
+            display: flex;
+            align-items: left;
         }
-        .clinic-name {
-            font-size: 20px;
-            font-weight: bold;
+        .clinic-logo {
+            width: 100px;   
+            height: auto;
+            margin-right: 20px;
+        }
+        .clinic-details h1 {
+            margin: 0;
             color: #2563eb;
-            margin-bottom: 5px;
+            font-size: 24px;
+        }
+        .clinic-details p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .prescription-info {
+            text-align: right;
+            font-size: 14px;
+        }
+        .prescription-info p {
+            margin: 0;
         }
         .patient-info {
             margin: 20px 0;
-            padding: 10px;
-            background-color: #f8f8f8;
+            padding: 15px;
+            background-color: #f8f9fa;
             border-radius: 5px;
         }
-        .vitals-section {
+        .vitals {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #f0f9ff;
+            border-radius: 5px;
+        }
+        .section {
             margin: 20px 0;
-            padding: 10px;
-            background-color: #f8f8f8;
-            border-radius: 5px;
         }
-        .medication-item {
-            margin: 10px 0;
+        .section-title {
+            color: #1e40af;
+            font-size: 16px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 5px;
+        }
+        .medicine-item, .test-item {
             padding: 10px;
-            background-color: #f8f8f8;
-            border: 1px solid #ddd;
+            margin: 5px 0;
+            background-color: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 5px;
         }
         .footer {
-            text-align: right;
-            border-top: 1px solid #ddd;
-            padding-top: 10px;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ccc;
+            display: flex;
+            justify-content: space-between;
         }
         .doctor-info {
-            font-size: 14px;
-        }
-        .registration {
-            font-size: 12px;
-            color: #666;
+            text-align: right;
         }
     </style>
 </head>
 <body>
-    <!-- Header with Logo -->
-    <div id="headerContent">
-        <table width="100%">
-            <tr>
-                <td width="20%" style="text-align: left; vertical-align: top;">
-                    {% if logo_path %}
-                        <img src="{{ logo_path }}" alt="Clinic Logo" style="max-width: 200px; max-height: 100px;">
-                    {% endif %}
-                </td>
-                <td width="60%" style="text-align: center;">
-                    <div class="clinic-name">{{ doctor.clinic.name }}</div>
-                    <div>{{ doctor.clinic.address }}</div>
-                    <div>Phone: {{ doctor.clinic.phone_number }}</div>
-                    <div>Email: {{ doctor.clinic.email }}</div>
-                </td>
-                <td width="20%" style="text-align: right;">
-                    <div>Date: {{ prescription.date|date:"d-M-Y" }}</div>
-                    <div>Prescription #: {{ prescription.id }}</div>
-                </td>
-            </tr>
-        </table>
-        <hr style="border-top: 2px solid #333; margin: 10px 0;">
+        <div class="header">
+            <div class="clinic-info">
+                {% if clinic.logo %}
+                <img src="{{ clinic.logo.url }}" alt="{{ clinic.name }}" class="clinic-logo">
+                {% endif %}
+                <div class="clinic-details">
+                    <h1>{{ clinic.name }}</h1>
+                    <p>{{ clinic.address }}</p>
+                    <p>Phone: {{ clinic.phone_number }}</p>
+                    <p>Email: {{ clinic.email }}</p>
+                </div>
+            </div>
+            <div class="prescription-info">
+                <p><strong>Date:</strong> {{ prescription.created_at|date:"F j, Y" }}</p>
+                <p><strong>Prescription ID:</strong> {{ prescription.id }}</p>
+            </div>
+        </div>
+
+    <div class="patient-info">
+        <h2>Patient Information</h2>
+        <p>Name: {{ prescription.patient.get_full_name }}</p>
+        <p>Age: {{ patient_age }} years</p>
+        <p>Gender: {{ prescription.patient.gender }}</p>
+        <p>Contact: {{ prescription.patient.phone_number }}</p>
     </div>
 
-    <!-- Content -->
-    <div class="content">
-        <!-- Patient Information -->
-        <div class="patient-info" style="margin-bottom: 10px; padding: 8px; background-color: #f8f8f8; border-radius: 5px;">
-            <table width="100%">
-                <tr>
-                    <td width="50%">
-                        <strong>Patient Name:</strong> {{ prescription.patient.get_full_name }}<br>
-                        <strong>Age:</strong> {{ prescription.patient.age }} years<br>
-                        <strong>Gender:</strong> {{ prescription.patient.gender }}
-                    </td>
-                    <td width="50%">
-                        <strong>Patient ID:</strong> {{ prescription.patient.patient_id }}<br>
-                        <strong>Mobile:</strong> {{ prescription.patient.phone_number }}
-                    </td>
-                </tr>
-            </table>
-        </div>
+    {% if vitals %}
+    <div class="vitals">
+        <div>Weight: {{ vitals.weight|default:'-' }} kg</div>
+        <div>Height: {{ vitals.height|default:'-' }} cm</div>
+        <div>BP: {{ vitals.blood_pressure|default:'-' }}</div>
+        <div>Temperature: {{ vitals.temperature|default:'-' }} °F</div>
+        <div>Heart Rate: {{ vitals.heart_rate|default:'-' }} bpm</div>
+        <div>SpO2: {{ vitals.oxygen_saturation|default:'-' }} %</div>
+    </div>
+    {% endif %}
 
-        <!-- Vitals Section - Even More Compact -->
-        <div class="vitals-section" style="margin-bottom: 10px; padding: 8px; background-color: #f8f8f8; border-radius: 5px;">
-            <h3>Patient Vitals</h3> 
-            <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 0.875rem; border-collapse: collapse;">
-                <tr style="line-height: 1.2;">
-                    <td width="25%" style="padding: 1px;">Weight: {{ vitals.weight|default:'-' }} kg</td>
-                    <td width="25%" style="padding: 1px;">Height: {{ vitals.height|default:'-' }} cm</td>
-                    <td width="25%" style="padding: 1px;">BMI: {{ vitals.bmi|default:'-' }}</td>
-                    <td width="25%" style="padding: 1px;">BP: {{ vitals.blood_pressure|default:'-' }}</td>
-                </tr>
-                <tr style="line-height: 1.2;">
-                    <td style="padding: 1px;">Temp: {{ vitals.temperature|default:'-' }} °C</td>
-                    <td style="padding: 1px;">HR: {{ vitals.heart_rate|default:'-' }} bpm</td>
-                    <td style="padding: 1px;">SpO2: {{ vitals.oxygen_saturation|default:'-' }}%</td>
-                    <td></td>
-                </tr>
-            </table>
-        </div>
-
-        <!-- Diagnosis -->
-        <div style="margin: 20px 0;">
-            <h3 style="margin-bottom: 5px;">Diagnosis</h3>
-            <p>{{ prescription.diagnosis }}</p>
-        </div>
-
-        <!-- Medications -->
-        <div style="margin: 20px 0;">
-            <h3 style="margin-bottom: 5px;">Medications</h3>
-            <table width="100%" cellpadding="4" cellspacing="0" style="border-collapse: collapse;">
-                <thead>
-                    <tr style="background-color: #f8f8f8;">
-                        <th style="border: 1px solid #ddd; padding: 6px; text-align: left; font-size: 0.875rem;">Medicine</th>
-                        <th style="border: 1px solid #ddd; padding: 6px; text-align: left; font-size: 0.875rem;">Dosage</th>
-                        <th style="border: 1px solid #ddd; padding: 6px; text-align: left; font-size: 0.875rem;">Duration</th>
-                        <th style="border: 1px solid #ddd; padding: 6px; text-align: left; font-size: 0.875rem;">Instructions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in prescription.items.all %}
-                    <tr>
-                        <td style="border: 1px solid #ddd; padding: 6px; font-size: 0.875rem;">
-                            <strong>{{ item.medicine }}</strong>
-                        </td>
-                        <td style="border: 1px solid #ddd; padding: 6px; font-size: 0.875rem;">
-                            {{ item.dosage }}
-                        </td>
-                        <td style="border: 1px solid #ddd; padding: 6px; font-size: 0.875rem;">
-                            {{ item.duration }} {{ item.duration_unit }}
-                        </td>
-                        <td style="border: 1px solid #ddd; padding: 6px; font-size: 0.875rem;">
-                            {{ item.instructions|default:'-' }}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Additional Instructions -->
-        {% if prescription.instructions %}
-        <div style="margin: 20px 0;">
-            <h3 style="margin-bottom: 5px;">Additional Instructions</h3>
-            <p>{{ prescription.instructions }}</p>
-        </div>
-        {% endif %}
-
-        <!-- Follow Up -->
-        {% if prescription.follow_up_date %}
-        <div style="margin: 20px 0;">
-            <h3 style="margin-bottom: 5px;">Follow Up Date</h3>
-            <p>{{ prescription.follow_up_date|date:"d-M-Y" }}</p>
-        </div>
-        {% endif %}
+    <div class="section">
+        <div class="section-title">Clinical Information</div>
+        <p><strong>Chief Complaints:</strong> {{ prescription.chief_complaints }}</p>
+        <p><strong>Clinical Findings:</strong> {{ prescription.clinical_findings }}</p>
+        <p><strong>Diagnosis:</strong> {{ prescription.diagnosis }}</p>
     </div>
 
-    <!-- Footer -->
-    <div id="footerContent">
-        <div class="footer">
-            <div class="doctor-info">
-                <strong>Dr. {{ doctor.name }}</strong><br>
-                {{ doctor.specialization }}<br>
-                {{ doctor.qualifications }}
-            </div>
-            <div class="registration">
-                Registration No: {{ doctor.license_number }}
-            </div>
+    <div class="section">
+        <div class="section-title">Prescribed Medications</div>
+        {% for item in prescription.items.all %}
+        <div class="medicine-item">
+            <p><strong>{{ item.medicine }}</strong></p>
+            <p>Dosage: {{ item.dosage }}</p>
+            <p>Duration: {{ item.duration }} {{ item.duration_unit }}</p>
+            <p>Instructions: {{ item.instructions }}</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if lab_tests %}
+    <div class="section">
+        <div class="section-title">Lab Tests</div>
+        {% for test in lab_tests %}
+        <div class="test-item">
+            <p><strong>{{ test.test_name }}</strong></p>
+            <p>Collection: {{ test.get_collection_type_display }}</p>
+            <p>Description: {{ test.description }}</p>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if prescription.advice %}
+    <div class="section">
+        <div class="section-title">Advice</div>
+        <p>{{ prescription.advice }}</p>
+    </div>
+    {% endif %}
+
+    {% if prescription.follow_up_date %}
+    <div class="section">
+        <div class="section-title">Follow Up</div>
+        <p>Next visit on: {{ prescription.follow_up_date|date:"F j, Y" }}</p>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <div class="clinic-stamp">
+            <!-- Space for clinic stamp -->
+        </div>
+        <div class="doctor-info">
+            <p>Dr. {{ prescription.doctor.name }}</p>
+            <p>{{ prescription.doctor.qualifications }}</p>
+            <p>Reg. No: {{ prescription.doctor.license_number }}</p>
+            <p>Digital Signature</p>
         </div>
     </div>
 </body>

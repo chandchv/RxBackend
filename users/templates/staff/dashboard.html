@@ -1,0 +1,310 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Staff Dashboard{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Staff Dashboard</h1>
+                <p class="text-gray-600">{{ clinic.name }}</p>
+            </div>
+            <div class="text-right">
+                <p class="text-gray-600">Today: {{ today|date:"F d, Y" }}</p>
+                <p class="text-gray-600">Welcome, {{ request.user.get_full_name }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <div class="bg-blue-500 text-white rounded-lg p-6">
+            <h3 class="text-lg font-semibold">Today's Appointments</h3>
+            <p class="text-3xl font-bold">{{ appointments|length }}</p>
+        </div>
+        <div class="bg-green-500 text-white rounded-lg p-6">
+            <h3 class="text-lg font-semibold">Recent Patients</h3>
+            <p class="text-3xl font-bold">{{ recent_patients|length }}</p>
+        </div>
+        <div class="bg-yellow-500 text-white rounded-lg p-6">
+            <h3 class="text-lg font-semibold">Pending Tests</h3>
+            <p class="text-3xl font-bold">{{ pending_tests|length }}</p>
+        </div>
+        <div class="bg-red-500 text-white rounded-lg p-6">
+            <h3 class="text-lg font-semibold">Pending Bills</h3>
+            <p class="text-3xl font-bold">{{ pending_bills|length }}</p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Today's Appointments -->
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-900">Today's Appointments</h2>
+                <a href="{% url 'users:staff_appointments' %}" class="text-blue-500 hover:text-blue-600">
+                    View All
+                </a>
+            </div>
+            
+            <!-- Calendar View -->
+            <div class="mb-6">
+                <!-- Doctor Filter -->
+                <div class="mb-4">
+                    <label for="doctor_filter" class="block text-sm font-medium text-gray-700">Filter by Doctor</label>
+                    <select id="doctor_filter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="">All Doctors</option>
+                        {% for doctor in doctors %}
+                        <option value="{{ doctor.id }}">{{ doctor.get_full_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div id="calendar" class="w-full"></div>
+            </div>
+
+            <!-- Appointments List -->
+            <div class="space-y-4">
+                {% for appointment in appointments %}
+                <div class="border-b border-gray-200 pb-4">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="font-semibold">{{ appointment.patient.get_full_name }}</p>
+                            <p class="text-gray-600">{{ appointment.time|time:"g:i A" }}</p>
+                        </div>
+                        <span class="px-2 py-1 rounded-full text-sm {% if appointment.status == 'scheduled' %}bg-blue-100 text-blue-800{% elif appointment.status == 'completed' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                            {{ appointment.get_status_display }}
+                        </span>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-gray-600">No appointments scheduled for today</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Recent Patients -->
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-900">Recent Patients</h2>
+                <a href="{% url 'users:staff_patients' %}" class="text-blue-500 hover:text-blue-600">
+                    View All
+                </a>
+            </div>
+            <div class="space-y-4">
+                {% for patient in recent_patients %}
+                <div class="border-b border-gray-200 pb-4">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="font-semibold">{{ patient.get_full_name }}</p>
+                            <p class="text-gray-600">{{ patient.email }}</p>
+                        </div>
+                        <a href="{% url 'users:patient_detail' patient.id %}" class="text-blue-500 hover:text-blue-600">
+                            View Details
+                        </a>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-gray-600">No recent patients</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Pending Lab Tests -->
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-900">Pending Lab Tests</h2>
+                <a href="{% url 'users:staff_lab_tests' %}" class="text-blue-500 hover:text-blue-600">
+                    View All
+                </a>
+            </div>
+            <div class="space-y-4">
+                {% for test in pending_tests %}
+                <div class="border-b border-gray-200 pb-4">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="font-semibold">{{ test.patient.get_full_name }}</p>
+                            <p class="text-gray-600">{{ test.test_type }}</p>
+                        </div>
+                        <span class="px-2 py-1 rounded-full text-sm bg-yellow-100 text-yellow-800">
+                            Pending
+                        </span>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-gray-600">No pending lab tests</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Pending Bills -->
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-900">Pending Bills</h2>
+                <a href="{% url 'users:staff_billing' %}" class="text-blue-500 hover:text-blue-600">
+                    View All
+                </a>
+            </div>
+            <div class="space-y-4">
+                {% for bill in pending_bills %}
+                <div class="border-b border-gray-200 pb-4">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="font-semibold">{{ bill.patient.get_full_name }}</p>
+                            <p class="text-gray-600">Amount: ${{ bill.amount }}</p>
+                        </div>
+                        <span class="px-2 py-1 rounded-full text-sm bg-red-100 text-red-800">
+                            Pending
+                        </span>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-gray-600">No pending bills</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="mt-6 bg-white shadow-lg rounded-lg p-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <a href="{% url 'users:staff_walk_in_appointment' %}" 
+               class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded text-center">
+                <i class="fas fa-user-plus mr-2"></i>Walk-in Appointment
+            </a>
+            <a href="{% url 'users:staff_create_appointment' %}" 
+               class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded text-center">
+                <i class="fas fa-calendar-plus mr-2"></i>Create Appointment
+            </a>
+            <a href="{% url 'users:staff_create_lab_test' %}" 
+               class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded text-center">
+                <i class="fas fa-flask mr-2"></i>Create Lab Test
+            </a>
+            <a href="{% url 'users:staff_create_billing' %}" 
+               class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded text-center">
+                <i class="fas fa-file-invoice-dollar mr-2"></i>Create Bill
+            </a>
+            <a href="{% url 'users:staff_patients' %}" 
+               class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded text-center">
+                <i class="fas fa-users mr-2"></i>Manage Patients
+            </a>
+            <a href="{% url 'users:staff_manage_leaves' %}" 
+               class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded text-center">
+                <i class="fas fa-calendar-times mr-2"></i>Manage Leaves
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #eee;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    text-decoration: none;
+    transition: background 0.3s;
+}
+
+.btn-primary:hover {
+    background: #2980b9;
+    color: white;
+}
+
+.btn-primary i {
+    font-size: 1.1rem;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var calendarEl = document.getElementById('calendar');
+    var calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+        },
+        height: 'auto',
+        events: function(info, successCallback, failureCallback) {
+            var doctorId = $('#doctor_filter').val();
+            var url = '{% url "users:staff_calendar_events" %}';
+            if (doctorId) {
+                url += '?doctor_id=' + doctorId;
+            }
+            $.ajax({
+                url: url,
+                type: 'GET',
+                success: function(response) {
+                    var events = response.map(function(event) {
+                        return {
+                            id: event.id,
+                            title: event.title,
+                            start: event.start,
+                            end: event.end,
+                            backgroundColor: event.status === 'scheduled' ? '#3b82f6' : 
+                                          event.status === 'completed' ? '#10b981' : '#ef4444',
+                            borderColor: event.status === 'scheduled' ? '#3b82f6' : 
+                                       event.status === 'completed' ? '#10b981' : '#ef4444'
+                        };
+                    });
+                    successCallback(events);
+                },
+                error: function() {
+                    failureCallback();
+                }
+            });
+        },
+        eventClick: function(info) {
+            window.location.href = '/staff/appointments/' + info.event.id + '/';
+        },
+        eventDidMount: function(info) {
+            // Add tooltip
+            $(info.el).tooltip({
+                title: info.event.title,
+                placement: 'top',
+                trigger: 'hover',
+                container: 'body'
+            });
+        }
+    });
+    calendar.render();
+
+    // Handle doctor filter change
+    $('#doctor_filter').change(function() {
+        calendar.refetchEvents();
+    });
+});
+</script>
+{% endblock %} 

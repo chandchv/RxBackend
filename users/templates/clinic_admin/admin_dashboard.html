@@ -25,7 +25,7 @@
         </div>
 
         <!-- Quick Stats -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 p-4 sm:p-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 p-4 sm:p-6">
             <div class="bg-blue-50 p-4 rounded-lg">
                 <h3 class="text-blue-800 font-semibold">Total Doctors</h3>
                 <p class="text-2xl font-bold text-blue-600">{{ doctors_count }}</p>
@@ -45,6 +45,11 @@
                 <a href="{% url 'users:appointments' %}" class="inline-block align-right px-4 py-2 text-sm text-center bg-yellow-500 hover:bg-yellow-600 text-white rounded">Manage Appointments</a>
                 <a href="{% url 'users:staff_create_appointment' %}" class="inline-block align-right px-4 py-2 text-sm text-center bg-yellow-500 hover:bg-yellow-600 text-white rounded">Create Appointment</a>
             </div>
+            <div class="bg-indigo-50 p-4 rounded-lg">
+                <h3 class="text-indigo-800 font-semibold">Lab Facilities</h3>
+                <p class="text-2xl font-bold text-indigo-600">{{ labs_count }}</p>
+                <p class="text-sm text-indigo-600">Active Tests: {{ active_tests_count }}</p>
+            </div>
         </div>
 
         <!-- Admin Navigation Cards -->
@@ -54,7 +59,7 @@
                 <h2 class="text-xl font-semibold mb-4">Clinic Management</h2>
                 <div class="space-y-2">
                     <a href="{% url 'users:clinic_profile' %}" 
-                       class="block w-full text-center bg-blue-500 hover:bg-blue-600 text-white py-2 rounded">
+                       class="block w-full text-center bg-blue-200 hover:bg-blue-400 text-black text-bold py-2 rounded">
                         Update Clinic Profile
                     </a>
                 </div>
@@ -65,11 +70,11 @@
                 <h2 class="text-xl font-semibold mb-4">Doctor Management</h2>
                 <div class="space-y-2">
                     <a href="{% url 'users:add_doctor' %}" 
-                       class="block w-full text-center bg-green-500 hover:bg-green-600 text-white py-2 rounded">
+                       class="block w-full text-center bg-green-200 hover:bg-green-400 text-black text-bold py-2 rounded">
                         Add New Doctor
                     </a>
                     <a href="{% url 'users:doctors_list' %}" 
-                       class="block w-full text-center bg-green-600 hover:bg-green-700 text-white py-2 rounded">
+                       class="block w-full text-center bg-green-200 hover:bg-green-400 text-black text-bold py-2 rounded">
                         Manage Doctors
                     </a>
                 </div>
@@ -80,14 +85,92 @@
                 <h2 class="text-xl font-semibold mb-4">Staff Management</h2>
                 <div class="space-y-2">
                     <a href="{% url 'users:add_staff' %}" 
-                       class="block w-full text-center bg-purple-500 hover:bg-purple-600 text-white py-2 rounded">
+                       class="block w-full text-center bg-purple-200 hover:bg-purple-400 text-black text-bold py-2 rounded">
                         Add New Staff
                     </a>
                     <a href="{% url 'users:staff_list' %}" 
-                       class="block w-full text-center bg-purple-600 hover:bg-purple-700 text-white py-2 rounded">
+                       class="block w-full text-center bg-purple-200 hover:bg-purple-400 text-black text-bold py-2 rounded">
                         Manage Staff
                     </a>
                 </div>
+            </div>
+
+            <!-- Lab Management Card -->
+            <div class="border rounded-lg p-4">
+                <h2 class="text-xl font-semibold mb-4">Lab Management</h2>
+                <div class="space-y-2">
+                    <a href="{% url 'users:add_lab' %}" 
+                       class="block w-full text-center bg-indigo-200 hover:bg-indigo-400 text-white py-2 rounded">
+                        Add New Lab
+                    </a>
+                    <a href="{% url 'users:labs_list' %}" 
+                       class="block w-full text-center bg-indigo-200 hover:bg-indigo-400 text-black text-bold py-2 rounded">
+                        Manage Labs
+                    </a>
+                    <a href="{% url 'users:lab_staff_list' %}" 
+                       class="block w-full text-center bg-indigo-200 hover:bg-indigo-400 text-black text-bold py-2 rounded">
+                        Lab Staff
+                    </a>
+                    <a href="{% url 'users:lab_tests' %}" 
+                       class="block w-full text-center bg-indigo-200 hover:bg-indigo-400 text-black text-bold py-2 rounded">
+                        View Test Reports
+                    </a>
+                </div>
+            </div>
+
+            <!-- Lab Statistics Card -->
+            <div class="border rounded-lg p-4">
+                <h2 class="text-xl font-semibold mb-4">Lab Statistics</h2>
+                <div class="space-y-4">
+                    <div class="bg-gray-50 p-3 rounded">
+                        <h3 class="text-sm font-medium text-gray-500">Pending Tests</h3>
+                        <p class="text-2xl font-bold text-indigo-600">{{ pending_tests_count }}</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded">
+                        <h3 class="text-sm font-medium text-gray-500">Tests Today</h3>
+                        <p class="text-2xl font-bold text-indigo-600">{{ today_tests_count }}</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded">
+                        <h3 class="text-sm font-medium text-gray-500">Active Lab Staff</h3>
+                        <p class="text-2xl font-bold text-indigo-600">{{ active_lab_staff_count }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Lab Activities -->
+        <div class="p-4 sm:p-6">
+            <h2 class="text-xl font-semibold mb-4">Recent Lab Activities</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test Type</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for test in recent_lab_tests %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ test.id }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ test.patient_name }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ test.test_name }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                    {% if test.status == 'COMPLETED' %}bg-green-100 text-green-800
+                                    {% elif test.status == 'PROCESSING' %}bg-yellow-100 text-yellow-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {{ test.status }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ test.created_at|date:"M d, Y" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

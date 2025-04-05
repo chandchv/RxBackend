@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
-from .models import Patient, Appointment, Doctor, DoctorAvailability, Bill, BillItem, Payment, BillingItem, Clinic
+from .models import Patient, Appointment, Doctor, DoctorAvailability, Bill, BillItem, Payment, BillingItem, Clinic, Lab
 from django.utils import timezone
 
 class PatientSignupForm(UserCreationForm):
@@ -149,11 +149,16 @@ class DoctorSignupForm(UserCreationForm):
 class DoctorAvailabilityForm(forms.ModelForm):
     class Meta:
         model = DoctorAvailability
-        fields = ['day_of_week', 'shift', 'start_time', 'end_time', 'is_available']
+        fields = ['start_time', 'end_time', 'is_available']
         widgets = {
             'start_time': forms.TimeInput(attrs={'type': 'time'}),
             'end_time': forms.TimeInput(attrs={'type': 'time'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['is_available'].initial = True
+        self.fields['is_available'].widget = forms.HiddenInput()
 
 class StaffAppointmentForm(forms.ModelForm):
     doctor = forms.ModelChoiceField(
@@ -299,3 +304,15 @@ class ClinicProfileForm(forms.ModelForm):
             if logo.size > 5 * 1024 * 1024:  # 5MB limit
                 raise forms.ValidationError("Image file too large ( > 5MB )")
         return logo
+
+class LabForm(forms.ModelForm):
+    class Meta:
+        model = Lab
+        fields = ['name', 'registration_number', 'address', 'phone_number', 'email']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'registration_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'phone_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+        }

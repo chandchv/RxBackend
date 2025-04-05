@@ -102,7 +102,7 @@
                         <p class="text-sm text-gray-600">{{ prescription.diagnosis|truncatechars:100 }}</p>
                     </div>
                     <a href="{% url 'users:prescription_detail' prescription.id %}"
-                       class="text-blue-600 hover:text-blue-800">View Details</a>
+                       class="text-blue-600 hover:text-blue-800">View Details</a> 
                 </div>
                 {% endfor %}
             </div>

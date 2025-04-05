@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from ..models import Doctor, Appointment, Patient, DoctorAvailability, AppointmentSlot, DoctorLeave, Billing, Bill, Prescription, PatientVitals, PrescriptionItem, Drug
+from ..models import Doctor, Appointment, Patient, DoctorAvailability, AppointmentSlot, DoctorLeave, Billing, Bill, Prescription, PatientVitals, PrescriptionItem, Drug, PatientDoctor, ClinicHoliday, Notification
 from ..serializers import DoctorSerializer
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -275,7 +275,7 @@ def doctor_appointments_view(request):
 
 
 @login_required
-def create_appointment(request):
+def create_appointment(request): 
     try:
         doctor = Doctor.objects.filter(user=request.user).first()
         
@@ -463,37 +463,63 @@ def doctors_list(request):
             'doctors': []
         })
 @login_required
+@user_is_doctor
 def create_patient_doctor(request):
-    try:
-        doctor = Doctor.objects.get(user=request.user)
-        clinic = doctor.clinic
-        
-        print("Received data:", request.data)  # Debug print to see what we're getting
-        
-        # Map the incoming data to match Patient model fields
-        patient_data = {
-            'first_name': request.data.get('first_name'),
-            'last_name': request.data.get('last_name'),
-            'email': request.data.get('email', ''),
-            'phone_number': request.data.get('phone', ''),  # Map 'phone' to 'phone_number'
-            'gender': request.data.get('gender', 'M'),
-            'address': request.data.get('address', ''),
-            'clinic': clinic
-        }
-        
-        # Create patient with mapped data
-        patient = Patient.objects.create(**patient_data)
-        
-        return Response({
-            'message': 'Patient added successfully!',
-            'patient_id': patient.id
-        }, status=status.HTTP_201_CREATED)
-                
-    except Exception as e:
-        print(f"Error creating patient: {str(e)}")  # Debug print for error
-        return Response({
-            'error': f'Error adding patient: {str(e)}'
-        }, status=status.HTTP_400_BAD_REQUEST)
+    if request.method == 'POST':
+        try:
+            # Get data from form submission
+            data = request.POST
+            
+            # Create patient
+            patient = Patient.objects.create(
+                first_name=data.get('first_name'),
+                last_name=data.get('last_name'),
+                email=data.get('email'),
+                phone_number=data.get('phone_number'),
+                date_of_birth=data.get('date_of_birth'),
+                gender=data.get('gender', 'M'),  # Default to Male if not specified
+                blood_group=data.get('blood_group', 'A+'),  # Default to A+ if not specified
+                address=data.get('address'),
+                pincode=data.get('pincode'),
+                existing_diseases=data.get('existing_diseases'),
+                current_medications=data.get('current_medications'),
+                allergies=data.get('allergies'),
+                clinic=request.user.doctor.clinic
+            )
+            
+            # Create patient vitals
+            PatientVitals.objects.create(
+                patient=patient,
+                weight=data.get('weight'),
+                height=data.get('height'),
+                blood_pressure=data.get('blood_pressure'),
+                temperature=data.get('temperature'),
+                heart_rate=data.get('heart_rate'),
+                oxygen_saturation=data.get('oxygen_saturation'),
+                recorded_by=request.user
+            )
+            
+            # Create patient doctor relationship
+            PatientDoctor.objects.create(
+                patient=patient,
+                doctor=request.user.doctor,
+                is_primary=True
+            )
+            
+            messages.success(request, 'Patient created successfully')
+            return redirect('users:patients_list')
+            
+        except Exception as e:
+            print(f"Error creating patient: {str(e)}")
+            messages.error(request, f'Error creating patient: {str(e)}')
+            return redirect('users:create_patient_doctor')
+    
+    # GET request - show the form
+    context = {
+        'gender_choices': Patient.GENDER_CHOICES,
+        'blood_group_choices': Patient.BLOOD_GROUP_CHOICES
+    }
+    return render(request, 'doctor/create_patient.html', context)
 
 @login_required
 def create_appointment_doctor(request):
@@ -532,21 +558,225 @@ def manage_availability(request):
     try:
         doctor = Doctor.objects.get(user=request.user)
         
+        # Define day choices
+        DAY_OF_WEEK_CHOICES = [
+            (0, 'Monday'),
+            (1, 'Tuesday'),
+            (2, 'Wednesday'),
+            (3, 'Thursday'),
+            (4, 'Friday'),
+            (5, 'Saturday'),
+            (6, 'Sunday')
+        ]
+        
         if request.method == 'POST':
-            form = DoctorAvailabilityForm(request.POST)
-            if form.is_valid():
-                availability = form.save(commit=False)
-                availability.doctor = doctor
-                availability.save()
-                messages.success(request, 'Availability schedule updated successfully')
-                return redirect('users:doctor_dashboard')
+            # Handle availability form submission
+            if 'start_time' in request.POST:
+                form = DoctorAvailabilityForm(request.POST)
+                if form.is_valid():
+                    # Get selected days from checkboxes
+                    available_days = request.POST.getlist('available_days')
+                    
+                    if not available_days:
+                        messages.error(request, 'Please select at least one day')
+                        return redirect('users:manage_availability')
+                    
+                    # Get the start and end times from the form
+                    start_time = form.cleaned_data['start_time']
+                    end_time = form.cleaned_data['end_time']
+                    
+                    # Update or create availability for each selected day
+                    for day in available_days:
+                        day_int = int(day)
+                        # Update existing availability or create new one
+                        DoctorAvailability.objects.update_or_create(
+                            doctor=doctor,
+                            day_of_week=day_int,
+                            defaults={
+                                'start_time': start_time,
+                                'end_time': end_time,
+                                'shift': 'morning',  # Set default shift
+                                'is_available': True
+                            }
+                        )
+                    
+                    # Generate slots for next 30 days
+                    try:
+                        clinic = doctor.clinic
+                        today = timezone.now().date()
+                        end_date = today + timedelta(days=30)
+                        
+                        # Get all leaves for the date range
+                        leaves = DoctorLeave.objects.filter(
+                            doctor=doctor,
+                            start_date__lte=end_date,
+                            end_date__gte=today,
+                            status='approved'
+                        )
+                        
+                        # Get clinic holidays
+                        holidays = ClinicHoliday.objects.filter(
+                            clinic=clinic,
+                            date__gte=today,
+                            date__lte=end_date
+                        )
+                        
+                        # Create sets of dates where doctor is on leave or clinic is closed
+                        leave_dates = set()
+                        holiday_dates = set(holidays.values_list('date', flat=True))
+                        
+                        for leave in leaves:
+                            current_date = leave.start_date
+                            while current_date <= leave.end_date:
+                                leave_dates.add(current_date)
+                                current_date += timedelta(days=1)
+                        
+                        slots_created = 0
+                        dates_processed = 0
+                        slots_deleted = 0
+                        
+                        # Delete old slots that are in the past
+                        old_slots = AppointmentSlot.objects.filter(
+                            doctor=doctor,
+                            date__lt=today
+                        )
+                        slots_deleted = old_slots.count()
+                        old_slots.delete()
+                        
+                        current_date = today
+                        while current_date <= end_date:
+                            # Skip if doctor is on leave or clinic is closed
+                            if current_date in leave_dates or current_date in holiday_dates:
+                                current_date += timedelta(days=1)
+                                continue
+                                
+                            # Get availability for current day of week
+                            availabilities = DoctorAvailability.objects.filter(
+                                doctor=doctor,
+                                day_of_week=current_date.weekday(),
+                                is_available=True
+                            )
+                            
+                            for availability in availabilities:
+                                slots = availability.generate_slots(current_date)
+                                
+                                for slot_time in slots:
+                                    slot, created = AppointmentSlot.objects.get_or_create(
+                                        doctor=doctor,
+                                        date=current_date,
+                                        start_time=slot_time.time(),
+                                        end_time=(slot_time + timedelta(minutes=10)).time(),
+                                        defaults={
+                                            'is_booked': False
+                                        }
+                                    )
+                                    if created:
+                                        slots_created += 1
+                            
+                            dates_processed += 1
+                            current_date += timedelta(days=1)
+                        
+                        messages.success(
+                            request, 
+                            f'Successfully saved availability and generated {slots_created} new slots (deleted {slots_deleted} old slots)'
+                        )
+                    except Exception as e:
+                        print(f"Error generating slots: {str(e)}")
+                        messages.warning(request, 'Availability saved but error generating slots')
+                    
+                    return redirect('users:manage_availability')
+            
+            # Handle leave request submission
+            elif 'start_date' in request.POST:
+                start_date = request.POST.get('start_date')
+                end_date = request.POST.get('end_date')
+                reason = request.POST.get('reason', '')
+                leave_type = request.POST.get('leave_type', 'personal')
+                
+                try:
+                    # Validate dates
+                    start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+                    end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+                    
+                    # Check minimum notice period (at least 24 hours)
+                    if start_date - timezone.now().date() < timedelta(days=1):
+                        raise ValidationError('Leave must be requested at least 24 hours in advance')
+                    
+                    # Check maximum leave duration (30 days)
+                    if (end_date - start_date).days > 30:
+                        raise ValidationError('Maximum leave duration is 30 days')
+                    
+                    # Check for overlapping leaves
+                    overlapping_leaves = DoctorLeave.objects.filter(
+                        doctor=doctor,
+                        start_date__lte=end_date,
+                        end_date__gte=start_date,
+                        status__in=['pending', 'approved']
+                    )
+                    
+                    if overlapping_leaves.exists():
+                        raise ValidationError('Leave request overlaps with existing approved or pending leaves')
+                    
+                    # Create leave request
+                    leave = DoctorLeave.objects.create(
+                        doctor=doctor,
+                        start_date=start_date,
+                        end_date=end_date,
+                        reason=reason,
+                        leave_type=leave_type,
+                        status='pending'  # Default status
+                    )
+                    
+                    # Notify admin for approval
+                    admin_users = User.objects.filter(is_staff=True)
+                    for admin in admin_users:
+                        Notification.objects.create(
+                            user=admin,
+                            title='New Leave Request',
+                            message=f'Doctor {doctor.user.get_full_name()} has requested leave from {start_date} to {end_date}',
+                            notification_type='leave_request'
+                        )
+                    
+                    messages.success(request, 'Leave request submitted successfully. Waiting for approval.')
+                except ValidationError as e:
+                    messages.error(request, str(e))
+                except Exception as e:
+                    messages.error(request, f'Error adding leave: {str(e)}')
+                
+                return redirect('users:manage_availability')
         else:
             form = DoctorAvailabilityForm()
         
+        # Get current availability schedule
         availabilities = DoctorAvailability.objects.filter(doctor=doctor)
+        
+        # Get upcoming leaves
+        upcoming_leaves = DoctorLeave.objects.filter(
+            doctor=doctor,
+            end_date__gte=timezone.now().date()
+        ).order_by('start_date')
+        
+        # Get leave statistics
+        total_leaves = DoctorLeave.objects.filter(
+            doctor=doctor,
+            start_date__year=timezone.now().year
+        ).count()
+        
+        approved_leaves = DoctorLeave.objects.filter(
+            doctor=doctor,
+            start_date__year=timezone.now().year,
+            status='approved'
+        ).count()
+        
         context = {
             'form': form,
-            'availabilities': availabilities
+            'availabilities': availabilities,
+            'upcoming_leaves': upcoming_leaves,
+            'total_leaves': total_leaves,
+            'approved_leaves': approved_leaves,
+            'leave_types': DoctorLeave.LEAVE_TYPE_CHOICES,
+            'days': DAY_OF_WEEK_CHOICES,
+            'today': timezone.now().date()
         }
         return render(request, 'doctor/manage_availability.html', context)
         
@@ -558,6 +788,7 @@ def manage_availability(request):
 def generate_slots(request):
     try:
         doctor = Doctor.objects.get(user=request.user)
+        clinic = doctor.clinic
         today = timezone.now().date()
         end_date = today + timedelta(days=30)  # Generate slots for next 30 days
         
@@ -565,11 +796,21 @@ def generate_slots(request):
         leaves = DoctorLeave.objects.filter(
             doctor=doctor,
             start_date__lte=end_date,
-            end_date__gte=today
+            end_date__gte=today,
+            status='approved'  # Only consider approved leaves
         )
         
-        # Create a set of dates where doctor is on leave
+        # Get clinic holidays
+        holidays = ClinicHoliday.objects.filter(
+            clinic=clinic,
+            date__gte=today,
+            date__lte=end_date
+        )
+        
+        # Create sets of dates where doctor is on leave or clinic is closed
         leave_dates = set()
+        holiday_dates = set(holidays.values_list('date', flat=True))
+        
         for leave in leaves:
             current_date = leave.start_date
             while current_date <= leave.end_date:
@@ -578,11 +819,20 @@ def generate_slots(request):
         
         slots_created = 0
         dates_processed = 0
+        slots_deleted = 0
+        
+        # Delete old slots that are in the past
+        old_slots = AppointmentSlot.objects.filter(
+            doctor=doctor,
+            date__lt=today
+        )
+        slots_deleted = old_slots.count()
+        old_slots.delete()
         
         current_date = today
         while current_date <= end_date:
-            # Skip if doctor is on leave
-            if current_date in leave_dates:
+            # Skip if doctor is on leave or clinic is closed
+            if current_date in leave_dates or current_date in holiday_dates:
                 current_date += timedelta(days=1)
                 continue
                 
@@ -594,6 +844,7 @@ def generate_slots(request):
             )
             
             for availability in availabilities:
+                # Generate slots for each availability period
                 slots = availability.generate_slots(current_date)
                 
                 for slot_time in slots:
@@ -602,7 +853,10 @@ def generate_slots(request):
                         doctor=doctor,
                         date=current_date,
                         start_time=slot_time.time(),
-                        end_time=(slot_time + timedelta(minutes=10)).time()
+                        end_time=(slot_time + timedelta(minutes=10)).time(),
+                        defaults={
+                            'is_booked': False
+                        }
                     )
                     if created:
                         slots_created += 1
@@ -612,7 +866,7 @@ def generate_slots(request):
             
         messages.success(
             request, 
-            f'Successfully generated {slots_created} slots across {dates_processed} days'
+            f'Successfully generated {slots_created} new slots and deleted {slots_deleted} old slots across {dates_processed} days'
         )
         return redirect('users:manage_availability')
         
@@ -633,15 +887,53 @@ def manage_leaves(request):
             start_date = request.POST.get('start_date')
             end_date = request.POST.get('end_date')
             reason = request.POST.get('reason', '')
+            leave_type = request.POST.get('leave_type', 'personal')
             
             try:
+                # Validate dates
+                start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+                
+                # Check minimum notice period (at least 24 hours)
+                if start_date - timezone.now().date() < timedelta(days=1):
+                    raise ValidationError('Leave must be requested at least 24 hours in advance')
+                
+                # Check maximum leave duration (30 days)
+                if (end_date - start_date).days > 30:
+                    raise ValidationError('Maximum leave duration is 30 days')
+                
+                # Check for overlapping leaves
+                overlapping_leaves = DoctorLeave.objects.filter(
+                    doctor=doctor,
+                    start_date__lte=end_date,
+                    end_date__gte=start_date,
+                    status__in=['pending', 'approved']
+                )
+                
+                if overlapping_leaves.exists():
+                    raise ValidationError('Leave request overlaps with existing approved or pending leaves')
+                
+                # Create leave request
                 leave = DoctorLeave.objects.create(
                     doctor=doctor,
                     start_date=start_date,
                     end_date=end_date,
-                    reason=reason
+                    reason=reason,
+                    leave_type=leave_type,
+                    status='pending'  # Default status
                 )
-                messages.success(request, 'Leave added successfully')
+                
+                # Notify admin for approval
+                admin_users = User.objects.filter(is_staff=True)
+                for admin in admin_users:
+                    Notification.objects.create(
+                        user=admin,
+                        title='New Leave Request',
+                        message=f'Doctor {doctor.user.get_full_name()} has requested leave from {start_date} to {end_date}',
+                        notification_type='leave_request'
+                    )
+                
+                messages.success(request, 'Leave request submitted successfully. Waiting for approval.')
             except ValidationError as e:
                 messages.error(request, str(e))
             except Exception as e:
@@ -653,8 +945,27 @@ def manage_leaves(request):
             end_date__gte=timezone.now().date()
         ).order_by('start_date')
         
+        # Get leave statistics
+        total_leaves = DoctorLeave.objects.filter(
+            doctor=doctor,
+            start_date__year=timezone.now().year
+        ).count()
+        
+        approved_leaves = DoctorLeave.objects.filter(
+            doctor=doctor,
+            start_date__year=timezone.now().year,
+            status='approved'
+        ).count()
+        
+        pending_leaves = total_leaves - approved_leaves
+        
         context = {
-            'upcoming_leaves': upcoming_leaves
+            'upcoming_leaves': upcoming_leaves,
+            'total_leaves': total_leaves,
+            'approved_leaves': approved_leaves,
+            'pending_leaves': pending_leaves,
+            'leave_types': DoctorLeave.LEAVE_TYPE_CHOICES,
+            'today': timezone.now().date()
         }
         return render(request, 'doctor/manage_leaves.html', context)
         
@@ -760,14 +1071,9 @@ def doctor_create_appointment(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def get_available_slots_doctor(request):
+def get_available_slots_doctor(request, doctor_id, date):
     try:
-        doctor = Doctor.objects.get(user=request.user)
-        date = request.GET.get('date')  # Get date from query params
-        
-        if not date:
-            return Response({'error': 'Date parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
-            
+        doctor = Doctor.objects.get(id=doctor_id)
         selected_date = datetime.strptime(date, '%Y-%m-%d').date()
         current_date = timezone.now().date()
         current_time = timezone.now().time()
@@ -786,36 +1092,40 @@ def get_available_slots_doctor(request):
             status='scheduled'
         ).values_list('appointment_time', flat=True)
         
-        # Get doctor's availability for this day
-        availability = DoctorAvailability.objects.filter(
+        # Get all doctor's availability for this day
+        availabilities = DoctorAvailability.objects.filter(
             doctor=doctor,
             day_of_week=selected_date.weekday(),
             is_available=True
-        ).first()
+        )
         
-        if not availability:
+        if not availabilities.exists():
             return Response({
                 'slots': [],
                 'message': 'Doctor not available on this day'
             })
         
-        # Generate time slots based on doctor's availability
+        # Generate time slots based on all availability periods
         available_slots = []
-        slot_time = datetime.combine(selected_date, availability.start_time)
-        end_time = datetime.combine(selected_date, availability.end_time)
-        
-        while slot_time.time() <= end_time.time():
-            # For current date, only show future time slots
-            if selected_date == current_date and slot_time.time() <= current_time:
-                slot_time = slot_time + timedelta(minutes=30)
-                continue
-                
-            if slot_time.time() not in booked_slots:
-                available_slots.append({
-                    'time': slot_time.strftime('%H:%M')
-                })
+        for availability in availabilities:
+            slot_time = datetime.combine(selected_date, availability.start_time)
+            end_time = datetime.combine(selected_date, availability.end_time)
             
-            slot_time = slot_time + timedelta(minutes=30)
+            while slot_time.time() <= end_time.time():
+                # For current date, only show future time slots
+                if selected_date == current_date and slot_time.time() <= current_time:
+                    slot_time = slot_time + timedelta(minutes=30)
+                    continue
+                    
+                if slot_time.time() not in booked_slots:
+                    available_slots.append({
+                        'time': slot_time.strftime('%H:%M')
+                    })
+                
+                slot_time = slot_time + timedelta(minutes=30)
+        
+        # Sort slots by time
+        available_slots.sort(key=lambda x: x['time'])
         
         return Response({
             'slots': available_slots,
@@ -823,6 +1133,10 @@ def get_available_slots_doctor(request):
             'date': date
         })
         
+    except Doctor.DoesNotExist:
+        return Response({
+            'error': 'Doctor not found'
+        }, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         print(f"Error generating slots: {str(e)}")
         return Response({
@@ -1003,7 +1317,7 @@ def api_patient_prescriptions(request, patient_id):
     except (Doctor.DoesNotExist, Patient.DoesNotExist):
         return Response({'error': 'Not found'}, status=404)
     except Exception as e:
-        print(f"Error in prescriptions: {str(e)}")
+        print(f"Error in prescriptions: {str(e)}") 
         return Response({'error': 'Internal server error'}, status=500)
 
 @api_view(['GET'])
@@ -1495,7 +1809,6 @@ def doctor_appointments_api(request):
         return Response({
             'error': str(e)
         }, status=status.HTTP_400_BAD_REQUEST)
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def patient_prescriptions_api(request, patient_id):

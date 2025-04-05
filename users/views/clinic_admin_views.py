@@ -5,8 +5,8 @@ from django.db.models import Count
 from django.utils import timezone
 
 from users.forms import ClinicProfileForm
-from ..models import Clinic, Doctor, Staff, UserProfile
-from datetime import datetime
+from ..models import Clinic, Doctor, Staff, UserProfile, Lab, LabTest, LabStaff
+from datetime import datetime, timedelta
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404
@@ -21,8 +21,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from ..models import Patient, Staff, Appointment, Doctor
+from ..models import Patient, Appointment
 from ..permissions import IsClinicAdmin
+from ..forms import LabForm  # We'll create this form
 
 
 
@@ -55,6 +56,28 @@ def clinic_admin_dashboard(request):
         # Get doctors for this clinic
         clinic_doctors = Doctor.objects.filter(clinic=clinic)
         
+        # New lab-related context data
+        labs_count = Lab.objects.filter(clinic=clinic).count()
+        active_tests_count = LabTest.objects.filter(
+            doctor__clinic=clinic,
+            status__in=['REQUESTED', 'PROCESSING']
+        ).count()
+        pending_tests_count = LabTest.objects.filter(
+            doctor__clinic=clinic,
+            status='REQUESTED'
+        ).count()
+        today_tests_count = LabTest.objects.filter(
+            doctor__clinic=clinic,
+            created_at__date=today
+        ).count()
+        active_lab_staff_count = LabStaff.objects.filter(
+            lab__clinic=clinic,
+            is_active=True
+        ).count()
+        recent_lab_tests = LabTest.objects.filter(
+            doctor__clinic=clinic
+        ).order_by('-created_at')[:5]
+        
         context = {
             'doctors_count': clinic_doctors.count(),
             'staff_count': Staff.objects.filter(clinic=clinic).count(),
@@ -66,6 +89,12 @@ def clinic_admin_dashboard(request):
             'clinic_name': clinic.name,
             'clinic_logo': clinic.logo.url if clinic.logo else None,
             'current_clinic_id': current_clinic_id,
+            'labs_count': labs_count,
+            'active_tests_count': active_tests_count,
+            'pending_tests_count': pending_tests_count,
+            'today_tests_count': today_tests_count,
+            'active_lab_staff_count': active_lab_staff_count,
+            'recent_lab_tests': recent_lab_tests,
         }
         
         if request.user.is_superuser:
@@ -119,126 +148,230 @@ def generate_random_password(length=12):
 @login_required
 def add_doctor(request):
     """Add new doctor view"""
-    clinic = request.user.profile.clinic
-    
-    if request.method == 'POST':
-        try:
-            # Get verification data
-            verified_data = json.loads(request.POST.get('verified_data', '{}'))
-            print("Verified data:", verified_data)  # Debug print
-            
-            # Get form data
-            email = request.POST.get('email')
-            specialization = request.POST.get('specialization', '')
-            consultation_fee = request.POST.get('consultation_fee', 0)
-            
-            if not email:
-                raise ValueError("Email is required")
-            
-            # Check if user already exists
-            if User.objects.filter(username=email).exists():
-                raise ValueError("A user with this email already exists")
-            
-            if User.objects.filter(email=email).exists():
-                raise ValueError("This email is already registered")
+    try:
+        # Get current clinic
+        if request.user.is_superuser:
+            current_clinic_id = request.session.get('current_clinic_id')
+            if not current_clinic_id:
+                # Default to first clinic if none selected
+                first_clinic = Clinic.objects.first()
+                if first_clinic:
+                    current_clinic_id = first_clinic.id
+                    request.session['current_clinic_id'] = current_clinic_id
+            clinic = get_object_or_404(Clinic, id=current_clinic_id)
+        else:
+            # For regular admins, get their assigned clinic
+            if not hasattr(request.user, 'profile') or not request.user.profile.clinic:
+                messages.error(request, "No clinic assigned to your account")
+                return redirect('users:clinic_admin_dashboard')
+            clinic = request.user.profile.clinic
+
+        if request.method == 'POST':
+            try:
+                # Get verification data
+                verified_data = json.loads(request.POST.get('verified_data', '{}'))
+                print("Verified data:", verified_data)  # Debug print
                 
-            # Generate random password
-            random_password = generate_random_password()
-            
-            # Create user
-            name_parts = verified_data.get('name', '').split()
-            first_name = name_parts[0] if name_parts else ''
-            last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
-            
-            # Create user with transaction
-            with transaction.atomic():
-                user = User.objects.create_user(
-                    username=email,
-                    email=email,
-                    first_name=first_name,
-                    last_name=last_name,
-                    password=random_password
-                )
+                # Get form data
+                email = request.POST.get('email')
+                specialization = request.POST.get('specialization', '')
+                consultation_fee = request.POST.get('consultation_fee', 0)
                 
-                # Create doctor profile
-                doctor = Doctor.objects.create(
-                    user=user,
-                    clinic=clinic,
-                    name=verified_data.get('name', ''),
-                    specialization=specialization,
-                    license_number=verified_data.get('registration_number', ''),
-                    medical_council=verified_data.get('state_council', ''),
-                    consultation_fee=consultation_fee,
-                    verified=True,
-                    verification_details=verified_data
-                )
+                if not email:
+                    raise ValueError("Email is required")
                 
-                # Handle profile picture
-                if 'profile_picture' in request.FILES:
-                    doctor.profile_picture = request.FILES['profile_picture']
-                    doctor.save()
-            
-            messages.success(request, 'Doctor added successfully!')
-            # Store password in session temporarily
-            request.session['initial_password'] = random_password
-            
-            # Redirect to doctor details page
-            return redirect('users:doctor_details', doctor_id=doctor.id)
-            
-        except ValueError as e:
-            messages.error(request, str(e))
-        except IntegrityError:
-            messages.error(request, "A user with this email already exists")
-        except json.JSONDecodeError:
-            messages.error(request, "Invalid verification data")
-        except Exception as e:
-            print(f"Error adding doctor: {str(e)}")
-            messages.error(request, f'Error adding doctor: {str(e)}')
-    
-    return render(request, 'clinic_admin/add_doctor.html', {
-        'medical_councils': MEDICAL_COUNCILS
-    })
+                # Check if user already exists
+                if User.objects.filter(username=email).exists():
+                    raise ValueError("A user with this email already exists")
+                
+                if User.objects.filter(email=email).exists():
+                    raise ValueError("This email is already registered")
+                    
+                # Generate random password
+                random_password = generate_random_password()
+                
+                # Create user
+                name_parts = verified_data.get('name', '').split()
+                first_name = name_parts[0] if name_parts else ''
+                last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+                
+                # Create user with transaction
+                with transaction.atomic():
+                    user = User.objects.create_user(
+                        username=email,
+                        email=email,
+                        first_name=first_name,
+                        last_name=last_name,
+                        password=random_password
+                    )
+                    
+                    # Create doctor profile
+                    doctor = Doctor.objects.create(
+                        user=user,
+                        clinic=clinic,
+                        name=verified_data.get('name', ''),
+                        specialization=specialization,
+                        license_number=verified_data.get('registration_number', ''),
+                        medical_council=verified_data.get('state_council', ''),
+                        consultation_fee=consultation_fee,
+                        verified=True,
+                        verification_details=verified_data
+                    )
+                    
+                    # Handle profile picture
+                    if 'profile_picture' in request.FILES:
+                        doctor.profile_picture = request.FILES['profile_picture']
+                        doctor.save()
+                
+                messages.success(request, 'Doctor added successfully!')
+                # Store password in session temporarily
+                request.session['initial_password'] = random_password
+                
+                # Redirect to doctor details page
+                return redirect('users:doctor_details', doctor_id=doctor.id)
+                
+            except ValueError as e:
+                messages.error(request, str(e))
+            except IntegrityError:
+                messages.error(request, "A user with this email already exists")
+            except json.JSONDecodeError:
+                messages.error(request, "Invalid verification data")
+            except Exception as e:
+                print(f"Error adding doctor: {str(e)}")
+                messages.error(request, f'Error adding doctor: {str(e)}')
+        
+        return render(request, 'clinic_admin/add_doctor.html', {
+            'medical_councils': MEDICAL_COUNCILS,
+            'clinic': clinic
+        })
+        
+    except Exception as e:
+        messages.error(request, f'Error: {str(e)}')
+        return redirect('users:clinic_admin_dashboard')
 
 @login_required
 def doctors_list(request):
     """View and manage doctors"""
-    doctors = Doctor.objects.all().order_by('name')
-    return render(request, 'clinic_admin/doctors_list.html', {'doctors': doctors})
+    # Get current clinic
+    if request.user.is_superuser:
+        current_clinic_id = request.session.get('current_clinic_id')
+        if not current_clinic_id:
+            # Default to first clinic if none selected
+            first_clinic = Clinic.objects.first()
+            if first_clinic:
+                current_clinic_id = first_clinic.id
+                request.session['current_clinic_id'] = current_clinic_id
+    else:
+        # Non-superuser sees their assigned clinic
+        current_clinic_id = request.user.profile.clinic.id if hasattr(request.user, 'profile') else None
+    
+    if current_clinic_id:
+        current_clinic = Clinic.objects.get(id=current_clinic_id)
+        doctors = Doctor.objects.filter(clinic=current_clinic).order_by('name')
+        context = {
+            'doctors': doctors,
+            'current_clinic': current_clinic,
+            'clinic_list': Clinic.objects.all() if request.user.is_superuser else None
+        }
+        return render(request, 'clinic_admin/doctors_list.html', context)
+    else:
+        messages.error(request, "No clinic assigned.")
+        return redirect('users:dashboard')
 
 @login_required
 def add_staff(request):
     """Add new staff member"""
-    clinic = request.user.profile.clinic
-    
+    try:
+        # Get current clinic
+        if request.user.is_superuser:
+            current_clinic_id = request.session.get('current_clinic_id')
+            if not current_clinic_id:
+                # Default to first clinic if none selected
+                first_clinic = Clinic.objects.first()
+                if first_clinic:
+                    current_clinic_id = first_clinic.id
+                    request.session['current_clinic_id'] = current_clinic_id
+            clinic = get_object_or_404(Clinic, id=current_clinic_id)
+        else:
+            # For regular admins, get their assigned clinic
+            if not hasattr(request.user, 'profile') or not request.user.profile.clinic:
+                messages.error(request, "No clinic assigned to your account")
+                return redirect('users:clinic_admin_dashboard')
+            clinic = request.user.profile.clinic
+        
+        if request.method == 'POST':
+            try:
+                email = request.POST.get('email')
+                first_name = request.POST.get('first_name')
+                last_name = request.POST.get('last_name')
+                role = request.POST.get('role')
+                joining_date = request.POST.get('joining_date')
 
-    if not clinic:
-        messages.error(request, "Please set up your clinic first.")
-        return redirect('users:clinic_profile')
+                # Check if user with this email already exists
+                if User.objects.filter(email=email).exists():
+                    messages.error(request, "A user with this email already exists")
+                    return render(request, 'clinic_admin/add_staff.html', {'clinic': clinic})
+
+                # Create user for staff member with unique username
+                username = email  # Use email as username
+                counter = 1
+                while User.objects.filter(username=username).exists():
+                    username = f"{email}_{counter}"
+                    counter += 1
+
+                # Generate random password
+                password = generate_random_password()
+
+                # Create user with the generated password
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                    password=password,
+                    is_staff=False,  # Don't give admin access
+                    is_active=True
+                )
+                
+                # Create staff profile
+                staff = Staff.objects.create(
+                    user=user,
+                    clinic=clinic,
+                    role=role,
+                    joining_date=joining_date
+                )
+                
+                # Store credentials in session to display
+                request.session['new_staff_credentials'] = {
+                    'username': username,
+                    'password': password
+                }
+                
+                messages.success(request, 'Staff member added successfully!')
+                return redirect('users:staff_credentials')
+                
+            except Exception as e:
+                messages.error(request, f'Error adding staff member: {str(e)}')
+                return render(request, 'clinic_admin/add_staff.html', {'clinic': clinic})
+        
+        return render(request, 'clinic_admin/add_staff.html', {'clinic': clinic})
+        
+    except Exception as e:
+        messages.error(request, f'Error: {str(e)}')
+        return redirect('users:clinic_admin_dashboard')
+
+@login_required
+def staff_credentials(request):
+    """Display staff credentials after creation"""
+    credentials = request.session.pop('new_staff_credentials', None)
+    if not credentials:
+        messages.error(request, "No credentials found. Please add a staff member first.")
+        return redirect('users:add_staff')
     
-    if request.method == 'POST':
-        try:
-            # Create user for staff member
-            user = User.objects.create_user(
-                username=request.POST.get('email'),
-                email=request.POST.get('email'),
-                first_name=request.POST.get('first_name'),
-                last_name=request.POST.get('last_name'),
-                password=generate_random_password()  # Generate random password
-            )
-            
-            staff = Staff.objects.create(
-                user=user,
-                clinic=clinic,
-                role=request.POST.get('role'),
-                joining_date=request.POST.get('joining_date')
-            )
-            
-            messages.success(request, 'Staff member added successfully!')
-            return redirect('users:staff_list')
-        except Exception as e:
-            messages.error(request, f'Error adding staff member: {str(e)}')
-    
-    return render(request, 'clinic_admin/add_staff.html')
+    return render(request, 'clinic_admin/staff_credentials.html', {
+        'username': credentials['username'],
+        'password': credentials['password']
+    })
 
 @login_required
 def staff_list(request):
@@ -824,3 +957,160 @@ def get_current_clinic(request):
             'error': 'Failed to fetch current clinic',
             'detail': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@login_required
+@user_passes_test(lambda u: u.is_staff)
+def add_lab(request):
+    """Add a new lab to the clinic"""
+    try:
+        # Get the clinic from user's profile
+        if request.user.is_superuser:
+            clinic_id = request.session.get('current_clinic_id')
+            clinic = get_object_or_404(Clinic, id=clinic_id)
+        else:
+            clinic = request.user.profile.clinic
+            
+        if request.method == 'POST':
+            form = LabForm(request.POST)
+            if form.is_valid():
+                lab = form.save(commit=False)
+                lab.clinic = clinic
+                lab.save()
+                messages.success(request, 'Lab added successfully.')
+                return redirect('users:labs_list')
+        else:
+            form = LabForm()
+        
+        return render(request, 'clinic_admin/add_lab.html', {
+            'form': form,
+            'title': 'Add New Lab',
+            'clinic': clinic
+        })
+    except Exception as e:
+        messages.error(request, f'Error adding lab: {str(e)}')
+        return redirect('users:clinic_admin_dashboard')
+
+@login_required
+@user_passes_test(lambda u: u.is_staff)
+def labs_list(request):
+    """Display list of labs"""
+    try:
+        if request.user.is_superuser:
+            clinic_id = request.session.get('current_clinic_id')
+            clinic = get_object_or_404(Clinic, id=clinic_id)
+        else:
+            clinic = request.user.profile.clinic
+            
+        labs = Lab.objects.filter(clinic=clinic)
+        return render(request, 'clinic_admin/labs_list.html', {
+            'labs': labs,
+            'title': 'Labs Management',
+            'clinic': clinic
+        })
+    except Exception as e:
+        messages.error(request, f'Error accessing labs: {str(e)}')
+        return redirect('users:clinic_admin_dashboard')
+
+@login_required
+@user_passes_test(lambda u: u.is_staff)
+def lab_staff_list(request):
+    """Display list of lab staff"""
+    try:
+        if request.user.is_superuser:
+            clinic_id = request.session.get('current_clinic_id')
+            clinic = get_object_or_404(Clinic, id=clinic_id)
+        else:
+            clinic = request.user.profile.clinic
+            
+        lab_staff = LabStaff.objects.filter(lab__clinic=clinic)
+        return render(request, 'clinic_admin/lab_staff_list.html', {
+            'lab_staff': lab_staff,
+            'title': 'Lab Staff Management',
+            'clinic': clinic
+        })
+    except Exception as e:
+        messages.error(request, f'Error accessing lab staff: {str(e)}')
+        return redirect('users:clinic_admin_dashboard')
+
+@login_required
+@user_passes_test(lambda u: u.is_staff)
+def lab_tests(request):
+    """Display list of lab tests"""
+    try:
+        if request.user.is_superuser:
+            clinic_id = request.session.get('current_clinic_id')
+            clinic = get_object_or_404(Clinic, id=clinic_id)
+        else:
+            clinic = request.user.profile.clinic
+            
+        tests = LabTest.objects.filter(doctor__clinic=clinic).order_by('-created_at')
+        return render(request, 'clinic_admin/lab_tests.html', {
+            'tests': tests,
+            'title': 'Lab Tests',
+            'clinic': clinic
+        })
+    except Exception as e:
+        messages.error(request, f'Error accessing lab tests: {str(e)}')
+        return redirect('users:clinic_admin_dashboard')
+
+@login_required
+@require_POST
+def assign_doctor(request):
+    """Assign an existing doctor to the current clinic"""
+    try:
+        doctor_id = request.POST.get('doctor')
+        if not doctor_id:
+            return JsonResponse({'error': 'Doctor ID is required'}, status=400)
+            
+        # Get current clinic
+        if request.user.is_superuser:
+            current_clinic_id = request.session.get('current_clinic_id')
+        else:
+            current_clinic_id = request.user.profile.clinic.id
+            
+        if not current_clinic_id:
+            return JsonResponse({'error': 'No clinic selected'}, status=400)
+            
+        doctor = get_object_or_404(Doctor, id=doctor_id)
+        clinic = get_object_or_404(Clinic, id=current_clinic_id)
+        
+        # Check if doctor is already assigned to this clinic
+        if doctor.clinic == clinic:
+            return JsonResponse({'error': 'Doctor is already assigned to this clinic'}, status=400)
+            
+        # Assign doctor to clinic
+        doctor.clinic = clinic
+        doctor.save()
+        
+        return JsonResponse({'success': True})
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def available_doctors(request):
+    """Get list of doctors not assigned to any clinic"""
+    try:
+        # Get current clinic
+        if request.user.is_superuser:
+            current_clinic_id = request.session.get('current_clinic_id')
+        else:
+            current_clinic_id = request.user.profile.clinic.id
+            
+        # Get doctors not assigned to any clinic
+        doctors = Doctor.objects.filter(clinic__isnull=True)
+        
+        doctor_data = []
+        for doctor in doctors:
+            doctor_data.append({
+                'id': doctor.id,
+                'name': doctor.name,
+                'specialization': doctor.specialization,
+                'email': doctor.email
+            })
+            
+        return Response(doctor_data)
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

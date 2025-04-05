@@ -3,66 +3,67 @@
 {% block title %}Manage Availability{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto px-4 py-8">
+<div class="max-w-4xl mx-auto px-4 py-8">
     <div class="bg-white shadow-lg rounded-lg p-6">
-        <h2 class="text-2xl font-bold mb-6">Manage Availability Schedule</h2>
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold">Manage Availability Schedule</h2>
+            <a href="{% url 'users:manage_leaves' %}" 
+               class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded">
+                Manage Leaves
+            </a>
+        </div>
 
+        <!-- Availability Form -->
         <form method="POST" class="space-y-4">
             {% csrf_token %}
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <!-- Day of Week -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Day of Week *</label>
-                    {{ form.day_of_week }}
-                </div>
-
-                <!-- Shift -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Shift *</label>
-                    {{ form.shift }}
-                </div>
-
-                <!-- Time Range -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Start Time *</label>
-                    {{ form.start_time }}
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">End Time *</label>
-                    {{ form.end_time }}
-                </div>
-
-                <!-- Availability -->
-                <div class="col-span-2">
-                    <label class="flex items-center">
-                        {{ form.is_available }}
-                        <span class="ml-2 text-sm text-gray-700">Available for appointments</span>
-                    </label>
+            <!-- Calendar Selection -->
+            <div class="mb-8">
+                <h3 class="text-xl font-bold mb-4">Select Available Days</h3>
+                <div class="grid grid-cols-7 gap-2 mb-4">
+                    {% for day in days %}
+                    <div class="text-center">
+                        <label class="flex items-center justify-center">
+                            <input type="checkbox" name="available_days" value="{{ day.0 }}" 
+                                   class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            <span class="ml-2">{{ day.1 }}</span>
+                        </label>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
 
-            <div class="mt-6 flex justify-between">
+            <!-- Time Range -->
+            <div class="mb-8">
+                <h3 class="text-xl font-bold mb-4">Set Working Hours</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Start Time *</label>
+                        {{ form.start_time }}
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">End Time *</label>
+                        {{ form.end_time }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6">
                 <button type="submit" 
                         class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
-                    Save Availability
+                    Save & Generate Slots
                 </button>
-                <a href="{% url 'users:generate_slots' %}"
-                   class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
-                    Generate Slots
-                </a>
             </div>
         </form>
 
-        <!-- Current Availability Schedule -->
-        <div class="mt-8">
+        <!-- Current Schedule -->
+        <div>
             <h3 class="text-xl font-bold mb-4">Current Schedule</h3>
             <div class="grid grid-cols-1 gap-4">
                 {% for availability in availabilities %}
                 <div class="border rounded p-4">
                     <p class="font-medium">{{ availability.get_day_of_week_display }}</p>
-                    <p>{{ availability.get_shift_display }}</p>
                     <p>{{ availability.start_time|time:"g:i A" }} - {{ availability.end_time|time:"g:i A" }}</p>
                     <p>{{ availability.is_available|yesno:"Available,Not Available" }}</p>
                 </div>

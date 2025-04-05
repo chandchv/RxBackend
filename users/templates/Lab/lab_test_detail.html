@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+
+{% block title %}Lab Test Details{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <!-- Header -->
+        <div class="border-b p-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold">{{ test.test_name }}</h1>
+                    <p class="text-gray-600">Test ID: {{ test.id }}</p>
+                </div>
+                <div class="text-right">
+                    <span class="px-3 py-1 rounded-full text-sm font-semibold
+                        {% if test.status == 'REQUESTED' %}bg-yellow-100 text-yellow-800
+                        {% elif test.status == 'ASSIGNED' %}bg-blue-100 text-blue-800
+                        {% elif test.status == 'SAMPLE_COLLECTED' %}bg-purple-100 text-purple-800
+                        {% elif test.status == 'PROCESSING' %}bg-indigo-100 text-indigo-800
+                        {% elif test.status == 'COMPLETED' %}bg-green-100 text-green-800
+                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ test.get_status_display }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Details -->
+        <div class="p-6">
+            <div class="grid grid-cols-2 gap-6">
+                <div>
+                    <h2 class="text-lg font-semibold mb-4">Patient Information</h2>
+                    <div class="space-y-2">
+                        <p><strong>Name:</strong> {{ test.patient.get_full_name }}</p>
+                        <p><strong>ID:</strong> {{ test.patient.patient_id }}</p>
+                    </div>
+                </div>
+                <div>
+                    <h2 class="text-lg font-semibold mb-4">Doctor Information</h2>
+                    <div class="space-y-2">
+                        <p><strong>Name:</strong> Dr. {{ test.doctor.name }}</p>
+                        <p><strong>Specialization:</strong> {{ test.doctor.specialization }}</p>
+                    </div>
+                </div>
+                <div>
+                    <h2 class="text-lg font-semibold mb-4">Test Details</h2>
+                    <div class="space-y-2">
+                        <p><strong>Description:</strong> {{ test.description }}</p>
+                        <p><strong>Collection Type:</strong> {{ test.get_collection_type_display }}</p>
+                        <p><strong>Created:</strong> {{ test.created_at|date:"d M Y H:i" }}</p>
+                    </div>
+                </div>
+                <div>
+                    <h2 class="text-lg font-semibold mb-4">Lab Information</h2>
+                    <div class="space-y-2">
+                        <p><strong>Lab:</strong> {{ test.lab.name }}</p>
+                        <p><strong>Assigned Technician:</strong> 
+                            {% if test.technician %}
+                                {{ test.technician.user.get_full_name }}
+                            {% else %}
+                                Not assigned
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test Results -->
+            {% if test.result_file %}
+            <div class="mt-6">
+                <h2 class="text-lg font-semibold mb-4">Test Results</h2>
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <a href="{{ test.result_file.url }}" target="_blank" class="text-blue-600 hover:text-blue-800">
+                        View Result File
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Actions -->
+            <div class="mt-6 border-t pt-6">
+                <h2 class="text-lg font-semibold mb-4">Update Test Status</h2>
+                <form method="POST" enctype="multipart/form-data" class="space-y-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="update_status">
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">New Status</label>
+                            <select name="status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                {% for status_value, status_label in status_choices %}
+                                <option value="{{ status_value }}" {% if test.status == status_value %}selected{% endif %}>
+                                    {{ status_label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Result File</label>
+                            <input type="file" name="result_file" class="mt-1 block w-full text-sm text-gray-500
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-md file:border-0
+                                file:text-sm file:font-semibold
+                                file:bg-blue-50 file:text-blue-700
+                                hover:file:bg-blue-100">
+                            <p class="mt-1 text-sm text-gray-500">Upload result file when marking as completed</p>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end space-x-4">
+                        <a href="{% url 'users:lab_dashboard' %}" 
+                           class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            Cancel
+                        </a>
+                        <button type="submit" 
+                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
+                            Update Status
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Assign Technician -->
+            {% if not test.technician %}
+            <div class="mt-6 border-t pt-6">
+                <form method="POST" class="flex justify-end">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="assign_technician">
+                    <button type="submit" 
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700">
+                        Assign to Me
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

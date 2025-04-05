@@ -2,7 +2,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from ..models import Prescription, Doctor, Patient, PrescriptionItem, PatientVitals
+from ..models import Prescription, Doctor, Patient, PrescriptionItem, PatientVitals, Lab, LabTest
 from ..serializers import PrescriptionSerializer
 from django.shortcuts import get_object_or_404, render
 from django.contrib.auth.decorators import login_required
@@ -18,6 +18,7 @@ import os
 import json
 from rest_framework.views import APIView
 from django.views import View
+from datetime import date
 
 
 @login_required
@@ -91,6 +92,21 @@ def create_prescription(request, patient_id):
                     instructions=medicine['instructions']
                 )
 
+            # Handle lab tests
+            lab_tests_data = json.loads(request.POST.get('lab_tests', '[]'))
+            clinic_lab = Lab.objects.filter(clinic=doctor.clinic).first()
+            
+            for test_data in lab_tests_data:
+                LabTest.objects.create(
+                    patient=patient,
+                    doctor=doctor,
+                    lab=clinic_lab,
+                    test_name=test_data['test_name'],
+                    description=test_data['description'],
+                    collection_type=test_data['collection_type'],
+                    status='REQUESTED'
+                )
+
             messages.success(request, 'Prescription created successfully')
             return redirect('users:prescription_detail', pk=prescription.id)
 
@@ -109,7 +125,8 @@ def create_prescription(request, patient_id):
     context = {
         'patient': patient,
         'doctor': doctor,
-        'vitals': latest_vitals
+        'vitals': latest_vitals,
+        'has_lab': Lab.objects.filter(clinic=doctor.clinic).exists()
     }
     return render(request, 'doctor/create_prescription.html', context)
 
@@ -149,13 +166,21 @@ def prescription_detail(request, pk):
         vitals = PatientVitals.objects.filter(
             patient=prescription.patient
         ).order_by('-created_at').first()
+
+        # Get lab tests created with this prescription
+        lab_tests = LabTest.objects.filter(
+            patient=prescription.patient,
+            doctor=prescription.doctor,
+            created_at__date=prescription.created_at.date()
+        ).order_by('created_at')
         
         context = {
             'prescription': prescription,
             'vitals': vitals,
             'patient': prescription.patient,
             'today': timezone.now(),
-            'is_doctor': hasattr(request.user, 'doctor')
+            'is_doctor': hasattr(request.user, 'doctor'),
+            'lab_tests': lab_tests
         }
         
         return render(request, template, context)
@@ -279,3 +304,101 @@ class PrescriptionListView(View):
         except Exception as e:
             print(f"Error fetching prescriptions: {str(e)}")
             return render(request, 'error.html', {'message': 'Failed to fetch prescriptions'})
+@login_required
+class DoctorPatientPrescriptionsView(APIView):
+    permission_classes = [IsAuthenticated]
+    csrf_exempt = True
+    def get(self, request, patient_id):
+        """Get prescriptions for a specific patient (doctor only)."""
+        try:
+            if not hasattr(request.user, 'doctor'):
+                return Response({"error": "Doctor privileges required"}, status=status.HTTP_403_FORBIDDEN)
+            
+            patient = get_object_or_404(Patient, id=patient_id)
+            prescriptions = Prescription.objects.filter(
+                patient=patient,
+                doctor=request.user.doctor
+            ).select_related(
+                'patient',
+                'patient__user'
+            ).prefetch_related('items').order_by('-created_at')
+            
+            serializer = PrescriptionSerializer(prescriptions, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"Error fetching prescriptions: {str(e)}")
+            return Response({"error": "Failed to fetch prescriptions"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def prescription_detail_api(request, pk):
+    """API view for prescription details"""
+    try:
+        prescription = get_object_or_404(
+            Prescription.objects.select_related(
+                'doctor',
+                'doctor__user',
+                'doctor__clinic',
+                'patient',
+                'patient__user'
+            ).prefetch_related('items'),
+            id=pk
+        )
+        
+        # Check authorization
+        if hasattr(request.user, 'doctor'):
+            if prescription.doctor != request.user.doctor:
+                return Response({'error': 'Unauthorized access'}, status=403)
+        
+        elif hasattr(request.user, 'patient'):
+            if prescription.patient != request.user.patient:
+                return Response({'error': 'Unauthorized access'}, status=403)
+        
+        else:
+            return Response({'error': 'Access denied'}, status=403)
+
+        # Get patient vitals
+        vitals = PatientVitals.objects.filter(
+            patient=prescription.patient
+        ).order_by('-created_at').first()
+
+        # Calculate age from birthdate
+        today = date.today()
+        birthdate = prescription.patient.date_of_birth
+        age = today.year - birthdate.year - ((today.month, today.day) < (birthdate.month, birthdate.day))
+
+        # Format the response data
+        data = {
+            'id': prescription.id,
+            'created_at': prescription.created_at.strftime('%Y-%m-%d'),
+            'doctor_name': f"{prescription.doctor.user.first_name} {prescription.doctor.user.last_name}",
+            'doctor_qualification': prescription.doctor.qualification,
+            'doctor_registration_number': prescription.doctor.license_number,
+            'clinic_id': prescription.doctor.clinic.id if prescription.doctor.clinic else None,
+            'patient_name': f"{prescription.patient.user.first_name} {prescription.patient.user.last_name}",
+            'patient_gender': prescription.patient.gender,
+            'patient_age': age,
+            'patient_mobile': prescription.patient.phone_number,
+            'patient_address': prescription.patient.address,
+            'patient_weight': vitals.weight if vitals else None,
+            'patient_height': vitals.height if vitals else None,
+            'patient_bmi': vitals.bmi if vitals else None,
+            'patient_bp': vitals.blood_pressure if vitals else None,
+            'chief_complaints': prescription.chief_complaints,
+            'clinical_findings': prescription.clinical_findings,
+            'diagnosis': prescription.diagnosis,
+            'advice': prescription.advice,
+            'follow_up_date': prescription.follow_up_date.strftime('%Y-%m-%d') if prescription.follow_up_date else None,
+            'medicines': [{
+                'name': item.medicine,
+                'dosage': item.dosage,
+                'duration': item.duration,
+                'instructions': item.instructions
+            } for item in prescription.items.all()]
+        }
+        
+        return Response(data)
+
+    except Exception as e:
+        print(f"Error in prescription_detail_api: {str(e)}")
+        return Response({'error': str(e)}, status=500)

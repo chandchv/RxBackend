@@ -231,10 +231,12 @@ def patient_dashboard(request):
             status='scheduled'
         ).order_by('appointment_date')
 
-        # Get past appointments
-        past_appointments = Appointment.objects.filter(
+        # Get previous appointments (including completed, cancelled, and missed)
+        previous_appointments = Appointment.objects.filter(
             patient=patient,
             appointment_date__lt=timezone.now()
+        ).exclude(
+            status='scheduled'
         ).order_by('-appointment_date')
 
         # Get recent prescriptions
@@ -245,7 +247,7 @@ def patient_dashboard(request):
         context = {
             'patient': patient,
             'upcoming_appointments': upcoming_appointments,
-            'past_appointments': past_appointments,
+            'previous_appointments': previous_appointments,
             'recent_prescriptions': recent_prescriptions,
             'total_appointments': upcoming_appointments.count(),
             'total_prescriptions': recent_prescriptions.count(),

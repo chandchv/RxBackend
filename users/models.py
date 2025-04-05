@@ -247,6 +247,7 @@ class Appointment(TimeStampedModel):
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
         ('no_show', 'No Show'),
+        ('missed', 'Missed'),
     ]
     
     patient = models.ForeignKey(
@@ -267,6 +268,8 @@ class Appointment(TimeStampedModel):
         choices=STATUS_CHOICES, 
         default='scheduled'
     )
+    token_number = models.IntegerField(null=True, blank=True)
+    is_walk_in = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['appointment_date', 'appointment_time']
@@ -357,9 +360,6 @@ class Drug(TimeStampedModel):
         validators=[MinValueValidator(0)]
     )
     product_manufactured = models.CharField(max_length=255)
-    medicine_desc = models.TextField()
-    side_effects = models.TextField()
-    drug_interactions = models.JSONField()
 
     class Meta:
         ordering = ['product_name']
@@ -604,6 +604,21 @@ class ActivityLog(TimeStampedModel):
         return f"{self.user.get_full_name()} - {self.action} - {self.created_at}"
 
 class DoctorLeave(TimeStampedModel):
+    LEAVE_TYPE_CHOICES = [
+        ('personal', 'Personal'),
+        ('sick', 'Sick Leave'),
+        ('vacation', 'Vacation'),
+        ('other', 'Other')
+    ]
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected')
+    ]
+    
+    leave_type = models.CharField(max_length=20, choices=LEAVE_TYPE_CHOICES, default='personal')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     doctor = models.ForeignKey(
         'Doctor', 
         on_delete=models.CASCADE,
@@ -669,12 +684,54 @@ class Staff(TimeStampedModel):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='staff')
     role = models.CharField(max_length=100)
     clinic = models.ForeignKey(Clinic, on_delete=models.CASCADE, related_name='staff_members')
+    is_active = models.BooleanField(default=True)
+    joining_date = models.DateField(null=True, blank=True)
 
     class Meta:
         ordering = ['user__last_name']
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.role}"
+
+class StaffLeave(TimeStampedModel):
+    LEAVE_TYPE_CHOICES = [
+        ('personal', 'Personal'),
+        ('sick', 'Sick Leave'),
+        ('vacation', 'Vacation'),
+        ('other', 'Other')
+    ]
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected')
+    ]
+    
+    leave_type = models.CharField(max_length=20, choices=LEAVE_TYPE_CHOICES, default='personal')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    staff = models.ForeignKey(
+        'Staff', 
+        on_delete=models.CASCADE,
+        related_name='leaves'
+    )
+    start_date = models.DateField()
+    end_date = models.DateField()
+    reason = models.TextField(blank=True)
+    
+    class Meta:
+        ordering = ['-start_date']
+        indexes = [
+            models.Index(fields=['staff', 'start_date']),
+        ]
+    
+    def __str__(self):
+        return f"{self.staff} - {self.start_date} to {self.end_date}"
+    
+    def clean(self):
+        if self.start_date > self.end_date:
+            raise ValidationError("End date must be after start date")
+        if self.start_date < timezone.now().date():
+            raise ValidationError("Cannot add leave for past dates")
 
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, created, **kwargs):
@@ -784,3 +841,97 @@ class Payment(models.Model):
         elif total_paid > 0:
             self.bill.status = 'partial'
         self.bill.save()
+
+class LabTest(models.Model):
+    TEST_STATUS = (
+        ('REQUESTED', 'Requested'),
+        ('ASSIGNED', 'Assigned'),
+        ('SAMPLE_COLLECTED', 'Sample Collected'),
+        ('PROCESSING', 'Processing'),
+        ('COMPLETED', 'Completed'),
+        ('REVIEWED', 'Reviewed'),
+    )
+    
+    COLLECTION_TYPE = (
+        ('IN_CLINIC', 'In Clinic'),
+        ('HOME', 'Home Collection'),
+    )
+
+    patient = models.ForeignKey('Patient', on_delete=models.CASCADE)
+    doctor = models.ForeignKey('Doctor', on_delete=models.CASCADE)
+    lab = models.ForeignKey('Lab', on_delete=models.CASCADE, null=True, blank=True)
+    technician = models.ForeignKey('LabTechnician', on_delete=models.SET_NULL, null=True)
+    test_name = models.CharField(max_length=200)
+    description = models.TextField()
+    status = models.CharField(max_length=20, choices=TEST_STATUS, default='REQUESTED')
+    collection_type = models.CharField(max_length=20, choices=COLLECTION_TYPE, default='IN_CLINIC')
+    collection_date = models.DateTimeField(null=True, blank=True)
+    result_file = models.FileField(upload_to='lab_results/', null=True, blank=True)
+    doctor_notes = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+class LabTechnician(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    clinic = models.ForeignKey('Clinic', on_delete=models.CASCADE)
+    specialization = models.CharField(max_length=100)
+    is_available = models.BooleanField(default=True)
+
+class Lab(models.Model):
+    name = models.CharField(max_length=200)
+    clinic = models.ForeignKey(Clinic, on_delete=models.CASCADE)
+    registration_number = models.CharField(max_length=50, unique=True)
+    address = models.TextField()
+    phone_number = models.CharField(max_length=15)
+    email = models.EmailField()
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} - {self.clinic.name}"
+
+class LabStaff(models.Model):
+    ROLES = (
+        ('TECHNICIAN', 'Lab Technician'),
+        ('MANAGER', 'Lab Manager'),
+        ('ASSISTANT', 'Lab Assistant'),
+    )
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
+    role = models.CharField(max_length=20, choices=ROLES)
+    specialization = models.CharField(max_length=100, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.role}"
+
+class PatientDoctor(models.Model):
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='doctors')
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='patients')
+    is_primary = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('patient', 'doctor')
+        ordering = ['-is_primary', '-created_at']
+
+    def __str__(self):
+        return f"{self.patient.get_full_name()} - {self.doctor.name}"
+
+class ClinicHoliday(models.Model):
+    clinic = models.ForeignKey(Clinic, on_delete=models.CASCADE)
+    date = models.DateField()
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+
+class Notification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    title = models.CharField(max_length=100)
+    message = models.TextField()
+    notification_type = models.CharField(max_length=50)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)

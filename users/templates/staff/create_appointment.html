@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Schedule Appointment{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h2 class="text-2xl font-bold mb-6">Schedule New Appointment</h2>
+    
+    <form method="POST" class="max-w-lg">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        
+        <!-- Patient Selection -->
+        <div class="mb-4">
+            <label for="patient" class="block text-gray-700 text-sm font-bold mb-2">
+                Patient
+            </label>
+            <select id="patient" name="patient" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                <option value="">Select Patient</option>
+                {% for patient in patients %}
+                <option value="{{ patient.id }}">{{ patient.user.get_full_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <!-- Doctor Selection -->
+        <div class="mb-4">
+            <label for="doctor" class="block text-gray-700 text-sm font-bold mb-2">
+                Doctor
+            </label>
+            <select id="doctor" name="doctor" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                <option value="">Select Doctor</option>
+                {% for doctor in doctors %}
+                <option value="{{ doctor.id }}">{{ doctor.user.get_full_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <!-- Date Selection -->
+        <div class="mb-4">
+            <label for="appointment_date" class="block text-gray-700 text-sm font-bold mb-2">
+                Date
+            </label>
+            <input type="date" id="appointment_date" name="appointment_date" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+        </div>
+        
+        <!-- Time Slots -->
+        <div class="mb-4">
+            <label class="block text-gray-700 text-sm font-bold mb-2">
+                Available Time Slots
+            </label>
+            <div id="time-slots" class="grid grid-cols-4 gap-2">
+                <!-- Slots will be populated here -->
+            </div>
+            <input type="hidden" id="appointment_time" name="appointment_time" required>
+        </div>
+
+        <!-- Reason for Visit -->
+        <div class="mb-6">
+            <label for="reason" class="block text-gray-700 text-sm font-bold mb-2">
+                Reason for Visit
+            </label>
+            <textarea id="reason" 
+                      name="reason" 
+                      class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                      rows="3" required></textarea>
+        </div>
+        
+        <!-- Additional Notes -->
+        <div class="mb-6">
+            <label for="notes" class="block text-gray-700 text-sm font-bold mb-2">
+                Additional Notes
+            </label>
+            <textarea id="notes" 
+                      name="notes" 
+                      class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                      rows="3"></textarea>
+        </div>
+        
+        <!-- Submit Button -->
+        <div class="flex items-center justify-end">
+            <button type="submit" 
+                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                Schedule Appointment
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const doctorSelect = document.getElementById('doctor');
+    const dateInput = document.getElementById('appointment_date');
+    const timeInput = document.getElementById('appointment_time');
+    
+    function fetchAvailableSlots() {
+        const doctorId = doctorSelect.value;
+        const date = dateInput.value;
+        
+        if (!doctorId || !date) return;
+        
+        const slotsContainer = document.getElementById('time-slots');
+        slotsContainer.innerHTML = '<p>Loading available slots...</p>';
+        
+        fetch(`/api/available-slots/patient/${doctorId}/${date}/`)
+            .then(response => response.json())
+            .then(data => {
+                slotsContainer.innerHTML = '';
+                
+                if (!data.slots || data.slots.length === 0) {
+                    slotsContainer.innerHTML = '<p class="text-red-500">No slots available for this date</p>';
+                    return;
+                }
+                
+                data.slots.forEach(slot => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'slot-button w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded m-1 transition-colors duration-200';
+                    button.textContent = slot.time;
+                    button.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        selectTimeSlot(slot.time, button);
+                    });
+                    slotsContainer.appendChild(button);
+                });
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                slotsContainer.innerHTML = '<p class="text-red-500">Error loading slots</p>';
+            });
+    }
+    
+    function selectTimeSlot(time, selectedButton) {
+        document.getElementById('appointment_time').value = time;
+        
+        // Reset all buttons to default state
+        document.querySelectorAll('.slot-button').forEach(btn => {
+            btn.classList.remove('bg-green-500', 'hover:bg-green-600');
+            btn.classList.add('bg-blue-500', 'hover:bg-blue-600');
+        });
+        
+        // Highlight selected button
+        selectedButton.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+        selectedButton.classList.add('bg-green-500', 'hover:bg-green-600');
+    }
+    
+    doctorSelect.addEventListener('change', fetchAvailableSlots);
+    dateInput.addEventListener('change', fetchAvailableSlots);
+    
+    if (doctorSelect.value && dateInput.value) {
+        fetchAvailableSlots();
+    }
+});
+</script>
+{% endblock %} 
