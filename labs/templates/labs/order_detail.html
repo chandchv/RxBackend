@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+
+{% block title %}Order Details - #{{ order.id }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">Order Details #{{ order.id }}</h2>
+        <div class="flex space-x-4">
+            <a href="{% url 'labs:orders_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded">
+                Back to Orders
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <!-- Order Information -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-semibold mb-4">Order Information</h3>
+            <div class="space-y-4">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Status:</span>
+                    <span class="px-2 py-1 text-xs rounded-full
+                        {% if order.status == 'PENDING' %}bg-yellow-100 text-yellow-800
+                        {% elif order.status == 'COMPLETED' %}bg-green-100 text-green-800
+                        {% else %}bg-red-100 text-red-800{% endif %}">
+                        {{ order.status }}
+                    </span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Order Date:</span>
+                    <span>{{ order.created_at|date:"M d, Y" }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Total Amount:</span>
+                    <span class="font-semibold">₹{{ order.total_price }}</span>
+                </div>
+                {% if order.completed_at %}
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Completed On:</span>
+                    <span>{{ order.completed_at|date:"M d, Y" }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Patient Information -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-semibold mb-4">Patient Information</h3>
+            <div class="space-y-4">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Name:</span>
+                    <span>{{ order.patient.get_full_name }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Age:</span>
+                    <span>{{ order.patient.age }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Gender:</span>
+                    <span>{{ order.patient.gender }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Phone:</span>
+                    <span>{{ order.patient.phone_number }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Details -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h3 class="text-lg font-semibold mb-4">Test Details</h3>
+        <div class="space-y-4">
+            <div class="flex justify-between">
+                <span class="text-gray-600">Test Name:</span>
+                <span>{{ order.test.name }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-600">Test Price:</span>
+                <span>₹{{ order.test.price }}</span>
+            </div>
+            {% if order.test.description %}
+            <div>
+                <span class="text-gray-600">Description:</span>
+                <p class="mt-2 text-gray-800">{{ order.test.description }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h3 class="text-lg font-semibold mb-4">Actions</h3>
+        <div class="flex space-x-4">
+            {% if order.status == 'PENDING' %}
+            <a href="{% url 'labs:confirm_payment' order.id %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">
+                Confirm Payment
+            </a>
+            <a href="{% url 'labs:update_sample_status' order.id %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
+                Update Sample Status
+            </a>
+            {% elif order.status == 'IN_PROGRESS' %}
+            <a href="{% url 'labs:upload_result' order.id %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
+                Upload Result
+            </a>
+            {% endif %}
+            {% if order.result %}
+            <a href="{% url 'labs:download_result' order.result.id %}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded">
+                Download Result
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -2,7 +2,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from ..models import Prescription, Doctor, Patient, PrescriptionItem, PatientVitals, Lab, LabTest
+from ..models import Prescription, Doctor, Patient, PrescriptionItem, PatientVitals, Lab, LabTest, LabTestPrescription
+from labs.models import LabProfile, ExternalLabTestOffering
 from ..serializers import PrescriptionSerializer
 from django.shortcuts import get_object_or_404, render
 from django.contrib.auth.decorators import login_required
@@ -19,7 +20,11 @@ import json
 from rest_framework.views import APIView
 from django.views import View
 from datetime import date
+from notifications.utils import create_notification
+from django.contrib.auth.models import User
+import logging
 
+logger = logging.getLogger(__name__)
 
 @login_required
 def create_prescription(request, patient_id):
@@ -28,44 +33,18 @@ def create_prescription(request, patient_id):
     
     if request.method == 'POST':
         try:
-            # Debug print statements
-            print("POST data:", request.POST)
-            
-            # Convert empty strings to None for decimal fields
-            weight = request.POST.get('weight', '')
-            print(f"Raw weight: {weight}")
-            weight = float(weight) if weight.strip() else None
-            
-            height = request.POST.get('height', '')
-            print(f"Raw height: {height}")
-            height = float(height) if height.strip() else None
-            
-            blood_pressure = request.POST.get('blood_pressure', '').strip()
-            print(f"Raw BP: {blood_pressure}")
-            blood_pressure = blood_pressure if blood_pressure else None
-
-            temperature = request.POST.get('temperature', '')
-            temperature = float(temperature) if temperature.strip() else None
-
-            heart_rate = request.POST.get('heart_rate', '')
-            heart_rate = float(heart_rate) if heart_rate.strip() else None
-
-            oxygen_saturation = request.POST.get('oxygen_saturation', '')
-            oxygen_saturation = float(oxygen_saturation) if oxygen_saturation.strip() else None
-
-            print(f"Processed values - Weight: {weight}, Height: {height}, BP: {blood_pressure}, Temperature: {temperature}, Heart Rate: {heart_rate}, Oxygen Saturation: {oxygen_saturation}")
-
-            # Save vitals first
+            # Create patient vitals
             vitals = PatientVitals.objects.create(
                 patient=patient,
-                weight=weight,
-                height=height,
-                blood_pressure=blood_pressure,
-                temperature=temperature,
-                heart_rate=heart_rate,
-                oxygen_saturation=oxygen_saturation,
+                weight=float(request.POST.get('weight', 0)),
+                height=float(request.POST.get('height', 0)),
+                blood_pressure=request.POST.get('blood_pressure'),
+                temperature=float(request.POST.get('temperature', 0)),
+                heart_rate=float(request.POST.get('heart_rate', 0)),
+                oxygen_saturation=float(request.POST.get('oxygen_saturation', 0)),
                 recorded_by=request.user
             )
+
             print(f"Created vitals: {vitals.id}")
 
             # Create prescription
@@ -94,19 +73,149 @@ def create_prescription(request, patient_id):
 
             # Handle lab tests
             lab_tests_data = json.loads(request.POST.get('lab_tests', '[]'))
-            clinic_lab = Lab.objects.filter(clinic=doctor.clinic).first()
+            lab_prescription = None # Initialize
             
-            for test_data in lab_tests_data:
-                LabTest.objects.create(
+            if lab_tests_data:
+                # Create a lab test prescription
+                lab_prescription = LabTestPrescription.objects.create(
+                    doctor=request.user, # Use the actual user object
                     patient=patient,
-                    doctor=doctor,
-                    lab=clinic_lab,
-                    test_name=test_data['test_name'],
-                    description=test_data['description'],
-                    collection_type=test_data['collection_type'],
-                    status='REQUESTED'
+                    notes=request.POST.get('lab_notes', ''),
+                    preferred_lab_type='PATIENT_CHOICE' # Example, adjust if needed
                 )
+                
+                for test_data in lab_tests_data:
+                    lab_id = test_data.get('lab_id')
+                    lab_type = test_data.get('lab_type')
+                    test_name = test_data.get('test_name', 'Unknown Test')
+                    
+                    if not lab_id or not lab_type:
+                        messages.error(request, 'Missing lab ID or type for a test.')
+                        # Consider rolling back or handling differently
+                        return redirect('users:create_prescription', patient_id=patient_id) 
+                    
+                    try:
+                        if lab_type == 'internal':
+                            lab = get_object_or_404(Lab, id=lab_id)
+                            test_definition = lab.test_definitions.filter(name=test_name).first()
+                            if not test_definition:
+                                messages.error(request, f"Internal Lab {lab.name} does not offer: {test_name}")
+                                return redirect('users:create_prescription', patient_id=patient_id)
+                            
+                            LabTest.objects.create(
+                                prescription=lab_prescription,
+                                test_definition=test_definition,
+                                status='REQUESTED',
+                                collection_type=test_data.get('collection_type', 'CLINIC'),
+                                doctor_notes=test_data.get('description', '')
+                            )
+                        elif lab_type == 'external':
+                            lab_profile = get_object_or_404(LabProfile, id=lab_id, is_approved=True)
+                            test_offering = ExternalLabTestOffering.objects.filter(
+                                lab_profile=lab_profile,
+                                test__name=test_name,
+                                is_active=True
+                            ).select_related('test').first()
+                            
+                            if not test_offering:
+                                messages.error(request, f"External Lab {lab_profile.name} does not offer: {test_name}")
+                                return redirect('users:create_prescription', patient_id=patient_id)
+                            
+                            LabTest.objects.create(
+                                prescription=lab_prescription,
+                                test_definition=test_offering.test,
+                                status='REQUESTED',
+                                collection_type=test_data.get('collection_type', 'LAB'),
+                                doctor_notes=test_data.get('description', '')
+                            )
+                        else:
+                             messages.error(request, f"Invalid lab type specified: {lab_type}")
+                             return redirect('users:create_prescription', patient_id=patient_id)
+                             
+                    except (Lab.DoesNotExist, LabProfile.DoesNotExist):
+                        messages.error(request, f"Selected lab (Type: {lab_type}, ID: {lab_id}) not found or not approved.")
+                        return redirect('users:create_prescription', patient_id=patient_id)
+                    except Exception as e:
+                        logger.error(f"Error creating LabTest for {test_name}: {e}")
+                        messages.error(request, f"An error occurred while adding lab test {test_name}.")
+                        return redirect('users:create_prescription', patient_id=patient_id)
 
+            # --- Notifications --- 
+            # Notify Patient about the Prescription
+            try:
+                create_notification(
+                    recipient=prescription.patient.user,
+                    message=f"Dr. {prescription.doctor.name} has created a new prescription for you. You can view it in your portal.",
+                    sender=request.user, 
+                    notification_type='prescription_new',
+                    related_object=prescription
+                )
+            except Exception as e:
+                logger.error(f"Error creating patient prescription notification: {e}")
+                messages.warning(request, "Prescription created, but failed to send patient notification.")
+
+            # Notify Labs if tests were prescribed
+            if lab_prescription: 
+                notified_labs = set() # Keep track of notified labs (type, id)
+                try:
+                    for test_data in lab_tests_data: # Re-iterate to easily get lab details for notification
+                        lab_id = test_data.get('lab_id')
+                        lab_type = test_data.get('lab_type')
+                        test_name = test_data.get('test_name', 'Unknown Test')
+                        
+                        if not lab_id or not lab_type: continue
+                        lab_key = (lab_type, lab_id)
+                        if lab_key in notified_labs: continue
+
+                        try:
+                            recipient_user = None
+                            lab_display_name = "Unknown Lab"
+                            message_detail = f"New lab test request from Dr. {doctor.name}. Patient: {patient.get_full_name()}. Test: {test_name}"
+                            
+                            if lab_type == 'internal':
+                                lab = Lab.objects.get(id=lab_id)
+                                lab_display_name = lab.name
+                                # Notify clinic admins/staff associated with the internal lab's clinic
+                                # Assuming Staff model has clinic fk and is_admin/appropriate role field
+                                clinic_recipients = User.objects.filter(staff__clinic=doctor.clinic, staff__is_admin=True) # Adjust query as needed
+                                if not clinic_recipients.exists():
+                                    logger.warning(f"No admin staff found for clinic {doctor.clinic.id} to notify about internal lab test request for lab {lab_display_name} ({lab_id}).")
+                                else:
+                                    for recipient in clinic_recipients:
+                                        create_notification(
+                                            recipient=recipient,
+                                            message=f"{message_detail} for your internal lab {lab_display_name}.",
+                                            sender=request.user,
+                                            notification_type='lab_test_new',
+                                            related_object=lab_prescription
+                                        )
+                                    notified_labs.add(lab_key)
+
+                            elif lab_type == 'external':
+                                lab_profile = LabProfile.objects.select_related('user').get(id=lab_id)
+                                lab_display_name = lab_profile.name
+                                if lab_profile.user:
+                                    create_notification(
+                                        recipient=lab_profile.user,
+                                        message=f"{message_detail} for your lab {lab_display_name} (from Clinic: {doctor.clinic.name}).",
+                                        sender=request.user,
+                                        notification_type='lab_test_new',
+                                        related_object=lab_prescription
+                                    )
+                                    notified_labs.add(lab_key)
+                                else:
+                                    logger.warning(f"External LabProfile {lab_profile.id} ({lab_display_name}) has no associated user to notify.")
+
+                        except (Lab.DoesNotExist, LabProfile.DoesNotExist):
+                            logger.error(f"Notification Error: Could not find lab - Type={lab_type}, ID={lab_id}")
+                        except Exception as e:
+                            logger.error(f"Notification Error: Error processing lab {lab_key}: {e}")
+                            
+                except Exception as e:
+                    logger.error(f"General error during lab notification processing: {e}")
+                    messages.warning(request, "Prescription created, but failed to send some lab notifications.")
+            # --- End Notifications ---
+            
             messages.success(request, 'Prescription created successfully')
             return redirect('users:prescription_detail', pk=prescription.id)
 
@@ -122,11 +231,17 @@ def create_prescription(request, patient_id):
     # Get latest vitals for pre-filling the form
     latest_vitals = PatientVitals.objects.filter(patient=patient).order_by('-created_at').first()
 
+    # Get available labs
+    internal_labs = Lab.objects.filter(clinic=doctor.clinic)
+    external_labs = LabProfile.objects.filter(is_approved=True)
+
     context = {
         'patient': patient,
         'doctor': doctor,
         'vitals': latest_vitals,
-        'has_lab': Lab.objects.filter(clinic=doctor.clinic).exists()
+        'has_lab': internal_labs.exists() or external_labs.exists(),
+        'internal_labs': internal_labs,
+        'external_labs': external_labs
     }
     return render(request, 'doctor/create_prescription.html', context)
 
@@ -156,7 +271,6 @@ def prescription_detail(request, pk):
             if prescription.patient != request.user.patient:
                 messages.error(request, 'You are not authorized to view this prescription.')
                 return redirect('users:patient_dashboard')
-            template = 'patient/prescription_detail.html'
         
         else:
             messages.error(request, 'Access denied.')
@@ -168,11 +282,15 @@ def prescription_detail(request, pk):
         ).order_by('-created_at').first()
 
         # Get lab tests created with this prescription
-        lab_tests = LabTest.objects.filter(
+        lab_prescriptions = LabTestPrescription.objects.filter(
             patient=prescription.patient,
-            doctor=prescription.doctor,
-            created_at__date=prescription.created_at.date()
-        ).order_by('created_at')
+            doctor=prescription.doctor.user,
+            prescription_date__date=prescription.created_at.date()
+        )
+        
+        lab_tests = []
+        for lab_prescription in lab_prescriptions:
+            lab_tests.extend(LabTest.objects.filter(prescription=lab_prescription))
         
         context = {
             'prescription': prescription,
@@ -402,3 +520,4 @@ def prescription_detail_api(request, pk):
     except Exception as e:
         print(f"Error in prescription_detail_api: {str(e)}")
         return Response({'error': str(e)}, status=500)
+

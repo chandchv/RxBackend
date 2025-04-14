@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block title %}Commission Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-6xl mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold">Commission Dashboard</h1>
+            <a href="{% url 'users:doctor_dashboard' %}" 
+               class="text-blue-500 hover:text-blue-700">
+                Back to Dashboard
+            </a>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- Total Earned -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-600 mb-2">Total Earned</h3>
+                <p class="text-3xl font-bold text-green-600">₹{{ totals.total_earned|floatformat:2 }}</p>
+                <p class="text-sm text-gray-500 mt-2">Commissions ready for payout</p>
+            </div>
+            
+            <!-- Pending Payout -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-600 mb-2">Pending Payout</h3>
+                <p class="text-3xl font-bold text-yellow-600">₹{{ totals.total_pending|floatformat:2 }}</p>
+                <p class="text-sm text-gray-500 mt-2">Awaiting processing</p>
+            </div>
+            
+            <!-- Total Paid -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-600 mb-2">Total Paid</h3>
+                <p class="text-3xl font-bold text-blue-600">₹{{ totals.total_paid|floatformat:2 }}</p>
+                <p class="text-sm text-gray-500 mt-2">Successfully paid out</p>
+            </div>
+        </div>
+
+        <!-- Commission History -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold mb-4">Commission History</h2>
+            
+            {% if commissions %}
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Earned</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rule Used</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for commission in commissions %}
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        #{{ commission.order.id }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {{ commission.created_at|date:"F j, Y" }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        ₹{{ commission.amount|floatformat:2 }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                            {% if commission.status == 'EARNED' %}bg-green-100 text-green-800
+                                            {% elif commission.status == 'PENDING_PAYOUT' %}bg-yellow-100 text-yellow-800
+                                            {% else %}bg-blue-100 text-blue-800{% endif %}">
+                                            {{ commission.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {{ commission.rule_used.doctor_percentage }}%
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-8 text-gray-500">
+                    No commission records found.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

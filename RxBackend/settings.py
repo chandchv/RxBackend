@@ -49,6 +49,10 @@ INSTALLED_APPS = [
     'corsheaders',
     'users',
     'social_django',
+    'labs',
+    'HealthRecords',
+    'widget_tweaks',
+    'notifications',
 ]
 
 MIDDLEWARE = [
@@ -143,6 +147,7 @@ STATICFILES_DIRS = [
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -247,3 +252,13 @@ SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = 'your-google-oauth2-secret'
 
 # Add your domain to allowed hosts
 ALLOWED_HOSTS = ['*', 'localhost', '127.0.0.1', '192.168.29.57']
+
+# Login URL configuration
+LOGIN_URL = 'users:login'  # This matches your login URL pattern
+LOGIN_REDIRECT_URL = 'users:dashboard'  # Where to redirect after successful login
+LOGOUT_REDIRECT_URL = 'users:login'  # Where to redirect after logout
+
+# Email settings
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # For development
+DEFAULT_FROM_EMAIL = 'noreply@rxdoctor.com'
+ADMIN_EMAIL = 'admin@rxdoctor.com'  # Add this line for lab registration notifications

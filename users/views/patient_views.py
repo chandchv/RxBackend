@@ -14,6 +14,8 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from datetime import timedelta
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+from notifications.utils import create_notification
+
 @login_required
 def create_patient(request):
     try:
@@ -194,6 +196,19 @@ def patient_create_appointment(request):
                     messages.error(request, 'This time slot is already booked. Please select another time.')
                 else:
                     appointment.save()
+                    # --- Add Notification --- 
+                    try:
+                        create_notification(
+                            recipient=appointment.doctor.user,
+                            message=f"New appointment booked by {appointment.patient.get_full_name()} for {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')}. Reason: {appointment.reason}",
+                            sender=request.user, # Patient creating appointment
+                            notification_type='appointment_new',
+                            related_object=appointment
+                        )
+                    except Exception as e:
+                        print(f"Error creating notification in patient_create_appointment: {e}")
+                        messages.warning(request, "Appointment scheduled, but failed to send notification to doctor.")
+                    # --- End Notification ---
                     messages.success(request, 'Appointment scheduled successfully!')
                     return redirect('users:patient_dashboard')
             else:

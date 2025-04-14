@@ -5,7 +5,10 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from ..models import LabTest, LabTechnician, Lab
+from labs.models import TestDefinition
 from ..serializers import LabTestSerializer, LabTechnicianSerializer
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
 
 @login_required
 def lab_dashboard(request):
@@ -150,4 +153,34 @@ class LabTestViewSet(viewsets.ModelViewSet):
             test.status = 'COMPLETED'
             test.save()
             return Response({'status': 'Result uploaded'})
-        return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST) 
+        return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+@login_required
+@require_GET
+def get_available_labs(request):
+    """API endpoint to get available labs with their test offerings"""
+    try:
+        # Get all active labs
+        labs = Lab.objects.filter(is_active=True)
+        
+        # Get all available test definitions
+        test_definitions = TestDefinition.objects.all()
+        
+        # Format the response
+        labs_data = []
+        for lab in labs:
+            lab_data = {
+                'id': lab.id,
+                'name': lab.name,
+                'type': lab.type,
+                'available_tests': list(lab.test_definitions.values_list('name', flat=True))
+            }
+            labs_data.append(lab_data)
+        
+        return JsonResponse({
+            'labs': labs_data,
+            'all_tests': list(test_definitions.values_list('name', flat=True))
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500) 

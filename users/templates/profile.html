@@ -56,12 +56,10 @@
         </div>
 
         <div class="mt-8 flex justify-end">
-            <button class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                    hx-get="{% url 'users:profile_edit' %}"
-                    hx-target="#modal"
-                    hx-trigger="click">
+            <a href="{% url 'users:profile_edit_view' %}" 
+               class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
                 Edit Profile
-            </button>
+            </a>
         </div>
     </div>
 

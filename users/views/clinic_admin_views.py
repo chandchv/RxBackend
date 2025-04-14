@@ -3,9 +3,11 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.db.models import Count
 from django.utils import timezone
+from django.core.exceptions import PermissionDenied
+from ..decorators import user_is_admin
 
 from users.forms import ClinicProfileForm
-from ..models import Clinic, Doctor, Staff, UserProfile, Lab, LabTest, LabStaff
+from ..models import Clinic, Doctor, DoctorLeave, Notification, Staff, StaffLeave, UserProfile, Lab, LabTest, LabStaff
 from datetime import datetime, timedelta
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
@@ -59,15 +61,15 @@ def clinic_admin_dashboard(request):
         # New lab-related context data
         labs_count = Lab.objects.filter(clinic=clinic).count()
         active_tests_count = LabTest.objects.filter(
-            doctor__clinic=clinic,
+            prescription__doctor__doctor__clinic=clinic,
             status__in=['REQUESTED', 'PROCESSING']
         ).count()
         pending_tests_count = LabTest.objects.filter(
-            doctor__clinic=clinic,
+            prescription__doctor__doctor__clinic=clinic,
             status='REQUESTED'
         ).count()
         today_tests_count = LabTest.objects.filter(
-            doctor__clinic=clinic,
+            prescription__doctor__doctor__clinic=clinic,
             created_at__date=today
         ).count()
         active_lab_staff_count = LabStaff.objects.filter(
@@ -75,7 +77,7 @@ def clinic_admin_dashboard(request):
             is_active=True
         ).count()
         recent_lab_tests = LabTest.objects.filter(
-            doctor__clinic=clinic
+            prescription__doctor__doctor__clinic=clinic
         ).order_by('-created_at')[:5]
         
         context = {
@@ -108,10 +110,12 @@ def clinic_admin_dashboard(request):
 @login_required
 def clinic_profile(request):
     """View and update clinic profile"""
-    user_profile = request.user.profile
-    clinic = user_profile.clinic
+    if not hasattr(request.user, 'clinic_admin'):
+        messages.error(request, "You don't have permission to access this page.")
+        return redirect('users:dashboard')
+        
+    clinic = request.user.clinic_admin.clinic
     
-
     if request.method == 'POST':
         if not clinic:
             # Create new clinic
@@ -122,8 +126,8 @@ def clinic_profile(request):
                 email=request.POST.get('email'),
                 registration_number=request.POST.get('registration_number')
             )
-            user_profile.clinic = clinic
-            user_profile.save()
+            request.user.clinic_admin.clinic = clinic
+            request.user.clinic_admin.save()
         else:
             # Update existing clinic
             clinic.name = request.POST.get('name')
@@ -292,12 +296,14 @@ def add_staff(request):
                     current_clinic_id = first_clinic.id
                     request.session['current_clinic_id'] = current_clinic_id
             clinic = get_object_or_404(Clinic, id=current_clinic_id)
+            clinic_list = Clinic.objects.all()
         else:
             # For regular admins, get their assigned clinic
-            if not hasattr(request.user, 'profile') or not request.user.profile.clinic:
+            if not hasattr(request.user, 'clinic_admin') or not request.user.clinic_admin.clinic:
                 messages.error(request, "No clinic assigned to your account")
                 return redirect('users:clinic_admin_dashboard')
-            clinic = request.user.profile.clinic
+            clinic = request.user.clinic_admin.clinic
+            clinic_list = None
         
         if request.method == 'POST':
             try:
@@ -306,11 +312,28 @@ def add_staff(request):
                 last_name = request.POST.get('last_name')
                 role = request.POST.get('role')
                 joining_date = request.POST.get('joining_date')
+                clinic_id = request.POST.get('clinic_id')
+                is_clinic_admin = request.POST.get('is_clinic_admin') == 'on'
+                is_lab_admin = request.POST.get('is_lab_admin') == 'on'
+                staff_id = request.POST.get('staff_id')
 
                 # Check if user with this email already exists
                 if User.objects.filter(email=email).exists():
                     messages.error(request, "A user with this email already exists")
-                    return render(request, 'clinic_admin/add_staff.html', {'clinic': clinic})
+                    return render(request, 'clinic_admin/add_staff.html', {
+                        'clinic': clinic,
+                        'clinic_list': clinic_list,
+                        'current_clinic': clinic
+                    })
+
+                # Check if staff_id already exists
+                if Staff.objects.filter(staff_id=staff_id).exists():
+                    messages.error(request, "A staff member with this ID already exists")
+                    return render(request, 'clinic_admin/add_staff.html', {
+                        'clinic': clinic,
+                        'clinic_list': clinic_list,
+                        'current_clinic': clinic
+                    })
 
                 # Create user for staff member with unique username
                 username = email  # Use email as username
@@ -333,12 +356,21 @@ def add_staff(request):
                     is_active=True
                 )
                 
+                # Get the selected clinic for superusers
+                if request.user.is_superuser and clinic_id:
+                    selected_clinic = get_object_or_404(Clinic, id=clinic_id)
+                else:
+                    selected_clinic = clinic
+                
                 # Create staff profile
                 staff = Staff.objects.create(
                     user=user,
-                    clinic=clinic,
+                    clinic=selected_clinic,
                     role=role,
-                    joining_date=joining_date
+                    joining_date=joining_date,
+                    is_clinic_admin=is_clinic_admin,
+                    is_lab_admin=is_lab_admin,
+                    staff_id=staff_id
                 )
                 
                 # Store credentials in session to display
@@ -352,9 +384,17 @@ def add_staff(request):
                 
             except Exception as e:
                 messages.error(request, f'Error adding staff member: {str(e)}')
-                return render(request, 'clinic_admin/add_staff.html', {'clinic': clinic})
+                return render(request, 'clinic_admin/add_staff.html', {
+                    'clinic': clinic,
+                    'clinic_list': clinic_list,
+                    'current_clinic': clinic
+                })
         
-        return render(request, 'clinic_admin/add_staff.html', {'clinic': clinic})
+        return render(request, 'clinic_admin/add_staff.html', {
+            'clinic': clinic,
+            'clinic_list': clinic_list,
+            'current_clinic': clinic
+        })
         
     except Exception as e:
         messages.error(request, f'Error: {str(e)}')
@@ -376,8 +416,62 @@ def staff_credentials(request):
 @login_required
 def staff_list(request):
     """View and manage staff members"""
-    staff = Staff.objects.all().order_by('role')
-    return render(request, 'clinic_admin/staff_list.html', {'staff': staff})
+    try:
+        if request.user.is_superuser:
+            # Get current clinic from session or default to first clinic
+            current_clinic_id = request.session.get('current_clinic_id')
+            if not current_clinic_id:
+                first_clinic = Clinic.objects.first()
+                if first_clinic:
+                    current_clinic_id = first_clinic.id
+                    request.session['current_clinic_id'] = current_clinic_id
+            
+            if current_clinic_id:
+                current_clinic = Clinic.objects.get(id=current_clinic_id)
+                staff = Staff.objects.filter(clinic=current_clinic).order_by('role')
+                
+                # Get all clinics for superuser
+                clinic_list = Clinic.objects.all()
+                
+                # Handle clinic change
+                if request.method == 'POST' and 'clinic_id' in request.POST:
+                    new_clinic_id = request.POST.get('clinic_id')
+                    if new_clinic_id:
+                        request.session['current_clinic_id'] = new_clinic_id
+                        return redirect('users:staff_list')
+                    
+                # Handle clinic assignment
+                if request.method == 'POST' and 'assign_clinic' in request.POST:
+                    staff_id = request.POST.get('staff_id')
+                    new_clinic_id = request.POST.get('assign_clinic')
+                    if staff_id and new_clinic_id:
+                        staff_member = Staff.objects.get(id=staff_id)
+                        new_clinic = Clinic.objects.get(id=new_clinic_id)
+                        staff_member.clinic = new_clinic
+                        staff_member.save()
+                        messages.success(request, f'Staff member assigned to {new_clinic.name} successfully')
+                        return redirect('users:staff_list')
+            else:
+                staff = Staff.objects.none()
+                clinic_list = None
+        else:
+            # Non-superuser sees their assigned clinic
+            current_clinic = request.user.clinic_admin.clinic
+            staff = Staff.objects.filter(clinic=current_clinic).order_by('role')
+            clinic_list = None
+        
+        context = {
+            'staff': staff,
+            'current_clinic': current_clinic if 'current_clinic' in locals() else None,
+            'clinic_list': clinic_list,
+            'all_clinics': Clinic.objects.all() if request.user.is_superuser else None
+        }
+        
+        return render(request, 'clinic_admin/staff_list.html', context)
+        
+    except Exception as e:
+        messages.error(request, f'Error accessing staff list: {str(e)}')
+        return redirect('users:clinic_admin_dashboard')
 
 def get_recent_activities():
     """Helper function to get recent activities"""
@@ -1043,7 +1137,7 @@ def lab_tests(request):
         else:
             clinic = request.user.profile.clinic
             
-        tests = LabTest.objects.filter(doctor__clinic=clinic).order_by('-created_at')
+        tests = LabTest.objects.filter(prescription__doctor__clinic=clinic).order_by('-created_at')
         return render(request, 'clinic_admin/lab_tests.html', {
             'tests': tests,
             'title': 'Lab Tests',
@@ -1114,3 +1208,318 @@ def available_doctors(request):
         
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
+@login_required
+@user_is_admin
+def staff_leaves(request):
+    """View for managing staff leave requests"""
+    try:
+        clinic = request.user.clinic_admin.clinic
+        leave_requests = StaffLeave.objects.filter(
+            staff__clinic=clinic
+        ).order_by('-created_at')
+        
+        total_requests = leave_requests.count()
+        pending_requests = leave_requests.filter(status='pending').count()
+        approved_requests = leave_requests.filter(status='approved').count()
+        
+        context = {
+            'leave_requests': leave_requests,
+            'total_requests': total_requests,
+            'pending_requests': pending_requests,
+            'approved_requests': approved_requests,
+        }
+        
+        return render(request, 'clinic_admin/staff_leaves.html', context)
+        
+    except Exception as e:
+        messages.error(request, f'Error accessing staff leaves: {str(e)}')
+        return redirect('users:clinic_admin_dashboard')
+
+@login_required
+@user_is_admin
+def approve_staff_leave(request, leave_id):
+    """Approve a staff leave request"""
+    try:
+        leave = StaffLeave.objects.get(id=leave_id)
+        if leave.staff.clinic != request.user.clinic_admin.clinic:
+            raise PermissionDenied("You don't have permission to approve this leave request")
+            
+        leave.status = 'approved'
+        leave.save()
+        
+        # Notify staff member
+        Notification.objects.create(
+            user=leave.staff.user,
+            title='Leave Request Approved',
+            message=f'Your leave request from {leave.start_date} to {leave.end_date} has been approved',
+            notification_type='leave_approval'
+        )
+        
+        messages.success(request, 'Leave request approved successfully')
+        
+    except Exception as e:
+        messages.error(request, f'Error approving leave request: {str(e)}')
+        
+    return redirect('users:staff_leaves')
+
+@login_required
+@user_is_admin
+def reject_staff_leave(request, leave_id):
+    """Reject a staff leave request"""
+    try:
+        leave = StaffLeave.objects.get(id=leave_id)
+        if leave.staff.clinic != request.user.clinic_admin.clinic:
+            raise PermissionDenied("You don't have permission to reject this leave request")
+            
+        leave.status = 'rejected'
+        leave.save()
+        
+        # Notify staff member
+        Notification.objects.create(
+            user=leave.staff.user,
+            title='Leave Request Rejected',
+            message=f'Your leave request from {leave.start_date} to {leave.end_date} has been rejected',
+            notification_type='leave_rejection'
+        )
+        
+        messages.success(request, 'Leave request rejected successfully')
+        
+    except Exception as e:
+        messages.error(request, f'Error rejecting leave request: {str(e)}')
+        
+    return redirect('users:staff_leaves')
+
+@login_required
+@user_is_admin
+def doctor_leaves(request):
+    """View for managing doctor leave requests"""
+    try:
+        if request.user.is_superuser:
+            # Get current clinic from session or default to first clinic
+            current_clinic_id = request.session.get('current_clinic_id')
+            if not current_clinic_id:
+                first_clinic = Clinic.objects.first()
+                if first_clinic:
+                    current_clinic_id = first_clinic.id
+                    request.session['current_clinic_id'] = current_clinic_id
+            
+            if current_clinic_id:
+                current_clinic = Clinic.objects.get(id=current_clinic_id)
+                leave_requests = DoctorLeave.objects.filter(
+                    doctor__clinic=current_clinic
+                ).order_by('-created_at')
+                
+                # Get all clinics for superuser
+                clinic_list = Clinic.objects.all()
+                
+                # Handle clinic change
+                if request.method == 'POST' and 'clinic_id' in request.POST:
+                    new_clinic_id = request.POST.get('clinic_id')
+                    if new_clinic_id:
+                        request.session['current_clinic_id'] = new_clinic_id
+                        return redirect('users:doctor_leaves')
+                    
+                # Handle clinic assignment
+                if request.method == 'POST' and 'assign_clinic' in request.POST:
+                    doctor_id = request.POST.get('doctor_id')
+                    new_clinic_id = request.POST.get('assign_clinic')
+                    if doctor_id and new_clinic_id:
+                        doctor = Doctor.objects.get(id=doctor_id)
+                        new_clinic = Clinic.objects.get(id=new_clinic_id)
+                        doctor.clinic = new_clinic
+                        doctor.save()
+                        messages.success(request, f'Doctor assigned to {new_clinic.name} successfully')
+                        return redirect('users:doctor_leaves')
+            else:
+                leave_requests = DoctorLeave.objects.none()
+                
+            # Get all clinics for superuser
+            clinic_list = Clinic.objects.all()
+            
+            # Handle clinic change
+            if request.method == 'POST' and 'clinic_id' in request.POST:
+                new_clinic_id = request.POST.get('clinic_id')
+                if new_clinic_id:
+                    request.session['current_clinic_id'] = new_clinic_id
+                    return redirect('users:doctor_leaves')
+                    
+            # Handle clinic assignment
+            if request.method == 'POST' and 'assign_clinic' in request.POST:
+                doctor_id = request.POST.get('doctor_id')
+                new_clinic_id = request.POST.get('assign_clinic')
+                if doctor_id and new_clinic_id:
+                    doctor = Doctor.objects.get(id=doctor_id)
+                    new_clinic = Clinic.objects.get(id=new_clinic_id)
+                    doctor.clinic = new_clinic
+                    doctor.save()
+                    messages.success(request, f'Doctor assigned to {new_clinic.name} successfully')
+                    return redirect('users:doctor_leaves')
+        else:
+            # Non-superuser sees their assigned clinic
+            current_clinic = request.user.clinic_admin.clinic
+            leave_requests = DoctorLeave.objects.filter(
+                doctor__clinic=current_clinic
+            ).order_by('-created_at')
+            clinic_list = None
+        
+        total_requests = leave_requests.count()
+        pending_requests = leave_requests.filter(status='pending').count()
+        approved_requests = leave_requests.filter(status='approved').count()
+        
+        context = {
+            'leave_requests': leave_requests,
+            'total_requests': total_requests,
+            'pending_requests': pending_requests,
+            'approved_requests': approved_requests,
+            'current_clinic': current_clinic if 'current_clinic' in locals() else None,
+            'clinic_list': clinic_list,
+            'all_clinics': Clinic.objects.all() if request.user.is_superuser else None
+        }
+        
+        return render(request, 'clinic_admin/doctor_leaves.html', context)
+        
+    except Exception as e:
+        messages.error(request, f'Error accessing doctor leaves: {str(e)}')
+        return redirect('users:clinic_admin_dashboard')
+
+@login_required
+@user_is_admin
+def approve_doctor_leave(request, leave_id):
+    """Approve a doctor leave request"""
+    try:
+        leave = DoctorLeave.objects.get(id=leave_id)
+        
+        # Check clinic permission
+        if request.user.is_superuser:
+            current_clinic_id = request.session.get('current_clinic_id')
+            if not current_clinic_id:
+                first_clinic = Clinic.objects.first()
+                if first_clinic:
+                    current_clinic_id = first_clinic.id
+                    request.session['current_clinic_id'] = current_clinic_id
+            if leave.doctor.clinic.id != current_clinic_id:
+                raise PermissionDenied("You don't have permission to approve this leave request")
+        else:
+            if leave.doctor.clinic != request.user.clinic_admin.clinic:
+                raise PermissionDenied("You don't have permission to approve this leave request")
+            
+        # Update status and save
+        leave.status = 'approved'
+        leave.save()
+        
+        # Notify doctor
+        Notification.objects.create(
+            user=leave.doctor.user,
+            title='Leave Request Approved',
+            message=f'Your leave request from {leave.start_date} to {leave.end_date} has been approved',
+            notification_type='leave_approval'
+        )
+        
+        messages.success(request, 'Leave request approved successfully')
+        
+    except Exception as e:
+        messages.error(request, f'Error approving leave request: {str(e)}')
+        
+    return redirect('users:doctor_leaves')
+
+@login_required
+@user_is_admin
+def reject_doctor_leave(request, leave_id):
+    """Reject a doctor leave request"""
+    try:
+        leave = DoctorLeave.objects.get(id=leave_id)
+        
+        # Check clinic permission
+        if request.user.is_superuser:
+            current_clinic_id = request.session.get('current_clinic_id')
+            if not current_clinic_id:
+                first_clinic = Clinic.objects.first()
+                if first_clinic:
+                    current_clinic_id = first_clinic.id
+                    request.session['current_clinic_id'] = current_clinic_id
+            if leave.doctor.clinic.id != current_clinic_id:
+                raise PermissionDenied("You don't have permission to reject this leave request")
+        else:
+            if leave.doctor.clinic != request.user.clinic_admin.clinic:
+                raise PermissionDenied("You don't have permission to reject this leave request")
+            
+        leave.status = 'rejected'
+        leave.save()
+        
+        # Notify doctor
+        Notification.objects.create(
+            user=leave.doctor.user,
+            title='Leave Request Rejected',
+            message=f'Your leave request from {leave.start_date} to {leave.end_date} has been rejected',
+            notification_type='leave_rejection'
+        )
+        
+        messages.success(request, 'Leave request rejected successfully')
+        
+    except Exception as e:
+        messages.error(request, f'Error rejecting leave request: {str(e)}')
+        
+    return redirect('users:doctor_leaves')
+
+@login_required
+@user_is_admin
+def edit_doctor_leave(request, leave_id):
+    """Edit a doctor leave request"""
+    try:
+        leave = DoctorLeave.objects.get(id=leave_id)
+        if leave.doctor.clinic != request.user.clinic_admin.clinic:
+            raise PermissionDenied("You don't have permission to edit this leave request")
+            
+        if request.method == 'POST':
+            # Update leave details
+            leave.start_date = request.POST.get('start_date')
+            leave.end_date = request.POST.get('end_date')
+            leave.leave_type = request.POST.get('leave_type')
+            leave.reason = request.POST.get('reason')
+            leave.save()
+            
+            messages.success(request, 'Leave request updated successfully')
+            return redirect('users:doctor_leaves')
+            
+        context = {
+            'leave': leave,
+            'leave_types': DoctorLeave.LEAVE_TYPE_CHOICES
+        }
+        return render(request, 'clinic_admin/edit_doctor_leave.html', context)
+        
+    except Exception as e:
+        messages.error(request, f'Error editing leave request: {str(e)}')
+        return redirect('users:doctor_leaves')
+
+@login_required
+@user_is_admin
+def cancel_doctor_leave(request, leave_id):
+    """Cancel a doctor leave request"""
+    try:
+        leave = DoctorLeave.objects.get(id=leave_id)
+        if leave.doctor.clinic != request.user.clinic_admin.clinic:
+            raise PermissionDenied("You don't have permission to cancel this leave request")
+            
+        # Only allow canceling pending requests
+        if leave.status != 'pending':
+            messages.error(request, 'Only pending leave requests can be canceled')
+            return redirect('users:doctor_leaves')
+            
+        leave.status = 'cancelled'
+        leave.save(update_fields=['status'])
+        
+        # Notify doctor
+        Notification.objects.create(
+            user=leave.doctor.user,
+            title='Leave Request Cancelled',
+            message=f'Your leave request from {leave.start_date} to {leave.end_date} has been cancelled',
+            notification_type='leave_cancellation'
+        )
+        
+        messages.success(request, 'Leave request cancelled successfully')
+        
+    except Exception as e:
+        messages.error(request, f'Error cancelling leave request: {str(e)}')
+        
+    return redirect('users:doctor_leaves')

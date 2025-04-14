@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}Lab Result - Order #{{ order.id }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold">Lab Result Details</h1>
+            <a href="{% url 'users:patient_detail' order.patient.id %}" 
+               class="text-blue-500 hover:text-blue-700">
+                Back to Patient
+            </a>
+        </div>
+
+        <!-- Order and Patient Info -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4">Order Information</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <p><span class="font-semibold">Order ID:</span> #{{ order.id }}</p>
+                    <p><span class="font-semibold">Patient:</span> {{ order.patient.get_full_name }}</p>
+                    <p><span class="font-semibold">Date Ordered:</span> {{ order.created_at|date:"F j, Y" }}</p>
+                </div>
+                <div>
+                    <p><span class="font-semibold">Lab:</span> {{ lab.name }}</p>
+                    <p><span class="font-semibold">Uploaded At:</span> {{ result.uploaded_at|date:"F j, Y H:i" }}</p>
+                    <p><span class="font-semibold">File Name:</span> {{ file_name }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Details -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4">Result Details</h2>
+            
+            {% if result.lab_metadata %}
+            <div class="mb-4">
+                <h3 class="text-lg font-semibold mb-2">Lab Metadata</h3>
+                <div class="bg-gray-50 p-4 rounded">
+                    <pre class="whitespace-pre-wrap">{{ result.lab_metadata|pprint }}</pre>
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="mb-4">
+                <h3 class="text-lg font-semibold mb-2">File Verification</h3>
+                <p class="text-sm text-gray-600">
+                    SHA-256 Hash: <code class="bg-gray-100 px-2 py-1 rounded">{{ result.file_hash }}</code>
+                </p>
+            </div>
+            
+            <div class="flex justify-end">
+                <a href="{% url 'labs:download_result' result.id %}" 
+                   class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                    Download Result
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Confirm Payment</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5>Order Details</h5>
+                        <p><strong>Order ID:</strong> {{ order.id }}</p>
+                        <p><strong>Test:</strong> {{ order.test.name }}</p>
+                        <p><strong>Patient:</strong> {{ order.patient.get_full_name }}</p>
+                        <p><strong>Amount:</strong> ₹{{ order.amount }}</p>
+                    </div>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label>Payment Method</label>
+                            <select class="form-control" name="payment_method" required>
+                                <option value="CASH">Cash</option>
+                                <option value="ONLINE">Online Payment</option>
+                                <option value="UPI">UPI</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Transaction ID</label>
+                            <input type="text" class="form-control" name="transaction_id" required>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Confirm Payment</button>
+                        <a href="{% url 'labs:dashboard' %}" class="btn btn-secondary">Cancel</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

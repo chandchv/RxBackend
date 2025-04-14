@@ -1,189 +1,223 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <title>Prescription</title>
-    <style>
-        @page {
-            size: A4;
-            margin: 2cm;
-        }
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #333;
-            padding-bottom: 20px;
-        }
-        .clinic-info {
-            display: flex;
-            align-items: left;
-        }
-        .clinic-logo {
-            width: 100px;   
-            height: auto;
-            margin-right: 20px;
-        }
-        .clinic-details h1 {
-            margin: 0;
-            color: #2563eb;
-            font-size: 24px;
-        }
-        .clinic-details p {
-            margin: 5px 0;
-            color: #666;
-        }
-        .prescription-info {
-            text-align: right;
-            font-size: 14px;
-        }
-        .prescription-info p {
-            margin: 0;
-        }
-        .patient-info {
-            margin: 20px 0;
-            padding: 15px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-        }
-        .vitals {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin: 15px 0;
-            padding: 10px;
-            background-color: #f0f9ff;
-            border-radius: 5px;
-        }
-        .section {
-            margin: 20px 0;
-        }
-        .section-title {
-            color: #1e40af;
-            font-size: 16px;
-            margin-bottom: 10px;
-            border-bottom: 1px solid #ccc;
-            padding-bottom: 5px;
-        }
-        .medicine-item, .test-item {
-            padding: 10px;
-            margin: 5px 0;
-            background-color: #fff;
-            border: 1px solid #e5e7eb;
-            border-radius: 5px;
-        }
-        .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #ccc;
-            display: flex;
-            justify-content: space-between;
-        }
-        .doctor-info {
-            text-align: right;
-        }
-    </style>
+  <meta charset="utf-8">
+  <title>Prescription</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 1.2cm;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      color: #000;
+      line-height: 1.4;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 1px solid #000;
+      padding-bottom: 6px;
+      margin-bottom: 6px;
+    }
+
+    .clinic-info {
+      display: flex;
+      gap: 10px;
+    }
+
+    .logo {
+      width: 60px;
+      height: 60px;
+      object-fit: contain;
+    }
+
+    .clinic-text {
+      font-size: 11px;
+    }
+
+    .clinic-text strong {
+      font-size: 13px;
+    }
+
+    .doctor-info {
+      text-align: right;
+      font-size: 11px;
+      font-weight: bold;
+    }
+
+    .info-table, .prescription-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+
+    .info-table td {
+      padding: 2px 4px;
+      vertical-align: top;
+    }
+
+    .section-title {
+      font-weight: bold;
+      margin-top: 6px;
+      border-top: 1px solid #000;
+      padding-top: 5px;
+      font-size: 11px;
+    }
+
+    .prescription-table th, .prescription-table td {
+      border: 1px solid #000;
+      padding: 3px;
+      text-align: left;
+      font-size: 10px;
+    }
+
+    .prescription-table th {
+      background-color: #f0f0f0;
+    }
+
+    .advice {
+      margin-top: 6px;
+      padding-left: 10px;
+      font-size: 10px;
+    }
+
+    .footer-sign {
+      margin-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      font-size: 10px;
+    }
+
+    .signature-box {
+      text-align: right;
+    }
+
+    .footer-line {
+      border-top: 1px solid #000;
+      margin-top: 10px;
+      font-size: 9px;
+      text-align: center;
+      padding-top: 4px;
+    }
+
+    ul {
+      padding-left: 15px;
+      margin: 0;
+    }
+
+  </style>
 </head>
 <body>
-        <div class="header">
-            <div class="clinic-info">
-                {% if clinic.logo %}
-                <img src="{{ clinic.logo.url }}" alt="{{ clinic.name }}" class="clinic-logo">
-                {% endif %}
-                <div class="clinic-details">
-                    <h1>{{ clinic.name }}</h1>
-                    <p>{{ clinic.address }}</p>
-                    <p>Phone: {{ clinic.phone_number }}</p>
-                    <p>Email: {{ clinic.email }}</p>
-                </div>
-            </div>
-            <div class="prescription-info">
-                <p><strong>Date:</strong> {{ prescription.created_at|date:"F j, Y" }}</p>
-                <p><strong>Prescription ID:</strong> {{ prescription.id }}</p>
-            </div>
+
+    <div class="header" style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #000; padding-bottom: 8px; margin-bottom: 8px;">
+  
+        <!-- Clinic Logo -->
+        <div style="flex: 0 0 70px;">
+          {% if logo_url %}
+            <img src="{{ logo_url }}" alt="Clinic Logo" style="width: 60px; height: 60px; object-fit: contain;">
+          {% endif %}
         </div>
-
-    <div class="patient-info">
-        <h2>Patient Information</h2>
-        <p>Name: {{ prescription.patient.get_full_name }}</p>
-        <p>Age: {{ patient_age }} years</p>
-        <p>Gender: {{ prescription.patient.gender }}</p>
-        <p>Contact: {{ prescription.patient.phone_number }}</p>
-    </div>
-
-    {% if vitals %}
-    <div class="vitals">
-        <div>Weight: {{ vitals.weight|default:'-' }} kg</div>
-        <div>Height: {{ vitals.height|default:'-' }} cm</div>
-        <div>BP: {{ vitals.blood_pressure|default:'-' }}</div>
-        <div>Temperature: {{ vitals.temperature|default:'-' }} °F</div>
-        <div>Heart Rate: {{ vitals.heart_rate|default:'-' }} bpm</div>
-        <div>SpO2: {{ vitals.oxygen_saturation|default:'-' }} %</div>
-    </div>
-    {% endif %}
-
-    <div class="section">
-        <div class="section-title">Clinical Information</div>
-        <p><strong>Chief Complaints:</strong> {{ prescription.chief_complaints }}</p>
-        <p><strong>Clinical Findings:</strong> {{ prescription.clinical_findings }}</p>
-        <p><strong>Diagnosis:</strong> {{ prescription.diagnosis }}</p>
-    </div>
-
-    <div class="section">
-        <div class="section-title">Prescribed Medications</div>
-        {% for item in prescription.items.all %}
-        <div class="medicine-item">
-            <p><strong>{{ item.medicine }}</strong></p>
-            <p>Dosage: {{ item.dosage }}</p>
-            <p>Duration: {{ item.duration }} {{ item.duration_unit }}</p>
-            <p>Instructions: {{ item.instructions }}</p>
+      
+        <!-- Clinic Information -->
+        <div style="flex: 1; padding-left: 10px; font-size: 11px;">
+          <strong style="font-size: 13px;">{{ clinic.name }}</strong><br>
+          {{ clinic.address }}<br>
+          {% if clinic.phone_number %}Ph: {{ clinic.phone_number }}<br>{% endif %}
+          {% if clinic.timings %}Timings: {{ clinic.timings }}<br>{% endif %}
+          {% if clinic.closed_days %}Closed: {{ clinic.closed_days }}{% endif %}
         </div>
-        {% endfor %}
-    </div>
-
-    {% if lab_tests %}
-    <div class="section">
-        <div class="section-title">Lab Tests</div>
-        {% for test in lab_tests %}
-        <div class="test-item">
-            <p><strong>{{ test.test_name }}</strong></p>
-            <p>Collection: {{ test.get_collection_type_display }}</p>
-            <p>Description: {{ test.description }}</p>
+      
+        <!-- Doctor Info -->
+        <div style="flex: 0 0 180px; text-align: right; font-size: 11px;">
+          Dr. {{ prescription.doctor.name }}<br>
+          {{ prescription.doctor.qualifications }}<br>
+          Reg. No: {{ prescription.doctor.license_number }}
         </div>
-        {% endfor %}
-    </div>
-    {% endif %}
+      </div>
+      
 
-    {% if prescription.advice %}
-    <div class="section">
-        <div class="section-title">Advice</div>
-        <p>{{ prescription.advice }}</p>
-    </div>
-    {% endif %}
+  <table class="info-table">
+    <tr>
+      <td><strong>ID:</strong> {{ prescription.id }}</td>
+      <td><strong>Date:</strong> {{ prescription.created_at|date:"d-M-Y" }}</td>
+    </tr>
+    <tr>
+      <td><strong>Patient:</strong> {{ prescription.patient.get_full_name }} ({{ prescription.patient.gender }}, {{ patient_age }} Y)</td>
+      <td><strong>Mob. No.:</strong> {{ prescription.patient.phone_number }}</td>
+    </tr>
+    <tr>
+      <td><strong>Address:</strong> {{ prescription.patient.address }}</td>
+      <td>
+        {% if vitals %}
+          <strong>Wt:</strong> {{ vitals.weight|default:"-" }} Kg,
+          <strong>Ht:</strong> {{ vitals.height|default:"-" }} cm,
+          <strong>BP:</strong> {{ vitals.blood_pressure|default:"-" }}
+        {% endif %}
+      </td>
+    </tr>
+  </table>
 
-    {% if prescription.follow_up_date %}
-    <div class="section">
-        <div class="section-title">Follow Up</div>
-        <p>Next visit on: {{ prescription.follow_up_date|date:"F j, Y" }}</p>
-    </div>
-    {% endif %}
+  <div class="section-title">Chief Complaints</div>
+  <ul><li>{{ prescription.chief_complaints|linebreaksbr }}</li></ul>
 
-    <div class="footer">
-        <div class="clinic-stamp">
-            <!-- Space for clinic stamp -->
-        </div>
-        <div class="doctor-info">
-            <p>Dr. {{ prescription.doctor.name }}</p>
-            <p>{{ prescription.doctor.qualifications }}</p>
-            <p>Reg. No: {{ prescription.doctor.license_number }}</p>
-            <p>Digital Signature</p>
-        </div>
+  <div class="section-title">Clinical Findings</div>
+  <ul><li>{{ prescription.clinical_findings|linebreaksbr }}</li></ul>
+
+  <div class="section-title">Diagnosis</div>
+  <ul><li>{{ prescription.diagnosis }}</li></ul>
+
+  <div class="section-title">R</div>
+  <table class="prescription-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Medicine Name</th>
+        <th>Dosage</th>
+        <th>Duration</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in prescription.items.all %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td>
+          {{ item.medicine }}<br>
+          <small>{{ item.composition }}</small>
+        </td>
+        <td>{{ item.dosage }}</td>
+        <td>{{ item.duration }} {{ item.duration_unit }}<br>
+            (Tot: {{ item.total_quantity }})</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="section-title">Advice</div>
+  <div class="advice">
+    {{ prescription.advice|linebreaksbr }}
+  </div>
+
+  {% if prescription.follow_up_date %}
+  <div class="section-title">Follow Up:</div>
+  <p><strong>Follow Up:</strong> {{ prescription.follow_up_date|date:"d-m-Y" }}</p>
+  {% endif %}
+
+  <div class="footer-sign">
+    <div><strong>Doctor:</strong> Dr. {{ prescription.doctor.name }}</div>
+    <div class="signature-box">
+      <div>________________________</div>
+      <div><small>Signature / Digital Sign</small></div>
     </div>
+  </div>
+
+  <div class="footer-line">
+    Substitute with equivalent Generics as required.
+  </div>
+
 </body>
-</html> 
+</html>

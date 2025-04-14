@@ -66,8 +66,8 @@ def dashboard_redirect(request):
         
     # Check if user is a superuser
     if request.user.is_superuser:
-        logger.info(f"Superuser {request.user.username} redirecting to admin dashboard")
-        return redirect('users:clinic_admin_dashboard')
+        logger.info(f"Superuser {request.user.username} redirecting to superuser dashboard")
+        return redirect('users:superuser_dashboard')
         
     # Check if user is a staff member
     if hasattr(request.user, 'staff'):
@@ -94,6 +94,14 @@ def dashboard_redirect(request):
     if hasattr(request.user, 'clinicadmin'):
         logger.info(f"Clinic admin {request.user.username} redirecting to clinic admin dashboard")
         return redirect('users:clinic_admin_dashboard')
+    
+    # Check if user is a lab user
+    if hasattr(request.user, 'lab_profile'):
+        logger.info(f"Lab user {request.user.username} redirecting to lab dashboard")
+        if request.user.lab_profile.is_approved:
+            return redirect('labs:lab_dashboard')
+        else:
+            messages.error(request, 'Your lab account is not yet approved.')
     
     # If no role is found, redirect to a default page
     logger.warning(f"No role found for user {request.user.username}")

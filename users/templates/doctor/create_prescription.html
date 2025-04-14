@@ -150,7 +150,9 @@
                         </div>
                     </div>
                 </div>
-
+                <text class="mt-2 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    To Add Another Medication search medicines
+                </text>
                 <!-- Lab Tests Section -->
                 <div class="lab-tests-section mt-6">
                     <h3 class="font-semibold mb-2">Add Lab Tests</h3>
@@ -185,6 +187,7 @@
                                     <th>Test Name</th>
                                     <th>Collection Type</th>
                                     <th>Description</th>
+                                    <th>Lab</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -194,9 +197,7 @@
                     </div>
                 </div>
 
-                <text class="mt-2 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                    To Add Another Medication search medicines
-                </text>
+                
 
                  <!-- Advice -->
                 <div class="mb-6">
@@ -330,6 +331,30 @@ function addMedication() {
     
     // Lab Tests functionality
     let labTests = [];
+    let availableLabs = [];
+
+    // Fetch available labs when the page loads
+    async function fetchAvailableLabs() {
+        try {
+            const response = await fetch('/labs/api/labs/available/');
+            const data = await response.json();
+            if (data.labs) {
+                availableLabs = data.labs;
+                console.log('Available labs:', availableLabs);
+                // Update the lab selection dropdowns if there are any lab tests
+                if (labTests.length > 0) {
+                    updateLabTestsTable();
+                }
+            } else {
+                console.error('No labs data received:', data);
+            }
+        } catch (error) {
+            console.error('Error fetching labs:', error);
+        }
+    }
+
+    // Call fetchAvailableLabs when the page loads
+    document.addEventListener('DOMContentLoaded', fetchAvailableLabs);
 
     function addLabTest() {
         const testName = document.getElementById('test-name').value;
@@ -344,7 +369,8 @@ function addMedication() {
         const test = {
             test_name: testName,
             collection_type: collectionType,
-            description: description
+            description: description,
+            lab_id: null  // Will be set when lab is selected
         };
 
         labTests.push(test);
@@ -369,10 +395,24 @@ function addMedication() {
                 <td>${test.collection_type === 'IN_CLINIC' ? 'In Clinic' : 'Home Collection'}</td>
                 <td>${test.description}</td>
                 <td>
+                    <select name="lab_id[]" onchange="updateLabSelection(${index}, this.value)" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="">Select Lab</option>
+                        ${availableLabs.map(lab => `
+                            <option value="${lab.id}" ${test.lab_id === lab.id ? 'selected' : ''}>
+                                ${lab.name} (${lab.type === 'INHOUSE' ? 'In-house' : 'External'})
+                            </option>
+                        `).join('')}
+                    </select>
+                </td>
+                <td>
                     <button type="button" onclick="removeLabTest(${index})" class="remove-btn">Remove</button>
                 </td>
             </tr>
         `).join('');
+    }
+
+    function updateLabSelection(index, labId) {
+        labTests[index].lab_id = labId;
     }
 
     // Modify the form submit handler to include lab tests

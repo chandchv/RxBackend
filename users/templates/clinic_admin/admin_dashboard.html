@@ -10,7 +10,7 @@
             <img src="{{ clinic_logo }}" alt="Clinic Logo" class="w-30 h-10 inline-block align-right">
             <h1 class="text-xl sm:text-2xl font-bold text-gray-900 inline-block align-middle mr-4">{{ clinic_name }} Clinic</h1>
             {% if user.is_superuser %}
-            <select id="clinicSelector" class="inline-block align-right px-4 py-2 border rounded-lg" onchange="changeClinic(this.value)">
+            <select id="clinicSelector" class="inline-block align-right px-4 py-3 border rounded-lg w-64 text-base h-12" onchange="changeClinic(this.value)">
                 {% for clinic in clinic_list %}
                     <option value="{{ clinic.id }}" {% if clinic.id == current_clinic_id %}selected{% endif %}>
                         {{ clinic.name }}
@@ -18,7 +18,7 @@
                 {% endfor %}
             </select>
             <a href="{% url 'users:edit_clinic_profile' current_clinic_id %}" 
-               class="inline-block px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 ml-2">
+               class="inline-block px-4 py-2 bg-blue-300 text-white rounded-lg hover:bg-blue-600 ml-2">
                 Edit Clinic Profile
             </a>
             {% endif %}
@@ -37,7 +37,7 @@
             <div class="bg-purple-50 p-4 rounded-lg">
                 <h3 class="text-purple-800 font-semibold">Total Patients</h3>
                 <p class="text-2xl font-bold text-purple-600">{{ patients_count }}</p>
-                <a href="{% url 'users:patients_list' %}" class="inline-block align-right px-4 py-2 text-sm text-center bg-purple-500 hover:bg-purple-600 text-white rounded">Manage Patients</a>
+                <a href="{% url 'users:patients_list' %}" class="inline-block align-right px-4 py-2 text-sm text-center bg-purple-300 hover:bg-purple-600 text-white rounded">Manage Patients</a>
             </div>
             <div class="bg-yellow-50 p-4 rounded-lg">
                 <h3 class="text-yellow-800 font-semibold">Today's Appointments</h3>
@@ -54,12 +54,27 @@
 
         <!-- Admin Navigation Cards -->
         <div class="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <!-- Leave Management -->
+            <div class="border rounded-lg p-4">
+                <h2 class="text-xl font-semibold mb-4">Leave Management</h2>
+                <div class="space-y-2">
+                    <a href="{% url 'users:staff_leaves' %}" 
+                       class="block w-full text-center bg-red-400 hover:bg-red-600 text-white !text-white font-bold text-sm px-6 py-3 rounded-lg shadow transition duration-300 text-center">
+                        Staff Leave Requests
+                    </a>
+                    <a href="{% url 'users:doctor_leaves' %}" 
+                       class="block w-full text-center bg-red-400 hover:bg-red-600 text-white !text-white font-bold text-sm px-6 py-3 rounded-lg shadow transition duration-300 text-center">
+                        Doctor Leave Requests
+                    </a>
+                </div>
+            </div>
+
             <!-- Clinic Management -->
             <div class="border rounded-lg p-4">  
                 <h2 class="text-xl font-semibold mb-4">Clinic Management</h2>
                 <div class="space-y-2">
                     <a href="{% url 'users:clinic_profile' %}" 
-                       class="block w-full text-center bg-blue-200 hover:bg-blue-400 text-black text-bold py-2 rounded">
+                       class="block w-full text-center bg-blue-400 hover:bg-blue-600 text-white !text-white font-bold text-sm px-6 py-3 rounded-lg shadow transition duration-300 text-center">
                         Update Clinic Profile
                     </a>
                 </div>
@@ -70,11 +85,11 @@
                 <h2 class="text-xl font-semibold mb-4">Doctor Management</h2>
                 <div class="space-y-2">
                     <a href="{% url 'users:add_doctor' %}" 
-                       class="block w-full text-center bg-green-200 hover:bg-green-400 text-black text-bold py-2 rounded">
+                       class="block w-full text-center bg-green-400 hover:bg-green-600 text-white !text-white font-bold text-sm px-6 py-3 rounded-lg shadow transition duration-300 text-center">
                         Add New Doctor
                     </a>
                     <a href="{% url 'users:doctors_list' %}" 
-                       class="block w-full text-center bg-green-200 hover:bg-green-400 text-black text-bold py-2 rounded">
+                       class="block w-full text-center bg-green-400 hover:bg-green-600 text-white !text-white font-bold text-sm px-6 py-3 rounded-lg shadow transition duration-300 text-center">
                         Manage Doctors
                     </a>
                 </div>
@@ -85,12 +100,12 @@
                 <h2 class="text-xl font-semibold mb-4">Staff Management</h2>
                 <div class="space-y-2">
                     <a href="{% url 'users:add_staff' %}" 
-                       class="block w-full text-center bg-purple-200 hover:bg-purple-400 text-black text-bold py-2 rounded">
+                       class="block w-full text-center bg-purple-400 hover:bg-purple-600 text-white !text-white font-bold text-sm px-6 py-3 rounded-lg shadow transition duration-300 text-center">
                         Add New Staff
                     </a>
                     <a href="{% url 'users:staff_list' %}" 
-                       class="block w-full text-center bg-purple-200 hover:bg-purple-400 text-black text-bold py-2 rounded">
-                        Manage Staff
+                    class="block w-full text-center bg-purple-400 hover:bg-purple-600 text-white !text-white font-bold text-sm px-6 py-3 rounded-lg shadow transition duration-300 text-center">
+                    Manage Staff
                     </a>
                 </div>
             </div>
@@ -100,19 +115,19 @@
                 <h2 class="text-xl font-semibold mb-4">Lab Management</h2>
                 <div class="space-y-2">
                     <a href="{% url 'users:add_lab' %}" 
-                       class="block w-full text-center bg-indigo-200 hover:bg-indigo-400 text-white py-2 rounded">
+                       class="block w-full text-center bg-indigo-400 hover:bg-indigo-600 text-white !text-white font-bold text-sm px-6 py-3 rounded-lg shadow transition duration-300 text-center">
                         Add New Lab
                     </a>
                     <a href="{% url 'users:labs_list' %}" 
-                       class="block w-full text-center bg-indigo-200 hover:bg-indigo-400 text-black text-bold py-2 rounded">
+                       class="block w-full text-center bg-indigo-400 hover:bg-indigo-600 text-white !text-white font-bold text-sm px-6 py-3 rounded-lg shadow transition duration-300 text-center">
                         Manage Labs
                     </a>
                     <a href="{% url 'users:lab_staff_list' %}" 
-                       class="block w-full text-center bg-indigo-200 hover:bg-indigo-400 text-black text-bold py-2 rounded">
+                       class="block w-full text-center bg-indigo-400 hover:bg-indigo-600 text-white !text-white font-bold text-sm px-6 py-3 rounded-lg shadow transition duration-300 text-center">
                         Lab Staff
                     </a>
                     <a href="{% url 'users:lab_tests' %}" 
-                       class="block w-full text-center bg-indigo-200 hover:bg-indigo-400 text-black text-bold py-2 rounded">
+                       class="block w-full text-center bg-indigo-400 hover:bg-indigo-600 text-white !text-white font-bold text-sm px-6 py-3 rounded-lg shadow transition duration-300 text-center">
                         View Test Reports
                     </a>
                 </div>

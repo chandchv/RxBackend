@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block title %}Bulk Upload Tests{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-2xl font-bold mb-6">Bulk Upload Tests</h2>
+        
+        <div class="mb-8">
+            <h3 class="text-lg font-semibold mb-4">Instructions</h3>
+            <p class="mb-4">Upload a CSV file with the following columns:</p>
+            <ul class="list-disc pl-6 mb-4">
+                <li><strong>name</strong> (required): Name of the test</li>
+                <li><strong>short_code</strong>: Short code for the test (e.g., CBC)</li>
+                <li><strong>description</strong>: Description of the test</li>
+                <li><strong>category</strong>: Test category (e.g., Hematology, Diabetes)</li>
+                <li><strong>preparation_instructions</strong>: Instructions for test preparation</li>
+                <li><strong>price</strong>: Price of the test</li>
+                <li><strong>turnaround_time_hours</strong>: Expected turnaround time in hours</li>
+                <li><strong>offers_home_collection</strong>: true/false</li>
+                <li><strong>specific_instructions</strong>: Any specific instructions for this test</li>
+            </ul>
+            <a href="{% url 'labs:download_template' %}" 
+               class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                Download Template CSV
+            </a>
+        </div>
+
+        <form method="POST" enctype="multipart/form-data" class="space-y-6">
+            {% csrf_token %}
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700">CSV File</label>
+                <div class="mt-1 flex items-center">
+                    <input type="file" name="csv_file" accept=".csv" required
+                           class="block w-full text-sm text-gray-500
+                                  file:mr-4 file:py-2 file:px-4
+                                  file:rounded-md file:border-0
+                                  file:text-sm file:font-semibold
+                                  file:bg-blue-50 file:text-blue-700
+                                  hover:file:bg-blue-100">
+                </div>
+            </div>
+
+            <div class="flex justify-end">
+                <button type="submit" 
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+                    Upload Tests
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %} 

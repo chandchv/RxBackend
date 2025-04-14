@@ -19,6 +19,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 import json
+from notifications.utils import create_notification
 
 class AppointmentView(APIView):
     permission_classes = [IsAuthenticated]
@@ -136,6 +137,31 @@ def appointment_delete(request, appointment_id):
         appointment.status = 'cancelled'
         appointment.save()
         
+        # --- Add Notifications --- 
+        try:
+            if request.user != appointment.patient.user:
+                 # Notify Patient if not cancelled by patient themselves
+                create_notification(
+                    recipient=appointment.patient.user,
+                    message=f"Your appointment with Dr. {appointment.doctor.name} on {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')} has been cancelled.",
+                    sender=request.user,
+                    notification_type='appointment_cancelled',
+                    related_object=appointment
+                )
+            if request.user != appointment.doctor.user:
+                 # Notify Doctor if not cancelled by doctor themselves
+                create_notification(
+                    recipient=appointment.doctor.user,
+                    message=f"Your appointment with {appointment.patient.get_full_name()} on {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')} has been cancelled.",
+                    sender=request.user,
+                    notification_type='appointment_cancelled',
+                    related_object=appointment
+                )
+        except Exception as e:
+            print(f"Error creating notification in appointment_delete: {e}")
+            messages.warning(request, "Appointment cancelled, but failed to send notifications.")
+        # --- End Notifications ---
+        
         # If it's an HTMX request, return updated row
         if request.headers.get('HX-Request'):
             return render(request, 'appointment_row.html', {'appointment': appointment})
@@ -183,6 +209,30 @@ def admin_create_appointment(request):
                 
                 # Send notifications
                 send_appointment_notifications(appointment)
+                
+                # --- Add Notifications --- 
+                try:
+                    # Notify Doctor
+                    create_notification(
+                        recipient=appointment.doctor.user,
+                        message=f"New appointment scheduled with {appointment.patient.get_full_name()} on {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')}.",
+                        sender=request.user, # The admin/staff who created it
+                        notification_type='appointment_new',
+                        related_object=appointment
+                    )
+                    # Notify Patient
+                    create_notification(
+                        recipient=appointment.patient.user,
+                        message=f"Your appointment with Dr. {appointment.doctor.name} is scheduled for {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')}.",
+                        sender=request.user,
+                        notification_type='appointment_new',
+                        related_object=appointment
+                    )
+                except Exception as e:
+                    print(f"Error creating notification in admin_create_appointment: {e}")
+                    # Optionally add a message, but don't break the flow
+                    messages.warning(request, "Appointment created, but failed to send notifications.")
+                # --- End Notifications ---
                 
                 messages.success(request, 'Appointment scheduled successfully!')
                 return redirect('users:clinic_admin_dashboard')
@@ -268,7 +318,15 @@ def update_appointment_status(request, appointment_id):
         
         # Send notification to patient
         try:
-            send_status_update_notification(appointment)
+            # --- Add Notification --- 
+            create_notification(
+                recipient=appointment.patient.user,
+                message=f"Your appointment with Dr. {appointment.doctor.name} on {appointment.appointment_date.strftime('%d-%b-%Y')} has been updated to: {new_status.capitalize()}.",
+                sender=request.user,
+                notification_type='appointment_status_update',
+                related_object=appointment
+            )
+            # --- End Notification ---
         except Exception as e:
             print(f"Error sending notification: {str(e)}")
         
@@ -309,9 +367,18 @@ def appointment_edit(request, appointment_id):
             
             # Send notification
             try:
-                send_appointment_update_notification(appointment)
+                 # --- Add Notification --- 
+                create_notification(
+                    recipient=appointment.patient.user,
+                    message=f"Your appointment with Dr. {appointment.doctor.name} has been rescheduled to {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')}.",
+                    sender=request.user,
+                    notification_type='appointment_rescheduled',
+                    related_object=appointment
+                )
+                 # --- End Notification ---
             except Exception as e:
                 print(f"Error sending notification: {str(e)}")
+                messages.warning(request, "Appointment updated, but failed to send notification.")
             
             messages.success(request, 'Appointment updated successfully')
             
@@ -458,7 +525,15 @@ def update_appointment_status_api(request, appointment_id):
         
         # Send notification to patient
         try:
-            send_status_update_notification(appointment)
+            # --- Add Notification --- 
+            create_notification(
+                recipient=appointment.patient.user,
+                message=f"Your appointment with Dr. {appointment.doctor.name} on {appointment.appointment_date.strftime('%d-%b-%Y')} has been updated to: {new_status.capitalize()}.",
+                sender=request.user,
+                notification_type='appointment_status_update',
+                related_object=appointment
+            )
+            # --- End Notification ---
         except Exception as e:
             print(f"Error sending notification: {str(e)}")
         

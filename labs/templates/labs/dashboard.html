@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if is_superuser %}Admin Lab Dashboard{% else %}Lab Dashboard{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    {% if is_superuser %}
+    <!-- Admin Lab Management Section -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-bold">Lab Management</h2>
+            <div class="flex space-x-4">
+                <a href="{% url 'labs:register' %}" class="bg-blue-300 hover:bg-blue-700 text-black !text-black font-bold text-lg px-4 py-2 rounded-lg shadow transition duration-300 text-center">
+                    Add New Lab
+                </a>
+                <a href="{% url 'labs:download_template' %}" class="bg-gray-300 hover:bg-gray-700 text-black !text-black font-bold text-lg px-4 py-2 rounded-lg shadow transition duration-300 text-center">
+                    Download Template
+                </a>
+                <a href="{% url 'labs:bulk_upload_tests' %}" class="bg-green-300 hover:bg-green-700 text-black !text-black font-bold text-lg px-4 py-2 rounded-lg shadow transition duration-300 text-center"> 
+                    Bulk Upload
+                </a>
+            </div>
+        </div>
+
+        <!-- Lab Statistics -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-blue-50 p-4 rounded-lg">
+                <h3 class="text-lg font-semibold text-blue-800">Total Labs</h3>
+                <p class="text-3xl font-bold text-blue-600">{{ labs|length }}</p>
+            </div>
+            <div class="bg-green-50 p-4 rounded-lg">
+                <h3 class="text-lg font-semibold text-green-800">Approved Labs</h3>
+                <p class="text-3xl font-bold text-green-600">{{ approved_labs_count }}</p>
+            </div>
+            <div class="bg-yellow-50 p-4 rounded-lg">
+                <h3 class="text-lg font-semibold text-yellow-800">Pending Approval</h3>
+                <p class="text-3xl font-bold text-yellow-600">{{ pending_labs_count }}</p>
+            </div>
+        </div>
+
+        <!-- Labs Table -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lab Name</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tests</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for lab in labs %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">{{ lab.name }}</div>
+                            <div class="text-sm text-gray-500">{{ lab.registration_number }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ lab.contact_person }}</div>
+                            <div class="text-sm text-gray-500">{{ lab.phone_number }}</div>
+                            <div class="text-sm text-gray-500">{{ lab.email }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                {% if lab.is_approved %}bg-green-100 text-green-800{% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                {{ lab.is_approved|yesno:"Approved,Pending Approval" }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ lab.test_offerings.count }} tests</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            {% if not lab.is_approved %}
+                            <a href="{% url 'labs:approve_lab' lab.id %}" 
+                               class="text-green-600 hover:text-green-900 mr-4">Approve</a>
+                            {% endif %}
+                            <a href="{% url 'labs:edit_lab' lab.id %}" class="text-blue-600 hover:text-blue-900 mr-4">Edit</a>
+                            <a href="{% url 'labs:deactivate_lab' lab.id %}" class="text-red-600 hover:text-red-900">Deactivate</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <!-- Lab Profile Section -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-bold">{{ lab_profile.name }}</h2>
+            <span class="px-3 py-1 text-sm font-semibold rounded-full {% if lab_profile.is_approved %}bg-green-100 text-green-800{% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                {{ lab_profile.is_approved|yesno:"Approved,Pending Approval" }}
+            </span>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <p class="text-gray-600">Email: {{ lab_profile.email }}</p>
+                <p class="text-gray-600">Phone: {{ lab_profile.phone_number }}</p>
+            </div>
+            <div>
+                <p class="text-gray-600">Address: {{ lab_profile.address }}</p>
+            </div>
+        </div>
+        
+        <div class="mt-4">
+            <a href="{% url 'labs:edit_lab' %}" 
+               class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                Edit Lab Details
+            </a>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <a href="{% url 'labs:add_test_offering' %}" 
+           class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+            <div class="text-center">
+                <svg class="mx-auto h-12 w-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                <h3 class="mt-4 text-lg font-medium">Add New Test</h3>
+                <p class="mt-1 text-sm text-gray-500">Add a new test offering to your lab</p>
+            </div>
+        </a>
+        
+        <a href="#" 
+           class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+            <div class="text-center">
+                <svg class="mx-auto h-12 w-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <h3 class="mt-4 text-lg font-medium">Appointments</h3>
+                <p class="mt-1 text-sm text-gray-500">View and manage appointments</p>
+            </div>
+        </a>
+        
+        <a href="#" 
+           class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+            <div class="text-center">
+                <svg class="mx-auto h-12 w-12 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <h3 class="mt-4 text-lg font-medium">Reports</h3>
+                <p class="mt-1 text-sm text-gray-500">View and manage test reports</p>
+            </div>
+        </a>
+    </div>
+
+    <!-- Active Tests Section -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold">Active Tests</h2>
+            <span class="text-sm text-gray-500">{{ test_offerings|length }} tests</span>
+        </div>
+
+        {% if test_offerings %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead>
+                        <tr>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test Name</th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turnaround Time</th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Home Collection</th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for offering in test_offerings %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ offering.test.name }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">₹{{ offering.price }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ offering.turnaround_time_hours }} hours</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if offering.offers_home_collection %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                        Yes
+                                    </span>
+                                {% else %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        No
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <a href="{% url 'labs:edit_test_offering' offering.id %}" 
+                                   class="text-blue-600 hover:text-blue-900 mr-4">Edit</a>
+                                <a href="{% url 'labs:delete_test_offering' offering.id %}" 
+                                   class="text-red-600 hover:text-red-900">Delete</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-8">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No tests added</h3>
+                <p class="mt-1 text-sm text-gray-500">Get started by adding your first test offering.</p>
+                <div class="mt-6">
+                    <a href="{% url 'labs:add_test_offering' %}" 
+                       class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Add Test
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %} 

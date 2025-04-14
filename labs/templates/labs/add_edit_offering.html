@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} - {{ lab_profile.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">{{ title }}</h2>
+                    
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.test.id_for_label }}" class="form-label">Test</label>
+                            {{ form.test }}
+                            {% if form.test.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.test.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.price.id_for_label }}" class="form-label">Price (₹)</label>
+                            {{ form.price }}
+                            {% if form.price.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.price.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.turnaround_time_hours.id_for_label }}" class="form-label">Turnaround Time (hours)</label>
+                            {{ form.turnaround_time_hours }}
+                            {% if form.turnaround_time_hours.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.turnaround_time_hours.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.offers_home_collection }}
+                                <label class="form-check-label" for="{{ form.offers_home_collection.id_for_label }}">
+                                    Offer Home Collection
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.specific_instructions.id_for_label }}" class="form-label">Specific Instructions</label>
+                            {{ form.specific_instructions }}
+                            {% if form.specific_instructions.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.specific_instructions.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'labs:manage_tests' %}" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        border: none;
+        border-radius: 0.5rem;
+    }
+    
+    .form-control, .form-select {
+        border-radius: 0.5rem;
+    }
+    
+    .form-check-input {
+        margin-top: 0.25rem;
+    }
+</style>
+{% endblock %} 

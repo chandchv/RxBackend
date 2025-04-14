@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, AbstractUser
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -11,8 +11,6 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 
 from elasticsearch_dsl import Q
-
-User = get_user_model()
 
 # Define the phone number regex validator
 phone_regex = RegexValidator(
@@ -105,15 +103,22 @@ class ClinicAdministrator(TimeStampedModel):
 class UserProfile(TimeStampedModel):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     clinic = models.ForeignKey(Clinic, on_delete=models.SET_NULL, null=True, blank=True)
-    phone_number = models.CharField(max_length=17, validators=[phone_regex])
-    address = models.TextField(null=True, blank=True)
-    pincode = models.CharField(max_length=10, null=True, blank=True)
+    phone_number = models.CharField(max_length=17, validators=[phone_regex], blank=True)
+    address = models.TextField(blank=True, null=True)
+    pincode = models.CharField(max_length=10, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
 
     def __str__(self):
         return f"{self.user.get_full_name()}'s profile"
 
     class Meta:
         db_table = 'users_userprofile'
+
+    def save(self, *args, **kwargs):
+        if not self.created_at:
+            self.created_at = timezone.now()
+        super().save(*args, **kwargs)
 
 class Doctor(TimeStampedModel):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='doctor')
@@ -577,31 +582,18 @@ class AppointmentSlot(TimeStampedModel):
             raise ValidationError("Cannot create slots for past dates")
 
 class ActivityLog(TimeStampedModel):
-    ACTION_CHOICES = [
-        ('create', 'Created'),
-        ('update', 'Updated'),
-        ('delete', 'Deleted'),
-        ('login', 'Logged In'),
-        ('logout', 'Logged Out'),
-    ]
-    
-    user = models.ForeignKey(
-        'auth.User', 
-        on_delete=models.CASCADE,
-        related_name='activity_logs'
-    )
-    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
-    details = models.TextField(blank=True)
-    
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    action = models.CharField(max_length=255)
+    details = models.TextField(blank=True, null=True)
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.TextField(blank=True, null=True)
+
     class Meta:
         ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['user', '-created_at']),
-            models.Index(fields=['action', '-created_at']),
-        ]
-    
+        db_table = 'users_activitylog'
+
     def __str__(self):
-        return f"{self.user.get_full_name()} - {self.action} - {self.created_at}"
+        return f"{self.user.username} - {self.action}"
 
 class DoctorLeave(TimeStampedModel):
     LEAVE_TYPE_CHOICES = [
@@ -686,6 +678,9 @@ class Staff(TimeStampedModel):
     clinic = models.ForeignKey(Clinic, on_delete=models.CASCADE, related_name='staff_members')
     is_active = models.BooleanField(default=True)
     joining_date = models.DateField(null=True, blank=True)
+    is_clinic_admin = models.BooleanField(default=False)
+    is_lab_admin = models.BooleanField(default=False)
+    staff_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
 
     class Meta:
         ordering = ['user__last_name']
@@ -842,6 +837,33 @@ class Payment(models.Model):
             self.bill.status = 'partial'
         self.bill.save()
 
+class LabTestPrescription(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('BOOKED', 'Booked'),
+        ('COMPLETED', 'Completed'),
+        ('CANCELLED', 'Cancelled'),
+    ]
+
+    doctor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='lab_prescriptions')
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='lab_prescriptions')
+    prescription_date = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    notes = models.TextField(blank=True)
+    preferred_lab_type = models.CharField(max_length=20, choices=[
+        ('INHOUSE', 'In-house Lab'),
+        ('EXTERNAL', 'External Lab'),
+        ('PATIENT_CHOICE', 'Patient Choice')
+    ], default='PATIENT_CHOICE')
+    
+    # Reference to either in-house lab or external lab
+    inhouse_lab = models.ForeignKey('Lab', on_delete=models.SET_NULL, null=True, blank=True, related_name='prescriptions')
+    external_lab = models.ForeignKey('labs.LabProfile', on_delete=models.SET_NULL, null=True, blank=True, related_name='prescriptions')
+    commission_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+
+    def __str__(self):
+        return f"Lab Test Prescription for {self.patient} by {self.doctor}"
+
 class LabTest(models.Model):
     TEST_STATUS = (
         ('REQUESTED', 'Requested'),
@@ -857,12 +879,8 @@ class LabTest(models.Model):
         ('HOME', 'Home Collection'),
     )
 
-    patient = models.ForeignKey('Patient', on_delete=models.CASCADE)
-    doctor = models.ForeignKey('Doctor', on_delete=models.CASCADE)
-    lab = models.ForeignKey('Lab', on_delete=models.CASCADE, null=True, blank=True)
-    technician = models.ForeignKey('LabTechnician', on_delete=models.SET_NULL, null=True)
-    test_name = models.CharField(max_length=200)
-    description = models.TextField()
+    prescription = models.ForeignKey(LabTestPrescription, on_delete=models.CASCADE, related_name='tests', null=True, blank=True)
+    test_definition = models.ForeignKey('labs.TestDefinition', on_delete=models.PROTECT, related_name='lab_tests', null=True, blank=True)
     status = models.CharField(max_length=20, choices=TEST_STATUS, default='REQUESTED')
     collection_type = models.CharField(max_length=20, choices=COLLECTION_TYPE, default='IN_CLINIC')
     collection_date = models.DateTimeField(null=True, blank=True)
@@ -870,6 +888,37 @@ class LabTest(models.Model):
     doctor_notes = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.test_definition.name if self.test_definition else 'Unknown Test'} - {self.get_status_display()}"
+
+class LabTestBooking(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('CONFIRMED', 'Confirmed'),
+        ('SAMPLE_COLLECTED', 'Sample Collected'),
+        ('IN_PROGRESS', 'In Progress'),
+        ('COMPLETED', 'Completed'),
+        ('CANCELLED', 'Cancelled'),
+    ]
+
+    prescription = models.OneToOneField(LabTestPrescription, on_delete=models.CASCADE, related_name='booking')
+    booking_date = models.DateTimeField(auto_now_add=True)
+    collection_date = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    collection_type = models.CharField(max_length=20, choices=[
+        ('LAB_VISIT', 'Lab Visit'),
+        ('HOME_COLLECTION', 'Home Collection')
+    ])
+    collection_address = models.TextField(blank=True)
+    report = models.FileField(upload_to='lab_reports/', null=True, blank=True)
+    report_upload_date = models.DateTimeField(null=True, blank=True)
+    report_signed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='signed_reports')
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    commission_amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"Lab Test Booking for {self.prescription.patient}"
 
 class LabTechnician(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -887,9 +936,19 @@ class Lab(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    test_definitions = models.ManyToManyField(
+        'labs.TestDefinition',
+        through='labs.LabTestOffering',
+        related_name='inhouse_labs'
+    )
 
     def __str__(self):
-        return f"{self.name} - {self.clinic.name}"
+        return f"{self.name} ({self.clinic.name})"
+
+    class Meta:
+        verbose_name = 'Lab'
+        verbose_name_plural = 'Labs'
+        ordering = ['name']
 
 class LabStaff(models.Model):
     ROLES = (
@@ -935,3 +994,31 @@ class Notification(models.Model):
     notification_type = models.CharField(max_length=50)
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+class LabRegistration(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('APPROVED', 'Approved'),
+        ('REJECTED', 'Rejected'),
+    ]
+    
+    name = models.CharField(max_length=255)
+    email = models.EmailField(unique=True)
+    phone_number = models.CharField(max_length=20)
+    address = models.TextField()
+    city = models.CharField(max_length=100)
+    state = models.CharField(max_length=100)
+    pincode = models.CharField(max_length=10)
+    registration_number = models.CharField(max_length=100, unique=True)
+    gst_number = models.CharField(max_length=15, unique=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    kyc_documents = models.FileField(upload_to='lab_kyc/', null=True, blank=True)
+    verification_notes = models.TextField(blank=True)
+    verified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='verified_labs')
+    verification_date = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.registration_number})"
+ 

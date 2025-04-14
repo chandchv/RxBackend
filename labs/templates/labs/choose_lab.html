@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}Choose Lab for Order #{{ order.id }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold">Choose Lab for Your Tests</h1>
+            <a href="{% url 'users:patient_dashboard' %}" 
+               class="text-blue-500 hover:text-blue-700">
+                Back to Dashboard
+            </a>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="mb-4 p-4 rounded {% if message.tags == 'success' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Order Details -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4">Order Details</h2>
+            <div class="space-y-2">
+                <p><span class="font-semibold">Order ID:</span> #{{ order.id }}</p>
+                <p><span class="font-semibold">Doctor:</span> {{ order.doctor.get_full_name }}</p>
+                <p><span class="font-semibold">Date Ordered:</span> {{ order.created_at|date:"F j, Y" }}</p>
+            </div>
+            
+            <h3 class="text-lg font-semibold mt-4 mb-2">Required Tests</h3>
+            <ul class="list-disc list-inside space-y-1">
+                {% for test in order_tests %}
+                    <li>{{ test.name }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- Available Labs -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold mb-4">Available Labs</h2>
+            <p class="text-sm text-gray-500 mb-4">
+                Please select a lab that will perform your tests. All listed labs offer all required tests.
+            </p>
+
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+                
+                {% for lab_info in available_labs %}
+                    <div class="border rounded-lg p-4 {% if lab_info.lab == doctor_recommendation %}border-blue-500 bg-blue-50{% endif %}">
+                        <div class="flex items-start">
+                            <input type="radio" 
+                                   name="chosen_lab" 
+                                   value="{{ lab_info.lab.id }}" 
+                                   id="lab_{{ lab_info.lab.id }}"
+                                   class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                   {% if lab_info.lab == doctor_recommendation %}checked{% endif %}>
+                            
+                            <label for="lab_{{ lab_info.lab.id }}" class="ml-3 flex-1">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <span class="block text-lg font-medium text-gray-900">{{ lab_info.lab.name }}</span>
+                                        <span class="block text-sm text-gray-500">{{ lab_info.lab.address }}</span>
+                                        {% if lab_info.lab == doctor_recommendation %}
+                                            <span class="inline-block mt-1 px-2 py-1 text-xs font-semibold text-blue-700 bg-blue-100 rounded">
+                                                Doctor's Recommendation
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="block text-lg font-bold text-gray-900">₹{{ lab_info.total_price }}</span>
+                                        <span class="block text-sm text-gray-500">{{ lab_info.max_turnaround }} days turnaround</span>
+                                    </div>
+                                </div>
+                                
+                                {% if lab_info.home_collection %}
+                                    <span class="inline-block mt-2 px-2 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded">
+                                        Home Collection Available
+                                    </span>
+                                {% endif %}
+                                
+                                <div class="mt-2 text-sm text-gray-500">
+                                    <p class="font-semibold">Test Details:</p>
+                                    <ul class="list-disc list-inside mt-1">
+                                        {% for offering in lab_info.offerings %}
+                                            <li>{{ offering.test.name }} - ₹{{ offering.price }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="text-center py-4 text-gray-500">
+                        No labs available that offer all required tests.
+                    </div>
+                {% endfor %}
+
+                <div class="flex justify-end space-x-4 mt-6">
+                    <a href="{% url 'users:patient_dashboard' %}" 
+                       class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                        Cancel
+                    </a>
+                    <button type="submit" 
+                            class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                        Select Lab
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

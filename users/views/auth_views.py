@@ -31,7 +31,9 @@ def login_view(request):
             if user is not None:
                 login(request, user)
                 # Check user role and redirect accordingly
-                if hasattr(user, 'staff'):
+                if user.is_superuser:
+                    return redirect('users:superuser_dashboard')
+                elif hasattr(user, 'staff'):
                     return redirect('users:staff_dashboard')
                 elif hasattr(user, 'doctor'):
                     return redirect('users:doctor_dashboard')
@@ -39,6 +41,12 @@ def login_view(request):
                     return redirect('users:patient_dashboard')
                 elif hasattr(user, 'clinicadmin'):
                     return redirect('users:clinic_admin_dashboard')
+                elif hasattr(user, 'lab'):
+                    # Check if lab profile is approved
+                    if user.lab_profile.is_approved:
+                        return redirect('labs:lab_dashboard')
+                    else:
+                        messages.error(request, 'Your lab account is not yet approved.')
                 else:
                     return redirect('users:dashboard')
             else:
@@ -475,6 +483,9 @@ def patient_signup_api(request):
                 user=user,
                 patient_id=patient_id,  # Add the generated ID
                 clinic=clinic,
+                first_name=request.data.get('first_name'),  # Add first_name
+                last_name=request.data.get('last_name'),    # Add last_name
+                email=request.data.get('email'),           # Add email
                 phone_number=request.data.get('phone_number'),
                 date_of_birth=request.data.get('date_of_birth'),
                 gender=request.data.get('gender'),
@@ -495,6 +506,9 @@ def patient_signup_api(request):
                 },
                 "patient": {
                     "patient_id": patient.patient_id,  # Include patient ID in response
+                    "first_name": patient.first_name,  # Include first_name
+                    "last_name": patient.last_name,    # Include last_name
+                    "email": patient.email,           # Include email
                     "phone_number": patient.phone_number,
                     "gender": patient.gender,
                     "date_of_birth": patient.date_of_birth,

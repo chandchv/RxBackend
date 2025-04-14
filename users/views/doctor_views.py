@@ -14,8 +14,8 @@ from django.db.models import Q
 from datetime import date, datetime, timedelta
 from django.utils import timezone
 from django.db.models import Count, Avg
-from ..forms import AppointmentForm, DoctorAvailabilityForm
-from django.core.exceptions import ValidationError
+from ..forms import AppointmentForm, DoctorAvailabilityForm, DoctorLeaveForm
+from django.core.exceptions import ValidationError, PermissionDenied
 from ..decorators import user_is_doctor
 from django.db import models
 from django.core.mail import send_mail
@@ -23,6 +23,7 @@ from django.conf import settings
 from django.urls import reverse
 from rest_framework.decorators import api_view, permission_classes
 from django.db.models import Case, When
+from django.contrib.auth.models import User
 
 def send_appointment_update_notification(appointment):
     try:
@@ -508,7 +509,7 @@ def create_patient_doctor(request):
             
             messages.success(request, 'Patient created successfully')
             return redirect('users:patients_list')
-            
+                
         except Exception as e:
             print(f"Error creating patient: {str(e)}")
             messages.error(request, f'Error creating patient: {str(e)}')
@@ -572,8 +573,8 @@ def manage_availability(request):
         if request.method == 'POST':
             # Handle availability form submission
             if 'start_time' in request.POST:
-                form = DoctorAvailabilityForm(request.POST)
-                if form.is_valid():
+             form = DoctorAvailabilityForm(request.POST)
+            if form.is_valid():
                     # Get selected days from checkboxes
                     available_days = request.POST.getlist('available_days')
                     
@@ -1108,21 +1109,21 @@ def get_available_slots_doctor(request, doctor_id, date):
         # Generate time slots based on all availability periods
         available_slots = []
         for availability in availabilities:
-            slot_time = datetime.combine(selected_date, availability.start_time)
-            end_time = datetime.combine(selected_date, availability.end_time)
-            
-            while slot_time.time() <= end_time.time():
-                # For current date, only show future time slots
-                if selected_date == current_date and slot_time.time() <= current_time:
-                    slot_time = slot_time + timedelta(minutes=30)
-                    continue
-                    
-                if slot_time.time() not in booked_slots:
-                    available_slots.append({
-                        'time': slot_time.strftime('%H:%M')
-                    })
-                
+          slot_time = datetime.combine(selected_date, availability.start_time)
+        end_time = datetime.combine(selected_date, availability.end_time)
+        
+        while slot_time.time() <= end_time.time():
+            # For current date, only show future time slots
+            if selected_date == current_date and slot_time.time() <= current_time:
                 slot_time = slot_time + timedelta(minutes=30)
+                continue
+                
+            if slot_time.time() not in booked_slots:
+                available_slots.append({
+                    'time': slot_time.strftime('%H:%M')
+                })
+            
+            slot_time = slot_time + timedelta(minutes=30)
         
         # Sort slots by time
         available_slots.sort(key=lambda x: x['time'])
@@ -1317,7 +1318,7 @@ def api_patient_prescriptions(request, patient_id):
     except (Doctor.DoesNotExist, Patient.DoesNotExist):
         return Response({'error': 'Not found'}, status=404)
     except Exception as e:
-        print(f"Error in prescriptions: {str(e)}") 
+        print(f"Error in prescriptions: {str(e)}")
         return Response({'error': 'Internal server error'}, status=500)
 
 @api_view(['GET'])
@@ -1856,3 +1857,46 @@ def patient_prescriptions_api(request, patient_id):
         return Response({
             'error': str(e)
         }, status=status.HTTP_400_BAD_REQUEST)
+
+@login_required
+def request_leave(request):
+    """Handle doctor leave requests"""
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        
+        if request.method == 'POST':
+            form = DoctorLeaveForm(request.POST)
+            if form.is_valid():
+                # Check for overlapping leaves
+                start_date = form.cleaned_data['start_date']
+                end_date = form.cleaned_data['end_date']
+                
+                overlapping_leaves = DoctorLeave.objects.filter(
+                    doctor=doctor,
+                    status__in=['pending', 'approved'],
+                    start_date__lte=end_date,
+                    end_date__gte=start_date
+                ).exists()
+                
+                if overlapping_leaves:
+                    messages.error(request, 'Leave request overlaps with existing approved or pending leaves')
+                    return render(request, 'doctor/request_leave.html', {'form': form})
+                
+                # Create leave request
+                leave = form.save(commit=False)
+                leave.doctor = doctor
+                leave.status = 'pending'
+                leave.save()
+                
+                messages.success(request, 'Leave request submitted successfully')
+                return redirect('users:doctor_dashboard')
+        else:
+            form = DoctorLeaveForm()
+            
+        return render(request, 'doctor/request_leave.html', {'form': form})
+        
+    except Doctor.DoesNotExist:
+        raise PermissionDenied("Only doctors can request leaves")
+    except Exception as e:
+        messages.error(request, f'Error requesting leave: {str(e)}')
+        return redirect('users:doctor_dashboard')

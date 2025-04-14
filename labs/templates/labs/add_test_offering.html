@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block title %}Add Test Offering{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-3xl mx-auto">
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
+                <h2 class="text-xl font-bold text-white flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                    </svg>
+                    Add Test Offering
+                </h2>
+            </div>
+            
+            <div class="p-6">
+                <form method="post" class="space-y-6" id="add-offering-form">
+                    {% csrf_token %}
+                    <input type="hidden" id="is_custom_test" name="is_custom_test" value="false">
+                    
+                    {% if form.non_field_errors %}
+                        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                                    </svg>
+                                </div>
+                                <div class="ml-3">
+                                    {% for error in form.non_field_errors %}
+                                        <p class="text-sm text-red-700">{{ error }}</p>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    {% if is_superuser %}
+                    <div class="space-y-2">
+                        <label for="{{ form.lab_profile.id_for_label }}" class="block text-sm font-medium text-gray-700 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                            Select Lab
+                        </label>
+                        {% render_field form.lab_profile class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %}
+                        {% if form.lab_profile.help_text %}
+                            <p class="mt-1 text-xs text-gray-500">{{ form.lab_profile.help_text }}</p>
+                        {% endif %}
+                        {% if form.lab_profile.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.lab_profile.errors|striptags }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="md:col-span-2 space-y-4">
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-sm font-medium text-gray-700 flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                    </svg>
+                                    Test Name
+                                </label>
+                                <div class="flex items-center">
+                                    <button type="button" id="dropdown_btn" class="px-2 py-1 text-xs rounded-l border border-gray-300 text-gray-800">
+                                        From List
+                                    </button>
+                                    
+                                    <button type="button" id="custom_btn" class="px-2 py-1 text-xs rounded-r border border-gray-300 text-gray-800">
+                                        Custom Test
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div id="dropdown_test_container">
+                                <label for="{{ form.test.id_for_label }}" class="sr-only">Select Test</label>
+                                {% render_field form.test class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %}
+                                {% if form.test.help_text %}
+                                    <p class="mt-1 text-xs text-gray-500">{{ form.test.help_text }}</p>
+                                {% endif %}
+                                {% if form.test.errors %}
+                                    <p class="mt-1 text-sm text-red-600">{{ form.test.errors|striptags }}</p>
+                                {% endif %}
+                            </div>
+                            
+                            <div id="custom_test_container" style="display:none;">
+                                <label for="custom_test_name" class="sr-only">Custom Test Name</label>
+                                <input type="text" name="custom_test_name" id="custom_test_name"
+                                       class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                       placeholder="Enter custom test name"
+                                       disabled>
+                                <p class="mt-1 text-xs text-gray-500">Enter a custom test name that's not in the dropdown</p>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label for="{{ form.price.id_for_label }}" class="block text-sm font-medium text-gray-700 flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                                </svg>
+                                Price (₹)
+                            </label>
+                            <div class="mt-1 relative rounded-md shadow-sm">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <span class="text-gray-500 sm:text-sm">₹</span>
+                                </div>
+                                {% render_field form.price class="block w-full pl-7 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="500" %}
+                            </div>
+                            {% if form.price.errors %}
+                                <p class="mt-1 text-sm text-red-600">{{ form.price.errors|striptags }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-2">
+                            <label for="{{ form.turnaround_time_hours.id_for_label }}" class="block text-sm font-medium text-gray-700 flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Turnaround Time (Hours)
+                            </label>
+                            {% render_field form.turnaround_time_hours class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="24" %}
+                            {% if form.turnaround_time_hours.help_text %}
+                                <p class="mt-1 text-xs text-gray-500">{{ form.turnaround_time_hours.help_text }}</p>
+                            {% endif %}
+                            {% if form.turnaround_time_hours.errors %}
+                                <p class="mt-1 text-sm text-red-600">{{ form.turnaround_time_hours.errors|striptags }}</p>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="flex items-center">
+                            <div class="mt-6">
+                                <label for="{{ form.offers_home_collection.id_for_label }}" class="flex items-center">
+                                    {% render_field form.offers_home_collection class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" %}
+                                    <span class="ml-2 text-sm text-gray-700 flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                        </svg>
+                                        Offers Home Collection
+                                    </span>
+                                </label>
+                                {% if form.offers_home_collection.help_text %}
+                                    <p class="mt-1 text-xs text-gray-500">{{ form.offers_home_collection.help_text }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label for="{{ form.specific_instructions.id_for_label }}" class="block text-sm font-medium text-gray-700 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Specific Instructions (Optional)
+                        </label>
+                        {% render_field form.specific_instructions class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" rows="3" placeholder="e.g., Fasting required, specific sample handling..." %}
+                        {% if form.specific_instructions.help_text %}
+                            <p class="mt-1 text-xs text-gray-500">{{ form.specific_instructions.help_text }}</p>
+                        {% endif %}
+                        {% if form.specific_instructions.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.specific_instructions.errors|striptags }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="pt-5 border-t border-gray-200">
+                        <div class="flex justify-end">
+                            <a href="{% url 'labs:dashboard' %}" class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                Cancel
+                            </a>
+                            <button type="submit" class="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                Add Test Offering
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const dropdownBtn = document.getElementById("dropdown_btn");
+        const customBtn = document.getElementById("custom_btn");
+        const dropdownContainer = document.getElementById("dropdown_test_container");
+        const customContainer = document.getElementById("custom_test_container");
+        const customInput = document.getElementById("custom_test_name");
+        const isCustomTest = document.getElementById("is_custom_test");
+
+        dropdownBtn.addEventListener("click", function () {
+            dropdownContainer.style.display = "block";
+            customContainer.style.display = "none";
+            customInput.disabled = true;
+            isCustomTest.value = "false";
+            dropdownBtn.classList.add("bg-blue-200");
+            customBtn.classList.remove("bg-blue-200");
+        });
+
+        customBtn.addEventListener("click", function () {
+            dropdownContainer.style.display = "none";
+            customContainer.style.display = "block";
+            customInput.disabled = false;
+            isCustomTest.value = "true";
+            customBtn.classList.add("bg-blue-200");
+            dropdownBtn.classList.remove("bg-blue-200");
+        });
+    });
+</script>
+
+{% endblock %} 

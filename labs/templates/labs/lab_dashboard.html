@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if is_superuser %}Admin - {% endif %}{{ lab_profile.name }} Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h2 class="text-2xl font-bold">{{ lab_profile.name }}</h2>
+            {% if is_superuser %}
+            <p class="text-gray-600">Lab ID: {{ lab_profile.id }}</p>
+            {% endif %}
+        </div>
+        <div class="flex space-x-4">
+            {% if is_superuser %}
+            <a href="{% url 'labs:approve_lab' lab_profile.id %}" 
+               class="{% if lab_profile.is_approved %}bg-green-600 hover:bg-green-700{% else %}bg-yellow-600 hover:bg-yellow-700{% endif %} text-white font-bold px-4 py-2 rounded">
+                {% if lab_profile.is_approved %}Approved{% else %}Approve{% endif %}
+            </a>
+            <a href="#" class="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded">
+                Deactivate
+            </a>
+            {% endif %}
+            <a href="{% url 'labs:add_test_offering' %}" class="bg-blue-600 hover:bg-blue-700 text-white !text-black text-lg px-4 py-2 rounded-lg shadow transition duration-300 text-center"> 
+                Add New Test
+            </a>
+            <a href="{% url 'labs:manage_tests' %}" class="bg-blue-600 hover:bg-blue-700 text-white !text-black text-lg px-4 py-2 rounded-lg shadow transition duration-300 text-center">
+                Manage Tests
+            </a>
+        </div>
+    </div>
+
+    <!-- Lab Info -->
+    {% if is_superuser %}
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <h3 class="text-lg font-semibold mb-2">Contact Information</h3>
+                <p class="text-gray-600">Email: {{ lab_profile.email }}</p>
+                <p class="text-gray-600">Phone: {{ lab_profile.phone_number }}</p>
+                <p class="text-gray-600">Contact Person: {{ lab_profile.contact_person }}</p>
+                <p class="text-gray-600">Designation: {{ lab_profile.contact_person_designation }}</p>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold mb-2">Address</h3>
+                <p class="text-gray-600">{{ lab_profile.address }}</p>
+                <h3 class="text-lg font-semibold mt-4 mb-2">Registration</h3>
+                <p class="text-gray-600">Registration Number: {{ lab_profile.registration_number }}</p>
+                <p class="text-gray-600">Certifications: {{ lab_profile.certifications }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Quick Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-semibold mb-2">Total Tests</h3>
+            <p class="text-3xl font-bold">{{ stats.total_tests }}</p>
+        </div>
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-semibold mb-2">Pending Orders</h3>
+            <p class="text-3xl font-bold">{{ stats.pending_orders }}</p>
+        </div>
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-semibold mb-2">Completed Orders</h3>
+            <p class="text-3xl font-bold">{{ stats.completed_orders }}</p>
+        </div>
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-semibold mb-2">Total Revenue</h3>
+            <p class="text-3xl font-bold">₹{{ stats.total_revenue }}</p>
+        </div>
+    </div>
+
+    <!-- Recent Orders -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Recent Orders</h3>
+            <a href="{% url 'labs:orders_list' %}" class="text-blue-600 hover:text-blue-800">View All</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="px-4 py-2">Order ID</th>
+                        <th class="px-4 py-2">Patient</th>
+                        <th class="px-4 py-2">Test</th>
+                        <th class="px-4 py-2">Status</th>
+                        <th class="px-4 py-2">Date</th>
+                        <th class="px-4 py-2">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in recent_orders %}
+                    <tr class="border-t">
+                        <td class="px-4 py-2">{{ order.id }}</td>
+                        <td class="px-4 py-2">{{ order.patient.get_full_name }}</td>
+                        <td class="px-4 py-2">{{ order.test.name }}</td>
+                        <td class="px-4 py-2">
+                            <span class="px-2 py-1 rounded text-sm 
+                                {% if order.status == 'PENDING' %}bg-yellow-100 text-yellow-800
+                                {% elif order.status == 'COMPLETED' %}bg-green-100 text-green-800
+                                {% else %}bg-blue-100 text-blue-800{% endif %}">
+                                {{ order.status }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2">{{ order.created_at|date:"M d, Y" }}</td>
+                        <td class="px-4 py-2">
+                            <a href="{% url 'labs:order_detail' order.id %}" class="text-blue-600 hover:text-blue-800">View</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-4 py-2 text-center text-gray-500">No recent orders</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Test Management -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <!-- Available Tests -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">Available Tests</h3>
+                <a href="{% url 'labs:manage_tests' %}" class="text-blue-600 hover:text-blue-800">Manage</a>
+            </div>
+            <div class="space-y-2">
+                {% for test in available_tests %}
+                <div class="border-b pb-2">
+                    <p class="font-medium">{{ test.name }}</p>
+                    <p class="text-sm text-gray-600">₹{{ test.price }}</p>
+                </div>
+                {% empty %}
+                <p class="text-gray-500">No tests available</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Doctor Requests -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">Doctor Requests</h3>
+                <a href="{% url 'labs:doctor_requests' %}" class="text-blue-600 hover:text-blue-800">View All</a>
+            </div>
+            <div class="space-y-2">
+                {% for request in doctor_requests %}
+                <div class="border-b pb-2">
+                    <p class="font-medium">Dr. {{ request.doctor.get_full_name }}</p>
+                    <p class="text-sm text-gray-600">{{ request.test.name }}</p>
+                    <p class="text-sm text-gray-500">{{ request.created_at|date:"M d, Y" }}</p>
+                </div>
+                {% empty %}
+                <p class="text-gray-500">No pending requests</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Overview -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h3 class="text-lg font-semibold mb-4">Payment Overview</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="border rounded-lg p-4">
+                <h4 class="font-medium mb-2">Pending Payments</h4>
+                <p class="text-2xl font-bold">₹{{ payment_stats.pending }}</p>
+            </div>
+            <div class="border rounded-lg p-4">
+                <h4 class="font-medium mb-2">Completed Payments</h4>
+                <p class="text-2xl font-bold">₹{{ payment_stats.completed }}</p>
+            </div>
+            <div class="border rounded-lg p-4">
+                <h4 class="font-medium mb-2">Total Revenue</h4>
+                <p class="text-2xl font-bold">₹{{ payment_stats.total }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

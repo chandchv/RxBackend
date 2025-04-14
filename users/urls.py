@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from .views import doctor_views, staff_views, admin_views
+from .views import doctor_views, staff_views, admin_views, lab_views
 from .views import auth_views
 from .views import (
     signup_view,
@@ -108,6 +108,11 @@ from .views.clinic_admin_views import (
     lab_tests,
     assign_doctor,
     available_doctors,
+    approve_staff_leave,
+    reject_staff_leave,
+    doctor_leaves,
+    approve_doctor_leave,
+    reject_doctor_leave,
 )
 
 from .views.auth_views import (
@@ -128,6 +133,7 @@ from .views.api_views import (
     get_clinic_appointments,
     get_clinic_doctors,
     get_clinic_staff,
+    public_clinics_api,
     update_staff_role,
     get_available_slots,
     get_clinics,
@@ -154,6 +160,9 @@ api_urlpatterns = [
 
 # Main URLs
 urlpatterns = [
+    # Superuser URLs
+    path('superuser/dashboard/', admin_views.superuser_dashboard, name='superuser_dashboard'),
+    
     # Patient URLs
     path('patients/create/', create_patient, name='create_patient'),
     path('patients/', patients_list, name='patients_list'),
@@ -191,6 +200,8 @@ urlpatterns = [
     path('staff/lab-tests/<int:test_id>/delete/', staff_views.staff_delete_lab_test, name='staff_delete_lab_test'),
     path('staff/walk-in/', staff_views.staff_walk_in_appointment, name='staff_walk_in_appointment'),
     path('staff/leaves/', staff_views.staff_manage_leaves, name='staff_manage_leaves'),
+    path('staff/leaves/approve/<int:leave_id>/', clinic_admin_views.approve_staff_leave, name='approve_staff_leave'),
+    path('staff/leaves/reject/<int:leave_id>/', clinic_admin_views.reject_staff_leave, name='reject_staff_leave'),
     
     # Authentication & Profile URLs
     path('', login_view, name='login'),
@@ -252,6 +263,12 @@ urlpatterns = [
     # Clinic Admin URLs - Updated paths
     path('clinic-admin/', clinic_admin_dashboard, name='clinic_admin_dashboard'),
     path('clinic-admin/profile/', clinic_profile, name='clinic_profile'),
+    path('clinic-admin/staff-leaves/', clinic_admin_views.staff_leaves, name='staff_leaves'),
+    path('clinic-admin/doctor-leaves/', clinic_admin_views.doctor_leaves, name='doctor_leaves'),
+    path('clinic-admin/staff-leaves/approve/<int:leave_id>/', clinic_admin_views.approve_staff_leave, name='approve_staff_leave'),
+    path('clinic-admin/staff-leaves/reject/<int:leave_id>/', clinic_admin_views.reject_staff_leave, name='reject_staff_leave'),
+    path('clinic-admin/doctor-leaves/approve/<int:leave_id>/', clinic_admin_views.approve_doctor_leave, name='approve_doctor_leave'),
+    path('clinic-admin/doctor-leaves/reject/<int:leave_id>/', clinic_admin_views.reject_doctor_leave, name='reject_doctor_leave'),
     
     # Doctor management
     path('clinic-admin/doctors/', doctors_list, name='doctors_list'),
@@ -372,6 +389,8 @@ urlpatterns = [
     path('doctor/generate-slots/', doctor_views.generate_slots, name='generate_slots'),
     path('api/doctor/generate-slots/', doctor_views.generate_slots_api, name='generate_slots_api'),
     path('doctor/leaves/', doctor_views.manage_leaves, name='manage_leaves'),
+    path('doctor/leaves/approve/<int:leave_id>/', clinic_admin_views.approve_doctor_leave, name='approve_doctor_leave'),
+    path('doctor/leaves/reject/<int:leave_id>/', clinic_admin_views.reject_doctor_leave, name='reject_doctor_leave'),
     path('profile/setup/', dashboard_views.profile_setup, name='profile_setup'),
     path('patient/medical-history/', 
          patient_views.patient_medical_history, 
@@ -437,6 +456,7 @@ urlpatterns = [
     path('change-clinic/<int:clinic_id>/', clinic_admin_views.change_clinic, name='change_clinic'),
     path('edit-clinic-profile/<int:clinic_id>/', clinic_admin_views.edit_clinic_profile, name='edit_clinic_profile'),
     path('api/clinics/', get_clinics_api, name='get_clinics_api'),
+    path('api/clinics/public/', public_clinics_api, name='public_clinics_api'),
     path('api/clinics/create/', create_clinic_api, name='create_clinic_api'),
     path('api/clinics/current/', update_current_clinic, name='update_current_clinic'),
     path('api/clinic-admin/dashboard/<int:clinic_id>/', clinic_admin_views.clinic_admin_dashboard_api, name='clinic_admin_dashboard_api_with_id'),
@@ -471,13 +491,20 @@ urlpatterns = [
     path('auth/google/', verify_firebase_token, name='verify_firebase_token'),
     path('social-auth/', include('social_django.urls', namespace='social')),
     path('add-lab/', clinic_admin_views.add_lab, name='add_lab'),
-    path('labs/', clinic_admin_views.labs_list, name='labs_list'),
-    path('lab-staff/', clinic_admin_views.lab_staff_list, name='lab_staff_list'),
-    path('lab-tests/', clinic_admin_views.lab_tests, name='lab_tests'),
-    path('lab/dashboard/', lab_views.lab_dashboard, name='lab_dashboard'),
-    path('lab/test/<int:pk>/', lab_views.lab_test_detail, name='lab_test_detail'),
+    path('clinic-admin/labs/', clinic_admin_views.labs_list, name='labs_list'),
+    path('clinic-admin/labs/add/', clinic_admin_views.add_lab, name='add_lab'),
+    path('clinic-admin/labs/staff/', clinic_admin_views.lab_staff_list, name='lab_staff_list'),
+    path('clinic-admin/labs/tests/', clinic_admin_views.lab_tests, name='lab_tests'),
+    path('clinic-admin/lab/dashboard/', lab_views.lab_dashboard, name='lab_dashboard'),
     # Staff Calendar API
     path('api/appointments/calendar/', staff_views.staff_calendar_events, name='staff_calendar_events'),
+    path('doctor-leaves/', clinic_admin_views.doctor_leaves, name='doctor_leaves'),
+    path('doctor-leaves/<int:leave_id>/approve/', clinic_admin_views.approve_doctor_leave, name='approve_doctor_leave'),
+    path('doctor-leaves/<int:leave_id>/reject/', clinic_admin_views.reject_doctor_leave, name='reject_doctor_leave'),
+    path('doctor-leaves/<int:leave_id>/edit/', clinic_admin_views.edit_doctor_leave, name='edit_doctor_leave'),
+    path('doctor-leaves/<int:leave_id>/cancel/', clinic_admin_views.cancel_doctor_leave, name='cancel_doctor_leave'),
+    path('request-leave/', doctor_views.request_leave, name='request_leave'),
+    path('api/labs/available/', lab_views.get_available_labs, name='get_available_labs'),
 ]
 
 router = DefaultRouter()

@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Lab Registration{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-8">
+    <div class="bg-white shadow-lg rounded-lg">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h1 class="text-2xl font-bold text-gray-900">Lab Registration</h1>
+            <p class="text-gray-600 mt-2">Register your lab to join the RxDoctor network</p>
+        </div>
+
+        <form method="POST" enctype="multipart/form-data" class="p-6 space-y-4">
+            {% csrf_token %}
+            
+            {% if messages %}
+            <div class="mb-4">
+                {% for message in messages %}
+                <div class="{% if message.tags == 'success' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %} p-4 rounded">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">Lab Name</label>
+                    {{ form.name }}
+                    {% if form.name.errors %}
+                    <div class="text-red-600 text-sm">{{ form.name.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">Email</label>
+                    {{ form.email }}
+                    {% if form.email.errors %}
+                    <div class="text-red-600 text-sm">{{ form.email.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">Phone Number</label>
+                    {{ form.phone_number }}
+                    {% if form.phone_number.errors %}
+                    <div class="text-red-600 text-sm">{{ form.phone_number.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">Registration Number</label>
+                    {{ form.registration_number }}
+                    {% if form.registration_number.errors %}
+                    <div class="text-red-600 text-sm">{{ form.registration_number.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">GST Number</label>
+                    {{ form.gst_number }}
+                    {% if form.gst_number.errors %}
+                    <div class="text-red-600 text-sm">{{ form.gst_number.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">KYC Documents</label>
+                    {{ form.kyc_documents }}
+                    {% if form.kyc_documents.errors %}
+                    <div class="text-red-600 text-sm">{{ form.kyc_documents.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">Address</label>
+                {{ form.address }}
+                {% if form.address.errors %}
+                <div class="text-red-600 text-sm">{{ form.address.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">City</label>
+                    {{ form.city }}
+                    {% if form.city.errors %}
+                    <div class="text-red-600 text-sm">{{ form.city.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">State</label>
+                    {{ form.state }}
+                    {% if form.state.errors %}
+                    <div class="text-red-600 text-sm">{{ form.state.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">Pincode</label>
+                    {{ form.pincode }}
+                    {% if form.pincode.errors %}
+                    <div class="text-red-600 text-sm">{{ form.pincode.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="pt-4">
+                <button type="submit" 
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                    Submit Registration
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+
+{% block title %}Lab Registration{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-2xl font-bold mb-6">Lab Registration</h2>
+        
+        {% if messages %}
+            {% for message in messages %}
+                <div class="mb-4 p-4 rounded {% if message.tags == 'success' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" class="space-y-4">
+            {% csrf_token %}
+            
+            <!-- Basic Information -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-semibold">Basic Information</h3>
+                
+                <div>
+                    <label for="id_name" class="block text-sm font-medium text-gray-700">Lab Name</label>
+                    {{ form.name }}
+                    {% if form.name.errors %}
+                        <div class="text-red-500 text-sm">{{ form.name.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="id_registration_number" class="block text-sm font-medium text-gray-700">Registration Number</label>
+                    {{ form.registration_number }}
+                    {% if form.registration_number.errors %}
+                        <div class="text-red-500 text-sm">{{ form.registration_number.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="id_contact_person" class="block text-sm font-medium text-gray-700">Contact Person</label>
+                    {{ form.contact_person }}
+                    {% if form.contact_person.errors %}
+                        <div class="text-red-500 text-sm">{{ form.contact_person.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="id_contact_person_designation" class="block text-sm font-medium text-gray-700">Contact Person Designation</label>
+                    {{ form.contact_person_designation }}
+                    {% if form.contact_person_designation.errors %}
+                        <div class="text-red-500 text-sm">{{ form.contact_person_designation.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-semibold">Contact Information</h3>
+                
+                <div>
+                    <label for="id_address" class="block text-sm font-medium text-gray-700">Address</label>
+                    {{ form.address }}
+                    {% if form.address.errors %}
+                        <div class="text-red-500 text-sm">{{ form.address.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="id_phone_number" class="block text-sm font-medium text-gray-700">Phone Number</label>
+                    {{ form.phone_number }}
+                    {% if form.phone_number.errors %}
+                        <div class="text-red-500 text-sm">{{ form.phone_number.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="id_email" class="block text-sm font-medium text-gray-700">Email</label>
+                    {{ form.email }}
+                    {% if form.email.errors %}
+                        <div class="text-red-500 text-sm">{{ form.email.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Certifications -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-semibold">Certifications</h3>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Select Certifications</label>
+                    <div class="space-y-2">
+                        {{ form.certifications }}
+                    </div>
+                    {% if form.certifications.errors %}
+                        <div class="text-red-500 text-sm">{{ form.certifications.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="id_other_certification" class="block text-sm font-medium text-gray-700">Other Certification</label>
+                    {{ form.other_certification }}
+                    {% if form.other_certification.errors %}
+                        <div class="text-red-500 text-sm">{{ form.other_certification.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Account Information -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-semibold">Account Information</h3>
+                
+                <div>
+                    <label for="id_username" class="block text-sm font-medium text-gray-700">Username</label>
+                    {{ form.username }}
+                    {% if form.username.errors %}
+                        <div class="text-red-500 text-sm">{{ form.username.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="id_password1" class="block text-sm font-medium text-gray-700">Password</label>
+                    {{ form.password1 }}
+                    {% if form.password1.errors %}
+                        <div class="text-red-500 text-sm">{{ form.password1.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="id_password2" class="block text-sm font-medium text-gray-700">Confirm Password</label>
+                    {{ form.password2 }}
+                    {% if form.password2.errors %}
+                        <div class="text-red-500 text-sm">{{ form.password2.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="mt-6">
+                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    Register
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %} 

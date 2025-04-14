@@ -25,6 +25,8 @@ import datetime as dt
 from django.db.models import Case, When, Value, IntegerField
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group
+# Add this import
+from notifications.utils import create_notification
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,19 @@ def update_appointment_status(request, appointment_id):
         if new_status in ['scheduled', 'completed', 'cancelled']:
             appointment.status = new_status
             appointment.save()
+            # --- Add Notification ---
+            try:
+                create_notification(
+                    recipient=appointment.patient.user,
+                    message=f"Your appointment with Dr. {appointment.doctor.name} on {appointment.appointment_date.strftime('%d-%b-%Y')} has been updated to: {new_status.capitalize()}.".format(new_status=new_status),
+                    sender=request.user, # Doctor updating via API
+                    notification_type='appointment_status_update',
+                    related_object=appointment
+                )
+            except Exception as e:
+                 logger.error(f"Error creating notification in API update_appointment_status: {e}")
+                 # Don't block the API response for notification failure
+            # --- End Notification ---
             return Response({'success': True})
         return Response(
             {'error': 'Invalid status'}, 
@@ -134,6 +149,19 @@ def cancel_appointment(request, appointment_id):
         if appointment.status == 'scheduled':
             appointment.status = 'cancelled'
             appointment.save()
+            # --- Add Notification ---
+            try:
+                create_notification(
+                    recipient=appointment.doctor.user,
+                    message=f"Appointment with {appointment.patient.get_full_name()} on {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')} was cancelled by the patient.",
+                    sender=request.user, # Patient cancelling via API
+                    notification_type='appointment_cancelled',
+                    related_object=appointment
+                )
+            except Exception as e:
+                 logger.error(f"Error creating notification in API cancel_appointment: {e}")
+                 # Don't block the API response for notification failure
+            # --- End Notification ---
             return Response({'success': True})
         
         return Response(
@@ -804,6 +832,20 @@ def create_appointment(request):
             status='scheduled'
         )
 
+        # --- Add Notification --- 
+        try:
+            create_notification(
+                recipient=appointment.doctor.user,
+                message=f"New appointment booked by {appointment.patient.get_full_name()} for {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')}.",
+                sender=request.user, # Patient using the API
+                notification_type='appointment_new',
+                related_object=appointment
+            )
+        except Exception as e:
+            logger.error(f"Error creating notification in API create_appointment: {e}")
+            # Don't block the API response for notification failure
+        # --- End Notification ---
+
         return Response({
             'message': 'Appointment created successfully',
             'id': appointment.id
@@ -975,4 +1017,22 @@ def clinic_doctors(request, clinic_id):
             {'error': str(e)}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+@api_view(['GET'])
+@permission_classes([])  # No authentication required
+def public_clinics_api(request):
+    """Public API endpoint to get list of clinics for patient registration"""
+    try:
+        clinics = Clinic.objects.all()  # Remove is_active filter
+        data = [{
+            'id': clinic.id,
+            'name': clinic.name,
+            'address': clinic.address,
+            'phone_number': clinic.phone_number,
+            'email': clinic.email
+        } for clinic in clinics]
+        return Response(data)
+    except Exception as e:
+        logger.error(f"Error in public clinics API: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

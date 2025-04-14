@@ -25,8 +25,25 @@ def user_is_staff(view_func):
     return _wrapped_view
 
 def user_is_admin(view_func):
+    """
+    Decorator to check if the user is a clinic administrator.
+    """
+    @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            raise PermissionDenied("You must be logged in to access this page")
+            
+        # If user is superuser, allow access
         if request.user.is_superuser:
             return view_func(request, *args, **kwargs)
-        raise PermissionDenied
+            
+        # For non-superusers, check for ClinicAdmin profile
+        if not hasattr(request.user, 'clinic_admin'):
+            raise PermissionDenied("You must be a clinic administrator to access this page")
+            
+        # Check if ClinicAdmin has a clinic assigned
+        if not request.user.clinic_admin.clinic:
+            raise PermissionDenied("You must be assigned to a clinic to access this page")
+            
+        return view_func(request, *args, **kwargs)
     return _wrapped_view 

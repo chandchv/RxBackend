@@ -1,7 +1,7 @@
 from django.http import HttpResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
-from ..models import Clinic, Prescription
+from ..models import Clinic, LabTestPrescription, Prescription
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -111,11 +111,15 @@ def generate_prescription_pdf(request, pk, format_type='digital'):
         ).order_by('-created_at').first()
 
         # Get lab tests
-        lab_tests = LabTest.objects.filter(
+        lab_prescriptions = LabTestPrescription.objects.filter(
             patient=prescription.patient,
-            doctor=prescription.doctor,
-            created_at__date=prescription.created_at.date()
-        ).order_by('created_at')
+            doctor=prescription.doctor.user,
+            prescription_date__date=prescription.created_at.date()
+        )
+        
+        lab_tests = []
+        for lab_prescription in lab_prescriptions:
+            lab_tests.extend(LabTest.objects.filter(prescription=lab_prescription))
 
         # Calculate patient age
         patient_age = calculate_age(prescription.patient.date_of_birth)

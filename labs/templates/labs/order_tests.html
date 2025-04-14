@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block title %}Order Lab Tests{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold">Order Lab Tests for {{ patient.get_full_name }}</h1>
+            <a href="{% url 'users:patient_detail' patient.id %}" 
+               class="text-blue-500 hover:text-blue-700">
+                Back to Patient
+            </a>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="mb-4 p-4 rounded {% if message.tags == 'success' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+            
+            <!-- Available Tests Section -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-bold mb-4">Available Tests</h2>
+                <div class="space-y-4">
+                    {% for test in available_tests %}
+                    <div class="flex items-start">
+                        <input type="checkbox" 
+                               name="tests" 
+                               value="{{ test.id }}" 
+                               id="test_{{ test.id }}"
+                               class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        <label for="test_{{ test.id }}" class="ml-3">
+                            <span class="block text-sm font-medium text-gray-900">{{ test.name }}</span>
+                            {% if test.description %}
+                                <span class="block text-sm text-gray-500">{{ test.description }}</span>
+                            {% endif %}
+                            {% if test.preparation_instructions %}
+                                <span class="block text-xs text-gray-500 mt-1">
+                                    <strong>Preparation:</strong> {{ test.preparation_instructions }}
+                                </span>
+                            {% endif %}
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Lab Recommendation Section -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-bold mb-4">Lab Recommendation (Optional)</h2>
+                <p class="text-sm text-gray-500 mb-4">
+                    You can recommend a specific lab to the patient. They can still choose a different lab.
+                </p>
+                <select name="recommended_lab" 
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">No specific recommendation</option>
+                    {% for lab in approved_labs %}
+                        <option value="{{ lab.id }}">{{ lab.name }} - {{ lab.address }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex justify-end space-x-4">
+                <a href="{% url 'users:patient_detail' patient.id %}" 
+                   class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </a>
+                <button type="submit" 
+                        class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                    Order Tests
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %} 

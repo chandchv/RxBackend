@@ -15,6 +15,13 @@ from .permissions import IsStaff
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db.models import Q
 from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied
+import logging
+from notifications.utils import create_notification
+
+logger = logging.getLogger(__name__)
+User = get_user_model()
 
 @login_required
 @user_is_staff
@@ -34,7 +41,7 @@ def staff_create_appointment(request):
     try:
         staff = request.user.staff
         clinic = staff.clinic
-        
+
         # Get available patients and doctors for the clinic
         patients = Patient.objects.filter(clinic=clinic)
         doctors = Doctor.objects.filter(clinic=clinic)
@@ -69,8 +76,33 @@ def staff_create_appointment(request):
                     status='scheduled'
                 )
                 
+                # --- Add Notifications --- 
+                try:
+                    # Notify Doctor
+                    create_notification(
+                        recipient=appointment.doctor.user,
+                        message=f"New appointment scheduled by staff for {appointment.patient.get_full_name()} on {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')}.",
+                        sender=request.user, 
+                        notification_type='appointment_new',
+                        related_object=appointment
+                    )
+                    # Notify Patient
+                    create_notification(
+                        recipient=appointment.patient.user,
+                        message=f"Your appointment with Dr. {appointment.doctor.name} is scheduled for {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')} (booked by clinic staff).",
+                        sender=request.user,
+                        notification_type='appointment_new',
+                        related_object=appointment
+                    )
+                except Exception as e:
+                    logger.error(f"Error creating notification in staff_create_appointment: {e}")
+                    messages.warning(request, "Appointment created, but failed to send notifications.")
+                # --- End Notifications ---
+
                 messages.success(request, 'Appointment created successfully!')
                 return redirect('users:staff_appointment_detail', appointment_id=appointment.id)
+            except (Patient.DoesNotExist, Doctor.DoesNotExist):
+                messages.error(request, 'Invalid patient or doctor selected.')
             except Exception as e:
                 messages.error(request, f'Error creating appointment: {str(e)}')
         
@@ -153,20 +185,48 @@ def staff_update_appointment(request, appointment_id):
     staff = request.user.staff
     clinic = staff.clinic
     appointment = get_object_or_404(Appointment, id=appointment_id, doctor__clinic=clinic)
-    
+    original_details = f"Dr. {appointment.doctor.name} on {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')}" # Store original details for comparison/notification message
+
     if request.method == 'POST':
         form = StaffAppointmentForm(request.POST, instance=appointment, clinic=clinic)
         if form.is_valid():
             try:
-                form.save()
+                updated_appointment = form.save()
+                # --- Add Notifications ---
+                try:
+                    updated_details = f"Dr. {updated_appointment.doctor.name} on {updated_appointment.appointment_date.strftime('%d-%b-%Y')} at {updated_appointment.appointment_time.strftime('%I:%M %p')}"
+                    change_message = f"Appointment updated by staff. Details changed from {original_details} to {updated_details}."
+                    
+                    # Notify Doctor
+                    create_notification(
+                        recipient=updated_appointment.doctor.user,
+                        message=f"Your appointment with {updated_appointment.patient.get_full_name()} was updated by staff. {change_message}",
+                        sender=request.user,
+                        notification_type='appointment_updated',
+                        related_object=updated_appointment
+                    )
+                    # Notify Patient
+                    create_notification(
+                        recipient=updated_appointment.patient.user,
+                        message=f"Your appointment details were updated by clinic staff. {change_message}",
+                        sender=request.user,
+                        notification_type='appointment_updated',
+                        related_object=updated_appointment
+                    )
+                except Exception as e:
+                    logger.error(f"Error creating notification in staff_update_appointment: {e}")
+                    messages.warning(request, "Appointment updated, but failed to send notifications.")
+                # --- End Notifications ---
+
                 messages.success(request, 'Appointment updated successfully!')
-                return redirect('users:staff_dashboard')
+                return redirect('users:staff_appointment_detail', appointment_id=updated_appointment.id) # Redirect to detail view
             except Exception as e:
                 messages.error(request, f'Error updating appointment: {str(e)}')
-        else:
+        else: # Corrected indentation for else block
             messages.error(request, 'Please correct the errors below.')
-    else:
-        form = StaffAppointmentForm(instance=appointment, clinic=clinic)
+       
+    # Moved form instantiation outside the else block to handle GET requests correctly
+    form = StaffAppointmentForm(instance=appointment, clinic=clinic) 
     
     return render(request, 'staff/update_appointment.html', {
         'form': form,
@@ -189,6 +249,28 @@ def staff_cancel_appointment(request, appointment_id):
         try:
             appointment.status = 'cancelled'
             appointment.save()
+             # --- Add Notifications --- 
+            try:
+                # Notify Doctor
+                create_notification(
+                    recipient=appointment.doctor.user,
+                    message=f"Appointment with {appointment.patient.get_full_name()} on {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')} was cancelled by staff.",
+                    sender=request.user, 
+                    notification_type='appointment_cancelled',
+                    related_object=appointment
+                )
+                # Notify Patient
+                create_notification(
+                    recipient=appointment.patient.user,
+                    message=f"Your appointment with Dr. {appointment.doctor.name} on {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')} was cancelled by clinic staff.",
+                    sender=request.user,
+                    notification_type='appointment_cancelled',
+                    related_object=appointment
+                )
+            except Exception as e:
+                logger.error(f"Error creating notification in staff_cancel_appointment: {e}")
+                messages.warning(request, "Appointment cancelled, but failed to send notifications.")
+            # --- End Notifications ---
             messages.success(request, 'Appointment cancelled successfully!')
         except Exception as e:
             messages.error(request, f'Error cancelling appointment: {str(e)}')
@@ -446,7 +528,7 @@ def staff_appointment_detail(request, appointment_id):
         if appointment.doctor.clinic != staff.clinic:
             messages.error(request, "You don't have permission to view this appointment")
             return redirect('users:staff_dashboard')
-            
+
         context = {
             'appointment': appointment,
             'patient': appointment.patient,
@@ -455,7 +537,7 @@ def staff_appointment_detail(request, appointment_id):
         }
         
         return render(request, 'staff/appointment_detail.html', context)
-        
+
     except Exception as e:
         messages.error(request, f'Error viewing appointment: {str(e)}')
         return redirect('users:staff_dashboard')
@@ -739,7 +821,7 @@ def staff_walk_in_appointment(request):
         # Get today's date and time
         today = timezone.now().date()
         current_time = timezone.now().time()
-        
+
         context = {
             'doctors': doctors,
             'clinic': staff.clinic,
@@ -748,7 +830,7 @@ def staff_walk_in_appointment(request):
         }
         
         return render(request, 'staff/walk_in_appointment.html', context)
-        
+
     except Exception as e:
         messages.error(request, f'Error: {str(e)}')
         return redirect('users:staff_dashboard')
@@ -819,7 +901,7 @@ def staff_manage_leaves(request):
                 # Notify clinic admin
                 admin_users = User.objects.filter(
                     is_staff=True,
-                    clinicadmin__clinic=clinic
+                    clinic_admin__clinic=clinic
                 )
                 
                 for admin in admin_users:
@@ -836,7 +918,7 @@ def staff_manage_leaves(request):
                 
             except Exception as e:
                 messages.error(request, f'Error submitting leave request: {str(e)}')
-        
+
         context = {
             'staff': staff,
             'clinic': clinic,
@@ -849,7 +931,7 @@ def staff_manage_leaves(request):
         }
         
         return render(request, 'staff/manage_leaves.html', context)
-        
+
     except Exception as e:
         messages.error(request, f'Error accessing leave management: {str(e)}')
         return redirect('users:staff_dashboard') 

@@ -33,12 +33,13 @@ def get_csrf_token(request):
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path('labs/', include('labs.urls', namespace='labs')),
     path("", include(('users.urls', 'users'), namespace='users')),
     path("api/token-auth/", obtain_auth_token, name="api_token_auth"),
-    #path("users/", include('users.urls')),
     path('dashboard/', views.dashboard_view, name='dashboard'),
     path('', redirect_to_dashboard, name='root'),  # Add this line for root URL
     path('api/', include(('users.urls', 'users_api'), namespace='users_api')),
+    path('api/notifications/', include('notifications.urls', namespace='notifications_api')),
     path('api/get-csrf-token/', get_csrf_token),
     path('social/', include(('social_django.urls', 'social'), namespace='social')),
 ]

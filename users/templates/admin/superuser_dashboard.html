@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+
+{% block title %}Superuser Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">Superuser Dashboard</h2>
+        <div class="flex space-x-4">
+            <a href="{% url 'users:clinic_admin_dashboard' %}" class="bg-blue-600 hover:bg-blue-700 text-white !text-white font-bold text-lg px-6 py-3 rounded-lg shadow transition duration-300">
+                Clinic Admin Dashboard
+            </a>
+            <a href="{% url 'labs:dashboard' %}" class="bg-blue-600 hover:bg-blue-700 text-white !text-white font-bold text-lg px-6 py-3 rounded-lg shadow transition duration-300">
+                Labs Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-semibold mb-4">Lab Statistics</h3>
+            <div class="space-y-2">
+                <p>Total Labs: {{ lab_stats.total_labs }}</p>
+                <p>Approved Labs: {{ lab_stats.approved_labs }}</p>
+                <p>Pending Labs: {{ lab_stats.pending_labs }}</p>
+                <p>Total Orders: {{ lab_stats.total_orders }}</p>
+                <p>Pending Orders: {{ lab_stats.pending_orders }}</p>
+                <p>Completed Orders: {{ lab_stats.completed_orders }}</p>
+            </div>
+            <div class="mt-4 flex space-x-4">
+                <a href="{% url 'labs:manage_tests' %}" class="text-blue-600 hover:text-blue-800 transition-colors duration-200">Manage Labs</a>
+                <a href="{% url 'labs:dashboard' %}" class="text-blue-600 hover:text-blue-800 transition-colors duration-200">View Orders</a>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-semibold mb-4">User Statistics</h3>
+            <div class="space-y-2">
+                <p>Total Doctors: {{ user_stats.total_doctors }}</p>
+                <p>Total Patients: {{ user_stats.total_patients }}</p>
+                <p>Total Staff: {{ user_stats.total_staff }}</p>
+                <p>Active Doctors: {{ user_stats.active_doctors }}</p>
+                <p>Active Patients: {{ user_stats.active_patients }}</p>
+            </div>
+            <div class="mt-4 flex space-x-4">
+                <a href="{% url 'users:clinic_admin_dashboard' %}" class="text-blue-600 hover:text-blue-800 transition-colors duration-200">Manage Users</a>   
+                <a href="{% url 'users:patients_list' %}" class="text-blue-600 hover:text-blue-800 transition-colors duration-200">Manage Patients</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <!-- Recent Lab Orders -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">Recent Lab Orders</h3>
+                <a href="{% url 'labs:dashboard' %}" class="text-sm text-blue-600 hover:text-blue-800 transition-colors duration-200">View All</a>
+            </div>
+            <div class="space-y-2">
+                {% for order in recent_activity.lab_orders %}
+                    <div class="border-b pb-2">
+                        <p class="font-medium">{{ order.patient.get_full_name }}</p>
+                        <p class="text-sm text-gray-600">{{ order.chosen_lab.name }}</p>
+                        <p class="text-sm text-gray-500">{{ order.order_date|date:"M d, Y" }}</p>
+                    </div>
+                {% empty %}
+                    <p class="text-gray-500">No recent lab orders</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Recent Labs -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">Recent Labs</h3>
+                <a href="{% url 'labs:manage_tests' %}" class="text-sm text-blue-600 hover:text-blue-800 transition-colors duration-200">View All</a>
+            </div>
+            <div class="space-y-2">
+                {% for lab in recent_activity.labs %}
+                    <div class="border-b pb-2">
+                        <p class="font-medium">{{ lab.name }}</p>
+                        <p class="text-sm text-gray-600">{{ lab.email }}</p>
+                        <p class="text-sm text-gray-500">{{ lab.created_at|date:"M d, Y" }}</p>
+                    </div>
+                {% empty %}
+                    <p class="text-gray-500">No recent labs</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Recent Doctors -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">Recent Doctors</h3>
+                <a href="{% url 'users:clinic_admin_dashboard' %}" class="text-sm text-blue-600 hover:text-blue-800 transition-colors duration-200">View All</a>
+            </div>
+            <div class="space-y-2">
+                {% for doctor in recent_activity.doctors %}
+                    <div class="border-b pb-2">
+                        <p class="font-medium">{{ doctor.user.get_full_name }}</p>
+                        <p class="text-sm text-gray-600">{{ doctor.specialization }}</p>
+                        <p class="text-sm text-gray-500">{{ doctor.created_at|date:"M d, Y" }}</p>
+                    </div>
+                {% empty %}
+                    <p class="text-gray-500">No recent doctors</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Management Sections -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <!-- User Management -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-semibold mb-4">User Management</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <a href="{% url 'users:clinic_admin_dashboard' %}" class="bg-blue-600 hover:bg-blue-700 text-white !text-white font-bold text-lg px-6 py-3 rounded-lg shadow transition duration-300 text-center">
+                    Manage Users
+                </a>
+                <a href="{% url 'users:patients_list' %}" class="bg-blue-600 hover:bg-blue-700 text-white !text-white font-bold text-lg px-6 py-3 rounded-lg shadow transition duration-300 text-center">
+                    Manage Patients
+                </a>
+                <a href="{% url 'users:clinic_admin_dashboard' %}" class="bg-blue-600 hover:bg-blue-700 text-white !text-white font-bold text-lg px-6 py-3 rounded-lg shadow transition duration-300 text-center">
+                    Manage Staff
+                </a>
+                <a href="{% url 'users:clinic_admin_dashboard' %}" class="bg-blue-600 hover:bg-blue-700 text-white !text-white font-bold text-lg px-6 py-3 rounded-lg shadow transition duration-300 text-center">
+                    Manage Doctors
+                </a>
+            </div>
+        </div>
+
+        <!-- Lab Management -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-semibold mb-4">Lab Management</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <a href="{% url 'labs:manage_tests' %}" class="bg-blue-600 hover:bg-blue-700 text-white !text-white font-bold text-lg px-6 py-3 rounded-lg shadow transition duration-300 text-center">
+                    Manage Labs
+                </a>
+                <a href="{% url 'labs:dashboard' %}" class="bg-blue-600 hover:bg-blue-700 text-white !text-white font-bold text-lg px-6 py-3 rounded-lg shadow transition duration-300 text-center">
+                    Lab Dashboard
+                </a>
+                <a href="{% url 'labs:register' %}" class="bg-blue-600 hover:bg-blue-700 text-white !text-white font-bold text-lg px-6 py-3 rounded-lg shadow transition duration-300 text-center">
+                    Register Lab
+                </a>
+                <a href="{% url 'labs:approve_lab' 0 %}" class="bg-blue-600 hover:bg-blue-700 text-white !text-white font-bold text-lg px-6 py-3 rounded-lg shadow transition duration-300 text-center">
+                    Approve Labs
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Settings -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h3 class="text-lg font-semibold mb-4">System Settings</h3>
+        <div class="grid grid-cols-2 gap-4">
+            <a href="{% url 'admin:index' %}" class="bg-blue-600 hover:bg-blue-700 text-white !text-white font-bold text-lg px-6 py-3 rounded-lg shadow transition duration-300 text-center">
+                Admin Panel
+            </a>
+            <a href="{% url 'users:profile' %}" class="bg-blue-600 hover:bg-blue-700 text-white !text-white font-bold text-lg px-6 py-3 rounded-lg shadow transition duration-300 text-center">
+                User Profile
+            </a> 
+        </div>
+    </div>
+</div>
+{% endblock %} 
