@@ -3,7 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from ..models import DoctorAvailability, Patient, Doctor, Appointment, Prescription, PatientVitals
+from ..models import DoctorAvailability, Patient, Doctor, Appointment, Prescription, PatientVitals, LabTest, LabTestPrescription
 from ..forms import AppointmentForm, PatientForm, AppointmentForm_patient
 from ..serializers import PatientSerializer
 from django.contrib import messages
@@ -258,6 +258,17 @@ def patient_dashboard(request):
         recent_prescriptions = Prescription.objects.filter(
             patient=patient
         ).order_by('-date')[:5]
+        
+        # Get completed lab tests
+        completed_lab_tests = LabTest.objects.filter(
+            prescription__patient=patient,
+            status__in=['COMPLETED', 'REVIEWED']
+        ).select_related('prescription', 'test_definition').order_by('-updated_at')[:5]
+        
+        # Get pending lab test prescriptions
+        lab_prescriptions = LabTestPrescription.objects.filter(
+            patient=patient
+        ).order_by('-prescription_date')[:5]
 
         context = {
             'patient': patient,
@@ -266,6 +277,8 @@ def patient_dashboard(request):
             'recent_prescriptions': recent_prescriptions,
             'total_appointments': upcoming_appointments.count(),
             'total_prescriptions': recent_prescriptions.count(),
+            'completed_lab_tests': completed_lab_tests,
+            'lab_prescriptions': lab_prescriptions,
         }
         
         return render(request, 'patient/dashboard.html', context)

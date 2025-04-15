@@ -1,9 +1,10 @@
 {% extends 'base.html' %}
+{% load static %} {# Ensure static is loaded if needed for JS helpers #}
+{% load custom_filters %} {# Keep your custom filters #}
 
 {% block title %}Create Prescription{% endblock %}
 
 {% block content %}
-
 <div class="max-w-4xl mx-auto px-4 py-8">
     <div class="bg-white shadow-lg rounded-lg overflow-hidden">
         <!-- Header -->
@@ -11,8 +12,8 @@
             <div class="flex justify-between">
                 <div>
                     <h1 class="text-2xl font-bold">{{ doctor.name }}</h1>
-                    <p>{{ doctor.specialization }}</p>
-                    <p>Reg. No: {{ doctor.license_number }}</p>
+                    <p>{{ doctor.specialization }}</p> {# Assuming doctor model has specialization #}
+                    <p>Reg. No: {{ doctor.license_number }}</p> {# Assuming doctor model has license_number #}
                 </div>
                 <div class="text-right">
                     <h2 class="text-xl text-blue-600">{{ doctor.clinic.name }}</h2>
@@ -22,516 +23,658 @@
             </div>
         </div>
         <!-- Patient Details -->
-       <div class="p-6 border-b">
-        <div class="grid grid-cols-2 gap-4">
-            <div>
-                {% load custom_filters %}
-                <p><strong>ID:</strong> {{ patient.patient_id }} </p>
-                <p><strong>Name:</strong> {{ patient.get_full_name }} <strong>  Age:</strong> {{ patient.date_of_birth|calculate_age}} years</p>
-                <p><strong>Address:</strong> {{ patient.address }}</p>
-                <p><strong>Gender:</strong> {{ patient.gender }}</p>
-            </div>
-            <div>
-                <p class="mt-1" align="right"><strong>Date:</strong> {% now "d-M-Y" %}</p>
-                <p class="mt-1" align="right"><strong>Mobile:</strong> {{ patient.phone_number }}</p>
+        <div class="p-6 border-b">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <p><strong>ID:</strong> {{ patient.patient_id }} </p>
+                    <p><strong>Name:</strong> {{ patient.get_full_name }} <strong>  Age:</strong> {{ patient.date_of_birth|calculate_age }} years</p>
+                    <p><strong>Address:</strong> {{ patient.address }}</p>
+                    <p><strong>Gender:</strong> {{ patient.get_gender_display }}</p> {# Use get_gender_display #}
+                </div>
+                <div>
+                    <p class="mt-1 text-right"><strong>Date:</strong> {% now "d-M-Y" %}</p> {# Align right #}
+                    <p class="mt-1 text-right"><strong>Mobile:</strong> {{ patient.phone_number }}</p> {# Align right #}
+                </div>
             </div>
         </div>
-         <!-- Vitals -->
-       
-    </div>
 
-        <form method="POST" class="p-6 space-y-6">
+        <form method="POST" class="p-6 space-y-6" id="prescription-form">
             {% csrf_token %}
-            <!-- Chief Complaints & Clinical Findings -->
-            <div class="mt-4 p-4 bg-gray-50 rounded" style="border: 1px solid #e0e0e0; padding-top: 2px;">
-                <h3 class="font-semibold mb-2">Vitals</h3>
+
+            <!-- Vitals Section -->
+            <div class="mt-4 p-4 bg-gray-50 rounded border border-gray-300">
+                <h3 class="font-semibold mb-2">Vitals (Optional)</h3>
+                {% if vitals_form.errors %}
+                    <div class="text-red-600 text-sm mb-2">Please correct the errors in the vitals section.</div>
+                {% endif %}
                 <div class="grid grid-cols-3 gap-4">
+                    {% for field in vitals_form %}
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Weight (kg)</label>
-                        <input type="number" 
-                               step="0.1" 
-                               name="weight" 
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                               value="{{ vitals.weight|default:'' }}"
-                               min="0"
-                               max="500">
+                        <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}
+                            <p class="text-red-500 text-xs mt-1">{{ field.errors|first }}</p>
+                        {% endif %}
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Height (cm)</label>
-                        <input type="number" 
-                               step="0.1" 
-                               name="height" 
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                               value="{{ vitals.height|default:'' }}"
-                               min="0"
-                               max="300">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Blood Pressure</label>
-                        <input type="text" 
-                               name="blood_pressure" 
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                               value="{{ vitals.blood_pressure|default:'' }}"
-                               placeholder="120/80">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Temperature (°F)</label>
-                        <input type="number" 
-                               step="0.1" 
-                               name="temperature" 
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                               value="{{ vitals.temperature|default:'' }}"
-                               min="95"
-                               max="109"
-                               placeholder="Enter temperature in Fahrenheit">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Heart Rate (bpm)</label>
-                        <input type="number" 
-                               step="1" 
-                               name="heart_rate" 
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                               value="{{ vitals.heart_rate|default:'' }}"
-                               min="0"
-                               max="250">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Oxygen Saturation (%)</label>
-                        <input type="number" 
-                               step="0.1" 
-                               name="oxygen_saturation" 
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                               value="{{ vitals.oxygen_saturation|default:'' }}"
-                               min="0"
-                               max="100">
-                    </div>
+                    {% endfor %}
                 </div>
             </div>
-           <div class="grid grid-cols-2 gap-6 mb-6">
+
+            <!-- Prescription Details Section -->
+            {% if prescription_form.non_field_errors %}
+                <div class="text-red-600 text-sm mb-2">{{ prescription_form.non_field_errors|first }}</div>
+            {% endif %}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
-                    <label class="block font-semibold mb-2">Chief Complaints</label>
-                    <textarea name="chief_complaints" rows="4" class="form-textarea w-full" required></textarea>
+                    <label for="{{ prescription_form.chief_complaints.id_for_label }}" class="block font-semibold mb-1">{{ prescription_form.chief_complaints.label }}</label>
+                    {{ prescription_form.chief_complaints }}
+                     {% if prescription_form.chief_complaints.errors %}
+                        <p class="text-red-500 text-xs mt-1">{{ prescription_form.chief_complaints.errors|first }}</p>
+                    {% endif %}
                 </div>
                 <div>
-                    <label class="block font-semibold mb-2">Clinical Findings</label>
-                    <textarea name="clinical_findings" rows="4" class="form-textarea w-full"></textarea>
+                    <label for="{{ prescription_form.clinical_findings.id_for_label }}" class="block font-semibold mb-1">{{ prescription_form.clinical_findings.label }}</label>
+                    {{ prescription_form.clinical_findings }}
+                    {% if prescription_form.clinical_findings.errors %}
+                        <p class="text-red-500 text-xs mt-1">{{ prescription_form.clinical_findings.errors|first }}</p>
+                    {% endif %}
                 </div>
             </div>
-         <!-- Diagnosis -->
-            <div class="space-y-4">
-                <div>
-                    <label class="block font-semibold mb-2">Diagnosis</label>
-                    <textarea name="diagnosis" rows="2" required
-                              class="mt-1 block bg-gray-100 w-full rounded-md border-gray-500 shadow-sm"></textarea>
-                </div>
-                <div class="medicine-section">
-                    <h3 class="font-semibold mb-2">Add Medicines</h3>
-                    <div class="medicine-search">
-                        <div class="search-container">
-                            <input type="text" id="drug-search" placeholder="Search medicines...">
-                            <ul id="suggestions-list"></ul>
-                        </div>
-                        
-                        <!-- Selected medicines will appear here -->
-                        <div id="selected-medicines">
-                            <table id="prescription-medicines">
-                                <thead>
-                                    <tr>
-                                        <th>Medicine</th>
-                                        <th>Dosage</th>
-                                        <th>Duration</th>
-                                        <th>Instructions</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                </tbody>
-                            </table>
-                        </div>
+            <div>
+                <label for="{{ prescription_form.diagnosis.id_for_label }}" class="block font-semibold mb-1">{{ prescription_form.diagnosis.label }}</label>
+                {{ prescription_form.diagnosis }}
+                 {% if prescription_form.diagnosis.errors %}
+                    <p class="text-red-500 text-xs mt-1">{{ prescription_form.diagnosis.errors|first }}</p>
+                {% endif %}
+                {# Add JS listener here later for suggestions #}
+                 <div id="diagnosis-suggestions" class="mt-2 text-sm text-gray-600"></div> 
+            </div>
+            
+            <!-- Medicines Section -->
+            <div class="medicine-section mt-6 border-t pt-6">
+                <h3 class="font-semibold mb-2 text-lg">Medicines</h3>
+                 {% if item_formset.non_form_errors %}
+                    <div class="text-red-600 text-sm mb-2">{{ item_formset.non_form_errors|first }}</div>
+                {% endif %}
+                
+                {{ item_formset.management_form }} {# Important for formset #}
+
+                <div class="medicine-search mb-4">
+                    <label for="drug-search" class="block text-sm font-medium text-gray-700 mb-1">Search & Add Medicine</label>
+                    <div class="relative">
+                        <input type="text" id="drug-search" placeholder="Search medicines by name or salt..." class="form-input w-full">
+                        <ul id="suggestions-list" class="absolute w-full max-h-60 overflow-y-auto list-none p-0 m-0 border border-t-0 border-gray-300 bg-white shadow-lg z-10 hidden"></ul>
                     </div>
                 </div>
-                <text class="mt-2 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                    To Add Another Medication search medicines
-                </text>
-                <!-- Lab Tests Section -->
-                <div class="lab-tests-section mt-6">
-                    <h3 class="font-semibold mb-2">Add Lab Tests</h3>
-                    <div class="grid grid-cols-2 gap-4">
+
+                <div id="selected-medicines" class="mt-4">
+                    <table id="prescription-medicines-table" class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Medicine</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dosage</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Instructions</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="prescription-medicines-tbody" class="bg-white divide-y divide-gray-200">
+                            {# Existing forms rendered here by JS #}
+                        </tbody>
+                    </table>
+                     <p id="no-medicines-message" class="text-gray-500 text-sm mt-2 {% if item_formset.forms %}hidden{% endif %}">No medicines added yet.</p>
+                </div>
+                 
+                <!-- Medicine Formset Template -->
+                <table class="hidden"> {# Wrap template in a table to keep tbody valid, but hide table #}
+                    <tbody id="item-form-template-container">
+                        <tr id="item-form-template" class="item-form-row"> {# Template is the TR itself #}
+                            <td class="px-4 py-2 whitespace-nowrap">
+                                <strong class="medicine-name-display">__MEDICINE_NAME_PLACEHOLDER__</strong>
+                                {{ item_formset.empty_form.medicine }} {# Hidden input #}
+                                {{ item_formset.empty_form.id }} {# Hidden ID field if needed for updates #}
+                                {{ item_formset.empty_form.DELETE }} {# Hidden DELETE field #}
+                            </td>
+                            <td class="px-4 py-2">{{ item_formset.empty_form.dosage }}</td>
+                            <td class="px-4 py-2">
+                                <div class="flex items-center space-x-2">
+                                    {{ item_formset.empty_form.duration }}
+                                    {{ item_formset.empty_form.duration_unit }}
+                                </div>
+                            </td>
+                            <td class="px-4 py-2">{{ item_formset.empty_form.instructions }}</td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm font-medium">
+                                <button type="button" class="remove-item-btn text-red-600 hover:text-red-800">Remove</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Lab Tests Section -->
+            {% if has_lab %}
+            <div class="lab-tests-section mt-6 border-t pt-6">
+                <h3 class="font-semibold mb-2 text-lg">Lab Tests (Optional)</h3>
+                {% if lab_formset.non_form_errors %}
+                    <div class="text-red-600 text-sm mb-2">{{ lab_formset.non_form_errors|first }}</div>
+                {% endif %}
+                 {{ lab_formset.management_form }} {# Important for formset #}
+
+                <div class="add-lab-test-form border p-4 rounded-md bg-gray-50 mb-4">
+                    <h4 class="font-medium mb-2">Add a Test</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Test Name</label>
-                            <input type="text" id="test-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <label for="add-test-name" class="block text-sm font-medium text-gray-700">Test Name</label>
+                            <input type="text" id="add-test-name" class="form-input w-full mt-1">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Collection Type</label>
-                            <select id="collection-type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                <option value="IN_CLINIC">In Clinic</option>
-                                <option value="HOME">Home Collection</option>
+                            <label for="add-collection-type" class="block text-sm font-medium text-gray-700">Collection Type</label>
+                            <select id="add-collection-type" class="form-select w-full mt-1">
+                                {% for value, text in lab_formset.empty_form.fields.collection_type.choices %}
+                                     <option value="{{ value }}">{{ text }}</option>
+                                {% endfor %}
                             </select>
                         </div>
-                        <div class="col-span-2">
-                            <label class="block text-sm font-medium text-gray-700">Test Description</label>
-                            <textarea id="test-description" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+                         <div>
+                            <label for="add-lab-select" class="block text-sm font-medium text-gray-700">Select Lab</label>
+                             <select id="add-lab-select" class="form-select w-full mt-1">
+                                <option value="">--- Select Lab ---</option>
+                                {# Options populated by JS #}
+                            </select>
                         </div>
-                        <div class="col-span-2">
-                            <button type="button" onclick="addLabTest()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
-                                Add Test
-                            </button>
-                        </div>
+                         <div class="md:col-span-2">
+                             <label for="add-test-description" class="block text-sm font-medium text-gray-700">Notes/Instructions</label>
+                             <textarea id="add-test-description" rows="1" class="form-textarea w-full mt-1"></textarea>
+                         </div>
                     </div>
-
-                    <!-- Selected lab tests will appear here -->
-                    <div class="mt-4">
-                        <table id="lab-tests-table" class="min-w-full divide-y divide-gray-200">
-                            <thead>
-                                <tr>
-                                    <th>Test Name</th>
-                                    <th>Collection Type</th>
-                                    <th>Description</th>
-                                    <th>Lab</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            </tbody>
-                        </table>
-                    </div>
+                     <button type="button" id="add-lab-test-btn" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Add Test to List
+                    </button>
+                </div>
+               
+                <div class="mt-4">
+                    <table id="lab-tests-table" class="min-w-full divide-y divide-gray-200">
+                         <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test Name</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lab</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Collection</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lab-tests-tbody" class="bg-white divide-y divide-gray-200">
+                            {# Existing forms rendered here by JS #}
+                        </tbody>
+                    </table>
+                    <p id="no-labs-message" class="text-gray-500 text-sm mt-2 {% if lab_formset.forms %}hidden{% endif %}">No lab tests added yet.</p>
                 </div>
 
-                
+                <!-- Lab Test Formset Template -->
+                <table class="hidden">
+                    <tbody id="lab-form-template-container">
+                        <tr id="lab-form-template" class="lab-form"> {# Template is TR directly #}
+                            {# Hidden fields first #}
+                            <td style="display: none;">
+                                {{ lab_formset.empty_form.test_name }}
+                                {{ lab_formset.empty_form.lab_id }}
+                                {{ lab_formset.empty_form.id }} {# Hidden ID field #}
+                                {{ lab_formset.empty_form.DELETE }} {# Hidden DELETE field #}
+                            </td>
+                            {# Visible display cells #}
+                            <td class="form-display-test-name px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">__TEST_NAME__</td>
+                            <td class="form-display-lab-name px-4 py-2 whitespace-nowrap text-sm text-gray-500">__LAB_NAME__</td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                                {{ lab_formset.empty_form.collection_type }}
+                            </td>
+                            <td class="px-4 py-2 text-sm text-gray-500 break-words">
+                                {{ lab_formset.empty_form.description }}
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm font-medium">
+                                <button type="button" class="remove-lab-btn text-red-600 hover:text-red-800">Remove</button>
+                            </td>
+                        </tr>
+                     </tbody>
+                </table>
 
-                 <!-- Advice -->
-                <div class="mb-6">
-                    <label class="block font-semibold mb-2">Advice</label>
-                    <textarea name="advice" rows="3" class="form-textarea w-full"></textarea>
+            </div>
+            {% endif %} {# End has_lab check #}
+
+            <!-- Advice & Follow Up -->
+            <div class="mt-6 border-t pt-6 space-y-4">
+                 <div>
+                    <label for="{{ prescription_form.advice.id_for_label }}" class="block font-semibold mb-1">{{ prescription_form.advice.label }}</label>
+                    {{ prescription_form.advice }}
+                     {% if prescription_form.advice.errors %}
+                        <p class="text-red-500 text-xs mt-1">{{ prescription_form.advice.errors|first }}</p>
+                    {% endif %}
                 </div>
-                <!-- Follow Up -->
-                <div class="mb-6">
-                    <label class="block font-semibold mb-2">Follow Up Date</label>
-                    <input type="date" name="follow_up_date" class="form-input">
+                <div>
+                    <label for="{{ prescription_form.follow_up_date.id_for_label }}" class="block font-semibold mb-1">{{ prescription_form.follow_up_date.label }}</label>
+                    {{ prescription_form.follow_up_date }}
+                     {% if prescription_form.follow_up_date.errors %}
+                        <p class="text-red-500 text-xs mt-1">{{ prescription_form.follow_up_date.errors|first }}</p>
+                    {% endif %}
                 </div>
             </div>
 
-            <div class="flex justify-end space-x-4">
+            <!-- Submit Buttons -->
+            <div class="flex justify-end space-x-4 pt-6 border-t">
                 <a href="{% url 'users:patient_detail' patient.id %}"
-                   class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                   class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                     Cancel
                 </a>
-                
                 <button type="submit"
-                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
+                        class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                     Save Prescription
                 </button>
             </div>
         </form>
-    
+    </div>
 </div>
 
 <script>
-function addMedication() {
-    const medicationsDiv = document.getElementById('medications');
-    const newMedication = document.querySelector('.medication-item').cloneNode(true);
-    
-    // Clear the input values
-    newMedication.querySelectorAll('input, textarea').forEach(input => {
-        input.value = '';
-    });
-    
-    medicationsDiv.appendChild(newMedication);
-}
-</script>
-<script>
-    const searchInput = document.getElementById('drug-search');
-    const suggestionsList = document.getElementById('suggestions-list');
-    const prescriptionTable = document.querySelector('#prescription-medicines tbody');
-    let selectedMedicines = [];
-    
-    // Debounce function (if not already defined)
-    function debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
+// Available labs data passed from the view
+const availableLabs = JSON.parse('{{ available_labs_json|escapejs }}');
+
+// DOM Elements
+const drugSearchInput = document.getElementById('drug-search');
+const suggestionsList = document.getElementById('suggestions-list');
+const medicinesTbody = document.getElementById('prescription-medicines-tbody');
+const itemFormTemplate = document.getElementById('item-form-template');
+const itemFormsetPrefix = '{{ item_formset.prefix }}'; // e.g., 'items'
+const noMedicinesMessage = document.getElementById('no-medicines-message');
+
+const addTestNameInput = document.getElementById('add-test-name');
+const addCollectionTypeSelect = document.getElementById('add-collection-type');
+const addLabSelect = document.getElementById('add-lab-select');
+const addTestDescriptionTextarea = document.getElementById('add-test-description');
+const addLabTestButton = document.getElementById('add-lab-test-btn');
+const labTestsTbody = document.getElementById('lab-tests-tbody');
+const labFormTemplate = document.getElementById('lab-form-template');
+const labFormsetPrefix = '{{ lab_formset.prefix }}'; // e.g., 'labs'
+const noLabsMessage = document.getElementById('no-labs-message');
+
+// Debounce function
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
             clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
+            func(...args);
         };
-    }
-    
-    // Handle medicine search
-    searchInput.addEventListener('input', debounce(async (e) => {
-        const query = e.target.value;
-        if (query.length < 2) {
-            suggestionsList.innerHTML = '';
-            return;
-        }
-    
-        try {
-            const response = await fetch(`/api/drug-suggestions/?query=${encodeURIComponent(query)}`);
-            const suggestions = await response.json();
-            
-            suggestionsList.innerHTML = suggestions.map(drug => `
-                <li onclick="addMedicineToPrescription('${drug.product_name}', '${drug.salt_composition}')">
-                    <strong>${drug.product_name}</strong>
-                    <br>
-                    <small>${drug.salt_composition}</small>
-                    <br>
-                    <small class="text-gray-500">Manufacturer: ${drug.product_manufactured}</small>
-                </li>
-            `).join('');
-        } catch (error) {
-            console.error('Error fetching suggestions:', error);
-        }
-    }, 300));
-    
-    // Add medicine to prescription
-    function addMedicineToPrescription(productName, saltComposition) {
-        const newRow = document.createElement('tr');
-        newRow.innerHTML = `
-            <td>
-                <strong>${productName}</strong>
-                <br>
-                <small>${saltComposition}</small>
-                <input type="hidden" name="medicines[]" value="${productName}">
-            </td>
-            <td>
-                <select name="dosage[]" required>
-                    <option value="1-0-0">Once daily (Morning)</option>
-                    <option value="1-0-1">Twice daily (Morning-Night)</option>
-                    <option value="1-1-1">Thrice daily</option>
-                    <option value="0-0-1">Once daily (Night)</option>
-                     <option value="0-1-0">Once daily (Afternoon)</option>
-                    <option value="SOS">As needed (SOS)</option>
-                </select>
-            </td>
-            <td>
-                <input type="number" name="duration[]" min="1" required>
-                <select name="duration_unit[]">
-                    <option value="days">Days</option>
-                    <option value="weeks">Weeks</option>
-                    <option value="months">Months</option>
-                </select>
-            </td>
-            <td>
-                <input type="text" name="instructions[]" placeholder="After food, etc.">
-            </td>
-            <td>
-                <button type="button" onclick="removeMedicine(this)" class="remove-btn">Remove</button>
-            </td>
-        `;
-        prescriptionTable.appendChild(newRow);
-        searchInput.value = '';
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// --- Medicine Handling ---
+
+// Fetch Drug Suggestions
+drugSearchInput.addEventListener('input', debounce(async (e) => {
+    const query = e.target.value.trim();
+    if (query.length < 2) {
         suggestionsList.innerHTML = '';
+        suggestionsList.classList.add('hidden');
+        return;
     }
-    
-    // Remove medicine from prescription
-    function removeMedicine(button) {
-        button.closest('tr').remove();
-    }
-    
-    // Lab Tests functionality
-    let labTests = [];
-    let availableLabs = [];
 
-    // Fetch available labs when the page loads
-    async function fetchAvailableLabs() {
-        try {
-            const response = await fetch('/labs/api/labs/available/');
-            const data = await response.json();
-            if (data.labs) {
-                availableLabs = data.labs;
-                console.log('Available labs:', availableLabs);
-                // Update the lab selection dropdowns if there are any lab tests
-                if (labTests.length > 0) {
-                    updateLabTestsTable();
-                }
-            } else {
-                console.error('No labs data received:', data);
-            }
-        } catch (error) {
-            console.error('Error fetching labs:', error);
+    try {
+        // Replace with your actual API endpoint
+        const response = await fetch(`/api/drug-suggestions/?query=${encodeURIComponent(query)}`); 
+        if (!response.ok) throw new Error('Network response was not ok');
+        const suggestions = await response.json();
+        
+        suggestionsList.innerHTML = suggestions.map(drug => `
+            <li class="px-4 py-2 cursor-pointer hover:bg-gray-100" 
+                onclick="addMedicineToPrescription('${drug.product_name.replace(/'/g, "\'")}')"> 
+                <strong>${drug.product_name}</strong>
+                ${drug.salt_composition ? `<br><small class="text-gray-600">${drug.salt_composition}</small>` : ''}
+                ${drug.product_manufactured ? `<br><small class="text-gray-500">Mfr: ${drug.product_manufactured}</small>` : ''}
+            </li>
+        `).join('');
+        suggestionsList.classList.remove('hidden');
+    } catch (error) {
+        console.error('Error fetching suggestions:', error);
+        suggestionsList.innerHTML = '<li class="px-4 py-2 text-red-500">Error loading suggestions.</li>';
+        suggestionsList.classList.remove('hidden');
+    }
+}, 300));
+
+// Hide suggestions when clicking outside
+document.addEventListener('click', function(event) {
+    if (!drugSearchInput.contains(event.target) && !suggestionsList.contains(event.target)) {
+        suggestionsList.classList.add('hidden');
+    }
+});
+
+// Add Medicine Form to Formset
+function addMedicineToPrescription(productName) {
+    const totalFormsInput = document.getElementById(`id_${itemFormsetPrefix}-TOTAL_FORMS`);
+    if (!totalFormsInput) {
+        console.error("Management form TOTAL_FORMS input not found!");
+        return;
+    }
+    const currentTotalForms = parseInt(totalFormsInput.value, 10);
+    const newFormIndex = currentTotalForms;
+
+    // Clone the template TR directly
+    const templateRow = document.getElementById('item-form-template');
+    if (!templateRow) {
+        console.error("Medicine form template TR not found!");
+        return;
+    }
+    const newRow = templateRow.cloneNode(true);
+    newRow.id = `item-${newFormIndex}`; // Remove template ID, give unique ID
+    newRow.classList.remove('hidden'); // Make it visible if template was hidden
+
+    // Update IDs and names in the cloned row
+    newRow.innerHTML = newRow.innerHTML.replace(/__prefix__/g, newFormIndex);
+
+    // Find and populate fields within the new row
+    const medicineNameDisplay = newRow.querySelector('.medicine-name-display');
+    const medicineInput = newRow.querySelector(`input[id^="id_${itemFormsetPrefix}-"][id$="-medicine"]`);
+    
+    if (medicineNameDisplay) medicineNameDisplay.textContent = productName;
+    if (medicineInput) {
+         medicineInput.value = productName; // Set value for the hidden input
+         // Ensure input has correct name attribute after replacing prefix
+         medicineInput.name = `${itemFormsetPrefix}-${newFormIndex}-medicine`; 
+    } else {
+        console.warn("Medicine input field not found in cloned row");
+    }
+
+    // Add remove button listener
+    const removeButton = newRow.querySelector('.remove-item-btn');
+    if (removeButton) {
+        removeButton.addEventListener('click', function() {
+             removeFormsetForm(this, itemFormsetPrefix);
+        });
+    }
+
+    // Append the populated row to the table body
+    medicinesTbody.appendChild(newRow);
+
+    // Update TOTAL_FORMS
+    totalFormsInput.value = currentTotalForms + 1;
+    
+    // Hide "No medicines added" message
+    noMedicinesMessage.classList.add('hidden');
+
+    // Clear search
+    drugSearchInput.value = '';
+    suggestionsList.innerHTML = '';
+    suggestionsList.classList.add('hidden');
+}
+
+// --- Lab Test Handling ---
+
+// Populate Lab Select Dropdown
+function populateLabSelect() {
+    addLabSelect.innerHTML = '<option value="">--- Select Lab ---</option>'; // Reset
+    availableLabs.forEach(lab => {
+        const option = document.createElement('option');
+        // Store combined type-id in the value
+        option.value = `${lab.type}-${lab.id}`; 
+        option.textContent = `${lab.name} (${lab.type === 'internal' ? 'Internal' : 'External'})`;
+        addLabSelect.appendChild(option);
+    });
+}
+
+// Add Lab Test Form to Formset
+if (addLabTestButton) {
+    addLabTestButton.addEventListener('click', function() {
+        const testName = addTestNameInput.value.trim();
+        const collectionType = addCollectionTypeSelect.value;
+        const description = addTestDescriptionTextarea.value.trim();
+        const selectedLabValue = addLabSelect.value; // e.g., "internal-5"
+        const selectedLabOption = addLabSelect.options[addLabSelect.selectedIndex];
+        const selectedLabName = selectedLabOption ? selectedLabOption.textContent : 'N/A';
+
+        if (!testName) {
+            alert('Please enter a test name.');
+            addTestNameInput.focus();
+            return;
         }
-    }
-
-    // Call fetchAvailableLabs when the page loads
-    document.addEventListener('DOMContentLoaded', fetchAvailableLabs);
-
-    function addLabTest() {
-        const testName = document.getElementById('test-name').value;
-        const collectionType = document.getElementById('collection-type').value;
-        const description = document.getElementById('test-description').value;
-
-        if (!testName || !description) {
-            alert('Please fill in all required fields');
+        if (!selectedLabValue) {
+            alert('Please select a lab.');
+            addLabSelect.focus();
             return;
         }
 
-        const test = {
-            test_name: testName,
-            collection_type: collectionType,
-            description: description,
-            lab_id: null  // Will be set when lab is selected
-        };
+        const totalFormsInput = document.getElementById(`id_${labFormsetPrefix}-TOTAL_FORMS`);
+        if (!totalFormsInput) {
+            console.error("Management form TOTAL_FORMS input not found for labs!");
+            return;
+        }
+        const currentTotalForms = parseInt(totalFormsInput.value, 10);
+        const newFormIndex = currentTotalForms;
 
-        labTests.push(test);
-        updateLabTestsTable();
-
-        // Clear the form
-        document.getElementById('test-name').value = '';
-        document.getElementById('test-description').value = '';
-        document.getElementById('collection-type').value = 'IN_CLINIC';
-    }
-
-    function removeLabTest(index) {
-        labTests.splice(index, 1);
-        updateLabTestsTable();
-    }
-
-    function updateLabTestsTable() {
-        const tbody = document.querySelector('#lab-tests-table tbody');
-        tbody.innerHTML = labTests.map((test, index) => `
-            <tr>
-                <td>${test.test_name}</td>
-                <td>${test.collection_type === 'IN_CLINIC' ? 'In Clinic' : 'Home Collection'}</td>
-                <td>${test.description}</td>
-                <td>
-                    <select name="lab_id[]" onchange="updateLabSelection(${index}, this.value)" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                        <option value="">Select Lab</option>
-                        ${availableLabs.map(lab => `
-                            <option value="${lab.id}" ${test.lab_id === lab.id ? 'selected' : ''}>
-                                ${lab.name} (${lab.type === 'INHOUSE' ? 'In-house' : 'External'})
-                            </option>
-                        `).join('')}
-                    </select>
-                </td>
-                <td>
-                    <button type="button" onclick="removeLabTest(${index})" class="remove-btn">Remove</button>
-                </td>
-            </tr>
-        `).join('');
-    }
-
-    function updateLabSelection(index, labId) {
-        labTests[index].lab_id = labId;
-    }
-
-    // Modify the form submit handler to include lab tests
-    document.querySelector('form').addEventListener('submit', function(e) {
-        const medicines = [];
-        const rows = prescriptionTable.querySelectorAll('tr');
+        // Clone the template row
+        const templateRow = document.getElementById('lab-form-template');
+        if (!templateRow) {
+            console.error("Lab form template TR not found!");
+            return;
+        }
+        const newRow = templateRow.cloneNode(true);
+        newRow.id = `lab-${newFormIndex}`;
+        newRow.classList.remove('hidden');
         
-        rows.forEach(row => {
-            medicines.push({
-                name: row.querySelector('input[name="medicines[]"]').value,
-                dosage: row.querySelector('select[name="dosage[]"]').value,
-                duration: row.querySelector('input[name="duration[]"]').value,
-                duration_unit: row.querySelector('select[name="duration_unit[]"]').value,
-                instructions: row.querySelector('input[name="instructions[]"]').value
+        // Update IDs and names in the cloned row
+        newRow.innerHTML = newRow.innerHTML.replace(/__prefix__/g, newFormIndex);
+
+        // Find and populate fields within the new row
+        const testNameInput = newRow.querySelector(`input[id^="id_${labFormsetPrefix}-"][id$="-test_name"]`);
+        const labIdInput = newRow.querySelector(`input[id^="id_${labFormsetPrefix}-"][id$="-lab_id"]`);
+        const collectionTypeSelect = newRow.querySelector(`select[id^="id_${labFormsetPrefix}-"][id$="-collection_type"]`);
+        const descriptionTextarea = newRow.querySelector(`textarea[id^="id_${labFormsetPrefix}-"][id$="-description"]`);
+        
+        // Find display cells
+        const testNameDisplay = newRow.querySelector('.form-display-test-name');
+        const labNameDisplay = newRow.querySelector('.form-display-lab-name');
+        
+        // Populate hidden inputs
+        if (testNameInput) {
+             testNameInput.value = testName;
+             testNameInput.name = `${labFormsetPrefix}-${newFormIndex}-test_name`;
+        } else console.warn('Lab test_name input not found');
+        if (labIdInput) {
+             labIdInput.value = selectedLabValue;
+             labIdInput.name = `${labFormsetPrefix}-${newFormIndex}-lab_id`;
+        } else console.warn('Lab lab_id input not found');
+        
+        // Set visible select/textarea values
+        if (collectionTypeSelect) {
+            collectionTypeSelect.value = collectionType;
+            collectionTypeSelect.name = `${labFormsetPrefix}-${newFormIndex}-collection_type`;
+        } else console.warn('Lab collection_type select not found');
+        if (descriptionTextarea) {
+            descriptionTextarea.value = description;
+            descriptionTextarea.name = `${labFormsetPrefix}-${newFormIndex}-description`;
+        } else console.warn('Lab description textarea not found');
+
+        // Populate display cells 
+        if(testNameDisplay) testNameDisplay.textContent = testName;
+        if(labNameDisplay) labNameDisplay.textContent = selectedLabName;
+       
+        // Add remove button listener
+        const removeButton = newRow.querySelector('.remove-lab-btn');
+        if (removeButton) {
+             removeButton.addEventListener('click', function() {
+                 removeFormsetForm(this, labFormsetPrefix);
             });
-        });
+        } else console.warn('Remove button not found in lab row');
 
-        // Add medicines and lab tests to your form data before submission
-        const medicinesInput = document.createElement('input');
-        medicinesInput.type = 'hidden';
-        medicinesInput.name = 'prescription_medicines';
-        medicinesInput.value = JSON.stringify(medicines);
-        this.appendChild(medicinesInput);
+        // Append the populated row to the table body
+        labTestsTbody.appendChild(newRow);
 
-        const labTestsInput = document.createElement('input');
-        labTestsInput.type = 'hidden';
-        labTestsInput.name = 'lab_tests';
-        labTestsInput.value = JSON.stringify(labTests);
-        this.appendChild(labTestsInput);
+        // Update TOTAL_FORMS
+        totalFormsInput.value = currentTotalForms + 1;
+
+        // Hide "No labs added" message
+         noLabsMessage.classList.add('hidden');
+
+        // Clear the add form
+        addTestNameInput.value = '';
+        addTestDescriptionTextarea.value = '';
+        addLabSelect.value = '';
+        // addCollectionTypeSelect.value = ''; // Reset if needed
     });
-    </script>
-    
-    <style>
-    .medicine-section {
-        margin: 20px 0;
+}
+
+// --- General Formset Handling ---
+
+// Remove Formset Form (Handles both item and lab)
+function removeFormsetForm(button, prefix) {
+    const formRow = button.closest(`.${prefix === 'items' ? 'item-form-row' : 'lab-form'}`);
+    if (!formRow) return;
+
+    const deleteInput = formRow.querySelector(`input[name$='-DELETE']`);
+    const formIdInput = formRow.querySelector(`input[name$='-id']`); // Check if it's an existing form
+
+    if (deleteInput) {
+        // If it's an existing form (has an ID) or we always want to use DELETE:
+        // Mark for deletion and hide
+         deleteInput.checked = true;
+         formRow.style.display = 'none';
+         
+         // Optional: Visually indicate it's marked for deletion if needed
+         // formRow.classList.add('marked-for-deletion');
+         
+         // Note: We don't decrement TOTAL_FORMS when marking for deletion.
+         // The backend handles forms marked with DELETE.
+    } else {
+        // If it's a new form (no deleteInput or no ID), remove it entirely
+         formRow.remove();
+        // Decrement TOTAL_FORMS only if removing a NEWLY added form
+        const totalFormsInput = document.getElementById(`id_${prefix}-TOTAL_FORMS`);
+        totalFormsInput.value = parseInt(totalFormsInput.value, 10) - 1;
     }
     
-    .search-container {
-        position: relative;
-        margin-bottom: 20px;
+    // Show "No items/labs added" message if the tbody becomes empty
+    const tbody = document.getElementById(prefix === 'items' ? 'prescription-medicines-tbody' : 'lab-tests-tbody');
+    const message = document.getElementById(prefix === 'items' ? 'no-medicines-message' : 'no-labs-message');
+    // Check visible rows (excluding hidden ones marked for delete)
+    const visibleRows = Array.from(tbody.children).filter(row => row.style.display !== 'none');
+     if (visibleRows.length === 0) {
+        message.classList.remove('hidden');
     }
+}
+
+// --- Initialization ---
+document.addEventListener('DOMContentLoaded', function() {
+    populateLabSelect(); // Populate lab dropdown on load
+
+    // Add initial remove listeners for any forms rendered by Django (e.g., on validation error)
+    document.querySelectorAll('#prescription-medicines-tbody .remove-item-btn').forEach(button => {
+         button.addEventListener('click', function() {
+             removeFormsetForm(this, itemFormsetPrefix);
+         });
+    });
+     document.querySelectorAll('#lab-tests-tbody .remove-lab-btn').forEach(button => {
+         button.addEventListener('click', function() {
+             removeFormsetForm(this, labFormsetPrefix);
+         });
+    });
     
-    #drug-search {
-        width: 100%;
-        padding: 10px;
-        font-size: 16px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
+    // Check if messages should be shown initially
+    if (medicinesTbody.children.length === 0) {
+        noMedicinesMessage.classList.remove('hidden');
     }
-    
-    #suggestions-list {
-        position: absolute;
-        width: 100%;
-        max-height: 300px;
-        overflow-y: auto;
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        border: 1px solid #ddd;
-        border-top: none;
-        background: white;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        z-index: 1000;
+     if (labTestsTbody.children.length === 0) {
+        noLabsMessage.classList.remove('hidden');
     }
-    
+
+    // --- Diagnosis Drug Suggestions ---
+    const diagnosisInput = document.getElementById('{{ prescription_form.diagnosis.id_for_label }}'); // Get diagnosis input by ID
+    const diagnosisSuggestionsDiv = document.getElementById('diagnosis-suggestions');
+
+    if(diagnosisInput && diagnosisSuggestionsDiv) {
+        diagnosisInput.addEventListener('input', debounce(async (e) => {
+            const diagnosisQuery = e.target.value.trim();
+            diagnosisSuggestionsDiv.innerHTML = ''; // Clear previous suggestions
+            
+            if (diagnosisQuery.length >= 3) { // Only search after 3 chars
+                diagnosisSuggestionsDiv.innerHTML = '<span class="text-gray-500 italic">Loading suggestions...</span>';
+                try {
+                    // Construct the URL using the named URL pattern if possible, otherwise hardcode
+                    // Ensure your users/urls.py API pattern name is 'diagnosis_drug_suggestions_api'
+                    const suggestionsUrl = `{% url 'users:diagnosis_drug_suggestions_api' %}?diagnosis=${encodeURIComponent(diagnosisQuery)}`;
+                    const response = await fetch(suggestionsUrl);
+                    
+                    if (!response.ok) {
+                         throw new Error(`Network response was not ok (${response.status})`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.suggestions && data.suggestions.length > 0) {
+                        diagnosisSuggestionsDiv.innerHTML = '<span class="font-medium mr-2">Suggested Medicines:</span>' + 
+                            data.suggestions.map(drug => 
+                                `<button type="button" 
+                                         class="bg-blue-100 text-blue-700 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                         onclick="addMedicineToPrescription('${drug.replace(/'/g, "\'")}')">
+                                    ${drug}
+                                 </button>`
+                            ).join('');
+                    } else {
+                         diagnosisSuggestionsDiv.innerHTML = '<span class="text-gray-500 italic">No frequent medicines found for this diagnosis.</span>';
+                    }
+
+                } catch (error) {
+                    console.error("Error fetching diagnosis suggestions:", error);
+                    diagnosisSuggestionsDiv.innerHTML = '<span class="text-red-500 italic">Could not load suggestions.</span>';
+                }
+            } 
+        }, 500)); // 500ms debounce
+    }
+
+});
+
+</script>
+<style>
+    /* Add styles for suggestions list if needed */
     #suggestions-list li {
-        padding: 10px;
-        cursor: pointer;
+        /* Example */
+        border-bottom: 1px solid #eee;
     }
-    
-    #suggestions-list li:hover {
-        background-color: #f5f5f5;
+     #suggestions-list li:last-child {
+        border-bottom: none;
     }
-    
-    #prescription-medicines {
+     /* Style for hidden template rows if needed */
+    .hidden {
+        display: none;
+    }
+    /* Style formset rows for clarity if rendering issue */
+    #prescription-medicines-table .item-form td, 
+    #lab-tests-table .lab-form td {
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+        vertical-align: top; /* Align content to top */
+    }
+     /* Adjust layout for generated formset table rows */
+    #item-form-template table, #item-form-template tbody, #item-form-template tr {
+        /* These might interfere, ensure template structure matches target table */
+        display: contents; /* Make template structure blend into target table */
+    }
+    /* Hide labels inside table cells if needed */
+     #prescription-medicines-tbody label, #lab-tests-tbody label {
+        /* display: none; */ /* Uncomment if labels are redundant in table */
+    }
+     /* Ensure inputs fit within table cells */
+    #prescription-medicines-tbody input, 
+    #prescription-medicines-tbody select,
+    #lab-tests-tbody input,
+    #lab-tests-tbody select,
+    #lab-tests-tbody textarea {
         width: 100%;
-        border-collapse: collapse;
-        margin-top: 20px;
+        max-width: 200px; /* Adjust as needed */
+        box-sizing: border-box;
     }
-    
-    #prescription-medicines th,
-    #prescription-medicines td {
-        padding: 10px;
-        border: 1px solid #ddd;
-        text-align: left;
-    }
-    
-    #prescription-medicines th {
-        background-color: #f5f5f5;
-    }
-    
-    .remove-btn {
-        background-color: #ff4444;
-        color: white;
-        border: none;
-        padding: 5px 10px;
-        border-radius: 3px;
-        cursor: pointer;
-    }
-    
-    .remove-btn:hover {
-        background-color: #cc0000;
+     #prescription-medicines-tbody input[type="number"] {
+        max-width: 80px;
     }
 
-    #lab-tests-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 20px;
-    }
+</style>
 
-    #lab-tests-table th,
-    #lab-tests-table td {
-        padding: 10px;
-        border: 1px solid #ddd;
-        text-align: left;
-    }
-
-    #lab-tests-table th {
-        background-color: #f5f5f5;
-    }
-    </style>
 {% endblock %} 

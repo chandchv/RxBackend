@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
-from ..models import Doctor, Patient, Appointment, Staff, ActivityLog
+from ..models import Doctor, Patient, Appointment, Staff, ActivityLog, LabTest
 from datetime import datetime, timedelta
 from django.contrib import messages
 import logging
@@ -14,8 +14,19 @@ def doctor_dashboard(request):
         doctor = Doctor.objects.get(user=request.user)
         today = timezone.now().date()
         
+        # Get lab tests that need doctor review (status='COMPLETED')
+        completed_lab_tests = LabTest.objects.filter(
+            prescription__doctor=request.user,
+            status='COMPLETED'
+        ).select_related(
+            'prescription',
+            'prescription__patient',
+            'test_definition'
+        ).order_by('-updated_at')
+        
         context = {
             'doctor': doctor,
+            'today_date': today,
             'today_appointments': Appointment.objects.filter(
                 doctor=doctor,
                 appointment_date=today
@@ -28,7 +39,8 @@ def doctor_dashboard(request):
             'pending_appointments': Appointment.objects.filter(
                 doctor=doctor,
                 status='scheduled'
-            ).count()
+            ).count(),
+            'completed_lab_tests': completed_lab_tests
         }
         return render(request, 'doctor/dashboard.html', context)
     except Doctor.DoesNotExist:

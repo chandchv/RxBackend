@@ -334,23 +334,50 @@ class Prescription(TimeStampedModel):
         ]
 
     def __str__(self):
-        return f"Prescription for {self.patient.get_full_name()} by Dr. {self.doctor.name}"
+        patient_name = self.patient.get_full_name() if self.patient else "Unknown Patient"
+        return f"Prescription for {patient_name} on {self.date.strftime('%Y-%m-%d')}"
 
     def clean(self):
-        if self.follow_up_date and self.follow_up_date < self.date:
-            raise ValidationError("Follow-up date cannot be before prescription date")
+        # Compare date parts only
+        if self.follow_up_date and self.date and self.follow_up_date < self.date.date():
+            raise ValidationError("Follow-up date cannot be before the prescription date.")
 
 class PrescriptionItem(TimeStampedModel):
+    # Define dosage choices as a class attribute
+    DOSAGE_CHOICES = [
+        ('1-0-0', 'Once daily (Morning)'),
+        ('0-1-0', 'Once daily (Afternoon)'),
+        ('0-0-1', 'Once daily (Night)'),
+        ('1-1-0', 'Twice daily (Morning-Afternoon)'),
+        ('1-0-1', 'Twice daily (Morning-Night)'),
+        ('0-1-1', 'Twice daily (Afternoon-Night)'),
+        ('1-1-1', 'Thrice daily'),
+        ('SOS', 'As needed (SOS)'),
+        # Add other common dosages as needed
+    ]
+    
+    # Define duration unit choices
+    DURATION_UNIT_CHOICES = [
+        ('days', 'Days'),
+        ('weeks', 'Weeks'),
+        ('months', 'Months'),
+        ('years', 'Years'), 
+        ('ongoing', 'Ongoing'),
+    ]
+
     prescription = models.ForeignKey(
         Prescription, 
         related_name='items', 
         on_delete=models.CASCADE
     )
     medicine = models.CharField(max_length=200)
-    dosage = models.CharField(max_length=100)
-    duration = models.CharField(max_length=100)
-    duration_unit = models.CharField(max_length=100, null=True, blank=True)
+    # Update dosage field to use choices
+    dosage = models.CharField(max_length=10, choices=DOSAGE_CHOICES, default='1-1-1') 
+    duration = models.IntegerField(validators=[MinValueValidator(1)], help_text="Duration value (e.g., 7)")
+    duration_unit = models.CharField(max_length=10, choices=DURATION_UNIT_CHOICES, default='days')
     instructions = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
 
     def __str__(self):
         return f"{self.medicine} - {self.dosage}"
@@ -886,6 +913,7 @@ class LabTest(models.Model):
     collection_date = models.DateTimeField(null=True, blank=True)
     result_file = models.FileField(upload_to='lab_results/', null=True, blank=True)
     doctor_notes = models.TextField(null=True, blank=True)
+    doctor_analysis = models.TextField(null=True, blank=True, help_text="Doctor's analysis of the test results")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

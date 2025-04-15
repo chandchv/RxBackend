@@ -1,8 +1,14 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
-from .models import Patient, Appointment, Doctor, DoctorAvailability, Bill, BillItem, Payment, BillingItem, Clinic, Lab, DoctorLeave, LabRegistration
+from .models import (
+    Patient, Appointment, Doctor, DoctorAvailability, Bill, BillItem, Payment, BillingItem, Clinic, Lab, DoctorLeave, LabRegistration, 
+    PatientVitals, Prescription, PrescriptionItem, LabTest, LabTestPrescription
+)
 from django.utils import timezone
+from labs.models import LabProfile, ExternalLabTestOffering, TestDefinition
+from django.forms import modelformset_factory, inlineformset_factory, BaseInlineFormSet
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 class PatientSignupForm(UserCreationForm):
    first_name = forms.CharField(max_length=30, required=True)
@@ -359,3 +365,64 @@ class LabRegistrationForm(forms.ModelForm):
         if LabRegistration.objects.filter(gst_number=gst_number).exists():
             raise forms.ValidationError("A lab with this GST number already exists.")
         return gst_number
+
+# --- Forms for Prescription Creation ---
+
+class VitalsForm(forms.ModelForm):
+    weight = forms.FloatField(required=False, validators=[MinValueValidator(0), MaxValueValidator(500)], widget=forms.NumberInput(attrs={'step': '0.1', 'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'}))
+    height = forms.FloatField(required=False, validators=[MinValueValidator(0), MaxValueValidator(300)], widget=forms.NumberInput(attrs={'step': '0.1', 'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'}))
+    blood_pressure = forms.CharField(required=False, max_length=20, widget=forms.TextInput(attrs={'placeholder': 'e.g., 120/80', 'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'}))
+    temperature = forms.FloatField(required=False, validators=[MinValueValidator(90), MaxValueValidator(110)], widget=forms.NumberInput(attrs={'step': '0.1', 'placeholder': '°F', 'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'}))
+    heart_rate = forms.IntegerField(required=False, validators=[MinValueValidator(0), MaxValueValidator(300)], widget=forms.NumberInput(attrs={'step': '1', 'placeholder': 'bpm', 'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'}))
+    oxygen_saturation = forms.FloatField(required=False, validators=[MinValueValidator(0), MaxValueValidator(100)], widget=forms.NumberInput(attrs={'step': '0.1', 'placeholder': '%', 'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500'}))
+
+    class Meta:
+        model = PatientVitals
+        fields = ['weight', 'height', 'blood_pressure', 'temperature', 'heart_rate', 'oxygen_saturation']
+
+class PrescriptionForm(forms.ModelForm):
+    follow_up_date = forms.DateField(required=False, widget=forms.DateInput(attrs={'type': 'date', 'class':'form-input'}))
+
+    class Meta:
+        model = Prescription
+        fields = ['chief_complaints', 'clinical_findings', 'diagnosis', 'advice', 'follow_up_date']
+        widgets = {
+            'chief_complaints': forms.Textarea(attrs={'rows': 4, 'class': 'form-textarea w-full', 'required': True}),
+            'clinical_findings': forms.Textarea(attrs={'rows': 4, 'class': 'form-textarea w-full'}),
+            'diagnosis': forms.Textarea(attrs={'rows': 2, 'class': 'mt-1 block bg-gray-100 w-full rounded-md border-gray-500 shadow-sm', 'required': True}),
+            'advice': forms.Textarea(attrs={'rows': 3, 'class': 'form-textarea w-full'}),
+        }
+
+class PrescriptionItemForm(forms.ModelForm):
+    medicine = forms.CharField(widget=forms.TextInput(attrs={'readonly': 'readonly', 'class': 'bg-gray-100'})) # Make readonly, set via JS
+    dosage = forms.ChoiceField(choices=PrescriptionItem.DOSAGE_CHOICES, required=True, widget=forms.Select(attrs={'class': 'form-select'}))
+    duration = forms.IntegerField(min_value=1, required=True, widget=forms.NumberInput(attrs={'class': 'form-input w-16', 'min': '1'}))
+    duration_unit = forms.ChoiceField(choices=PrescriptionItem.DURATION_UNIT_CHOICES, required=True, widget=forms.Select(attrs={'class': 'form-select'}))
+    instructions = forms.CharField(required=False, widget=forms.TextInput(attrs={'placeholder': 'e.g., After food', 'class': 'form-input'}))
+
+    class Meta:
+        model = PrescriptionItem
+        fields = ['medicine', 'dosage', 'duration', 'duration_unit', 'instructions']
+
+# Use inline formset as items are directly related to Prescription
+BasePrescriptionItemFormSet = inlineformset_factory(
+    Prescription, 
+    PrescriptionItem, 
+    form=PrescriptionItemForm, 
+    extra=0, # Start with 0 extra forms, add dynamically via JS
+    can_delete=True
+)
+
+class LabTestForm(forms.Form): # Not a ModelForm directly tied to LabTest yet, handle creation in view
+    test_name = forms.CharField(max_length=200, required=True, widget=forms.HiddenInput()) # Set via JS
+    collection_type = forms.ChoiceField(choices=LabTest.COLLECTION_TYPE, required=True, widget=forms.Select(attrs={'class': 'form-select'}))
+    description = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 1, 'class': 'form-textarea'}))
+    lab_id = forms.CharField(required=True, widget=forms.HiddenInput()) # Store combined type-id like 'internal-5' or 'external-12'
+    
+    # We won't directly map this form to LabTest model saving initially,
+    # as we need to handle LabTestPrescription creation and TestDefinition lookup in the view.
+    # The 'lab_id' field will store combined info to simplify JS and retrieve lab type/pk in the view.
+
+BaseLabTestFormSet = forms.formset_factory(LabTestForm, extra=0, can_delete=True)
+
+# --- End Forms for Prescription Creation ---

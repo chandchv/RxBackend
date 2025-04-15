@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+
+{% block title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8">
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <!-- Header -->
+        <div class="border-b p-6">
+            <h1 class="text-2xl font-bold">Notifications</h1>
+            <p class="text-gray-600">View and manage your notifications</p>
+        </div>
+
+        <!-- Notifications List -->
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">All Notifications</h2>
+                <a href="{% url 'notifications:list' %}?mark_read=true" 
+                   class="text-sm bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">
+                    Mark All as Read
+                </a>
+            </div>
+
+            <div class="space-y-4">
+                {% for notification in notifications %}
+                <div class="border-l-4 {% if notification.is_read %}border-gray-300{% else %}border-blue-500{% endif %} pl-4 py-3 {% if not notification.is_read %}bg-blue-50{% endif %}">
+                    <div class="flex justify-between">
+                        <p class="font-medium">{{ notification.message }}</p>
+                        <p class="text-sm text-gray-500">{{ notification.timestamp|timesince }} ago</p>
+                    </div>
+                    <div class="mt-2 flex justify-between">
+                        <div>
+                            {% if notification.content_type %}
+                            <a href="{{ notification.get_related_object_url }}" class="text-sm text-blue-600 hover:text-blue-800">
+                                View Details
+                            </a>
+                            {% endif %}
+                        </div>
+                        <div>
+                            {% if not notification.is_read %}
+                            <a href="{% url 'notifications:mark-read' notification.id %}" class="text-sm text-gray-600 hover:text-gray-800">
+                                Mark as Read
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-8">
+                    <p class="text-gray-500">No notifications to display</p>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <div class="flex justify-center mt-6">
+                <div class="flex space-x-2">
+                    {% if page_obj.has_previous %}
+                    <a href="?page=1" class="px-3 py-2 bg-gray-200 text-gray-700 rounded-l hover:bg-gray-300">
+                        First
+                    </a>
+                    <a href="?page={{ page_obj.previous_page_number }}" class="px-3 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300">
+                        Previous
+                    </a>
+                    {% endif %}
+
+                    <span class="px-3 py-2 bg-blue-600 text-white rounded">
+                        {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                    </span>
+
+                    {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}" class="px-3 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300">
+                        Next
+                    </a>
+                    <a href="?page={{ page_obj.paginator.num_pages }}" class="px-3 py-2 bg-gray-200 text-gray-700 rounded-r hover:bg-gray-300">
+                        Last
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

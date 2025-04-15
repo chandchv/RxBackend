@@ -25,6 +25,7 @@ from .views import (
     billing_views,
     report_views,
     lab_views,
+    lab_test_views,
 )
 
 from .views.drugs_views import (
@@ -80,6 +81,8 @@ from .views.prescription_views import (
     PatientPrescriptionsView,
     CreatePrescriptionView,
     PrescriptionListView,
+    prescription_detail_api,
+    get_diagnosis_drug_suggestions,
 )
 
 from .views.clinic_admin_views import (
@@ -156,6 +159,12 @@ api_urlpatterns = [
     path('appointments/', AppointmentView.as_view(), name='appointments_api'),
     path('appointments/list/', AppointmentListView.as_view(), name='appointments_list_api'),
     path('appointments/create/', AppointmentCreateView.as_view(), name='appointment_create_api'),
+    path('prescriptions/patient/<int:patient_id>/', PatientPrescriptionsView.as_view(), name='doctor_patient_prescriptions_api'),
+    path('prescriptions/<int:pk>/details/', prescription_detail_api, name='prescription_detail_api'),
+    path('prescriptions/mine/', PatientPrescriptionsView.as_view(), name='my_prescriptions_api'),
+    path('prescriptions/create/', CreatePrescriptionView.as_view(), name='create_prescription_api'),
+    path('drug-suggestions/', api_drug_suggestions, name='api_drug_suggestions'),
+    path('diagnosis-suggestions/', get_diagnosis_drug_suggestions, name='diagnosis_drug_suggestions_api'),
 ]
 
 # Main URLs
@@ -171,6 +180,11 @@ urlpatterns = [
     path('patients/<int:patient_id>/edit/', patient_edit, name='patient_edit'),
     path('patients/form/', patient_form, name='patient_form'),
     path('patient_detail/<int:patient_id>/', patient_detail, name='patient_detail'),
+    
+    # Lab Test URLs
+    path('lab-prescriptions/<int:prescription_id>/', lab_test_views.lab_prescription_detail, name='lab_prescription_detail'),
+    path('lab-prescriptions/create/<int:patient_id>/', lab_test_views.create_lab_prescription, name='create_lab_prescription'),
+    path('lab-tests/<int:pk>/detail/', lab_views.patient_lab_test_detail, name='patient_lab_test_detail'),
     
     # Appointment URLs
     path('appointments/', appointments_view, name='appointments'),
@@ -231,33 +245,7 @@ urlpatterns = [
     path('patients/<int:patient_id>/prescriptions/', patient_prescriptions, name='patient_prescriptions'),
    
     # API URLs
-     path('api/', include(([
-        path('doctors/', DoctorListView.as_view(), name='get_doctors_list'),
-        path('patients/', patients_list, name='get_patients'),
-        path('appointments/', AppointmentListView.as_view(), name='get_appointments_list'),
-        #path('prescriptions/', get_prescriptions, name='get_prescriptions_list'),
-       # path('clinics/', get_clinics_list, name='get_clinics_list'),
-        #path('staff/', get_staff_list, name='get_staff_list'),
-       # path('users/', get_users_list, name='get_users_list'),
-        path('login/', login_api, name='login'), 
-        path('logout/', logout_api, name='logout'),
-        path('signup/', signup_api, name='signup'),
-        path('doctor/signup/', doctor_signup_api, name='doctor_signup'),
-        path('patient/signup/', patient_signup_api, name='patient_signup'),
-        path('get-csrf-token/', api_views.get_csrf_token, name='get_csrf_token'),
-        path('appointments/', get_patient_appointments, name='get_patient_appointments'),
-        path('doctors/', get_doctors, name='get_doctors'),
-        path('clinic/appointments/', get_clinic_appointments, name='get_clinic_appointments'),
-        path('clinic/doctors/', get_clinic_doctors, name='get_clinic_doctors'),
-        path('clinic/staff/', get_clinic_staff, name='get_clinic_staff'),
-        path('clinic/reports/', clinic_reports, name='clinic_reports'),
-        path('patient/appointments/', api_views.patient_appointments, name='patient_appointments'),
-        path('patient/prescriptions/', api_views.patient_prescriptions, name='api_patient_prescriptions'),
-        path('patient/prescriptions_detail/<int:pk>/', api_views.patient_prescriptions_detail, name='patient_prescriptions_detail'),
-
-        #path('doctors/', get_doctors, name='get_doctors'),
-        
-    ], 'api'))),
+     path('api/', include(api_urlpatterns)),
 
    
     # Clinic Admin URLs - Updated paths
@@ -496,6 +484,11 @@ urlpatterns = [
     path('clinic-admin/labs/staff/', clinic_admin_views.lab_staff_list, name='lab_staff_list'),
     path('clinic-admin/labs/tests/', clinic_admin_views.lab_tests, name='lab_tests'),
     path('clinic-admin/lab/dashboard/', lab_views.lab_dashboard, name='lab_dashboard'),
+    # LabTest URLs
+    path('lab-tests/<int:pk>/', lab_views.lab_test_detail, name='lab_test_detail'),
+    path('lab-tests/<int:test_id>/update-status/', lab_views.update_lab_test_status, name='update_lab_test_status'),
+    path('doctor/lab-test/<int:pk>/', lab_views.doctor_lab_test_detail, name='doctor_lab_test_detail'),
+    path('patient/lab-test/<int:pk>/', lab_views.patient_lab_test_detail, name='patient_lab_test_detail'),
     # Staff Calendar API
     path('api/appointments/calendar/', staff_views.staff_calendar_events, name='staff_calendar_events'),
     path('doctor-leaves/', clinic_admin_views.doctor_leaves, name='doctor_leaves'),

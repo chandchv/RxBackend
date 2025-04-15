@@ -184,11 +184,13 @@
                     <div class="bg-gray-50 p-4 rounded-lg">
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <p class="font-medium">{{ test.test_name }}</p>
+                                <p class="font-medium">{{ test.test_definition.name }}</p>
                                 <p class="text-sm text-gray-600">Collection: {{ test.get_collection_type_display }}</p>
                             </div>
                             <div>
-                                <p class="text-sm text-gray-600">{{ test.description }}</p>
+                                {% if test.doctor_notes %}
+                                <p class="text-sm text-gray-600">Notes: {{ test.doctor_notes }}</p>
+                                {% endif %}
                                 <p class="text-sm text-gray-600">Status: {{ test.get_status_display }}</p>
                             </div>
                         </div>

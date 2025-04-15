@@ -98,6 +98,102 @@
         </div>
     </div>
 
+    <!-- New Lab Results Available -->
+    {% if completed_lab_tests %}
+    <div class="bg-white rounded-lg shadow p-6 mb-8">
+        <h2 class="text-xl font-bold mb-4">
+            <span class="text-green-600">🔬 New Lab Results Available</span>
+            <span class="bg-green-500 text-white px-2 py-1 rounded-full text-xs ml-2">{{ completed_lab_tests|length }}</span>
+        </h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test Name</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doctor</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Completed</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for test in completed_lab_tests %}
+                    <tr class="{% if test.status == 'REVIEWED' %}bg-green-50{% else %}bg-blue-50{% endif %}">
+                        <td class="px-6 py-4 whitespace-nowrap font-medium">
+                            {{ test.test_definition.name }}
+                        </td>
+                        <td class="px-6 py-4">
+                            Dr. {{ test.prescription.doctor.get_full_name }}
+                        </td>
+                        <td class="px-6 py-4">
+                            {{ test.updated_at|date:"F j, Y" }}
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                {% if test.status == 'REVIEWED' %}bg-green-100 text-green-800
+                                {% else %}bg-blue-100 text-blue-800{% endif %}">
+                                {{ test.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <a href="{% url 'users:patient_lab_test_detail' test.id %}" class="bg-blue-300 hover:bg-blue-700 text-white px-3 py-1 rounded">
+                                View Results
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Lab Test Prescriptions -->
+    {% if lab_prescriptions %}
+    <div class="bg-white rounded-lg shadow p-6 mb-8">
+        <h2 class="text-xl font-bold mb-4">
+            <span class="text-blue-600">🧪 Lab Test Prescriptions</span>
+            <span class="bg-blue-500 text-white px-2 py-1 rounded-full text-xs ml-2">{{ lab_prescriptions|length }}</span>
+        </h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prescription Date</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doctor</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lab Type</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tests</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for prescription in lab_prescriptions %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {{ prescription.prescription_date|date:"F j, Y" }}
+                        </td>
+                        <td class="px-6 py-4">
+                            Dr. {{ prescription.doctor.get_full_name }}
+                        </td>
+                        <td class="px-6 py-4">
+                            {{ prescription.get_preferred_lab_type_display }}
+                        </td>
+                        <td class="px-6 py-4">
+                            {{ prescription.tests.count }} tests
+                        </td>
+                        <td class="px-6 py-4">
+                            <a href="{% url 'users:lab_prescription_detail' prescription.id %}" class="bg-blue-300 hover:bg-blue-700 text-white px-3 py-1 rounded">
+                                View Details
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Previous Appointments -->
     <div class="bg-white rounded-lg shadow p-6 mb-8">
         <h2 class="text-xl font-bold mb-4">Previous Appointments</h2>

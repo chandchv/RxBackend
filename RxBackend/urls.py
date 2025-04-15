@@ -34,6 +34,7 @@ def get_csrf_token(request):
 urlpatterns = [
     path("admin/", admin.site.urls),
     path('labs/', include('labs.urls', namespace='labs')),
+    path('notifications/', include('notifications.urls', namespace='notifications')),
     path("", include(('users.urls', 'users'), namespace='users')),
     path("api/token-auth/", obtain_auth_token, name="api_token_auth"),
     path('dashboard/', views.dashboard_view, name='dashboard'),

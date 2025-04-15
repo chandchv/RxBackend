@@ -7,7 +7,7 @@ from django.http import JsonResponse, HttpResponse, Http404
 from django.contrib.auth import get_user_model
 from .forms import LabRegistrationForm, LabTestOfferingForm, ExternalLabTestOfferingForm
 from .models import ExternalLabTestOffering, LabProfile, LabTestOffering, TestDefinition, LabOrder, LabOrderTest, LabResult, CommissionLedger
-from users.models import Appointment, Doctor, Patient, Lab
+from users.models import Appointment, Doctor, Patient, Lab, LabTest, LabTestPrescription
 from django.db.models import Q, Sum, Count
 import os
 from rest_framework.decorators import api_view
@@ -19,6 +19,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.contrib.auth.models import Group
+from notifications.models import Notification
 
 User = get_user_model()
 
@@ -248,13 +249,18 @@ def lab_dashboard(request):
         'total_revenue': stats['total_revenue']
     }
     
+    # Get notifications for the user
+    notifications = Notification.objects.filter(recipient=request.user).order_by('-timestamp')[:5]
+    
     context = {
         'lab_profile': lab_profile,
         'stats': stats,
         'recent_orders': recent_orders,
         'available_tests': available_tests,
         'recent_requests': recent_requests,
-        'payment_stats': payment_stats
+        'payment_stats': payment_stats,
+        'notifications': notifications,
+        'is_superuser': request.user.is_superuser
     }
     
     return render(request, 'labs/lab_dashboard.html', context)
@@ -820,16 +826,16 @@ def orders_list(request):
     date = request.GET.get('date', '')
     
     # Start with base queryset
-    orders = LabOrder.objects.filter(lab=lab_profile)
+    orders = LabOrder.objects.filter(chosen_lab=lab_profile)
     
     # Apply filters
     if status:
         orders = orders.filter(status=status)
     if date:
-        orders = orders.filter(created_at__date=date)
+        orders = orders.filter(order_date__date=date)
     
     # Order by creation date (newest first)
-    orders = orders.order_by('-created_at')
+    orders = orders.order_by('-order_date')
     
     # Pagination
     page = request.GET.get('page', 1)
@@ -853,10 +859,10 @@ def orders_list(request):
 @login_required
 def order_detail(request, order_id):
     # Get the lab profile for the logged-in user
-    lab_profile = get_object_or_404(Lab, user=request.user)
+    lab_profile = get_object_or_404(LabProfile, user=request.user)
     
     # Get the order and verify it belongs to this lab
-    order = get_object_or_404(LabOrder, id=order_id, lab=lab_profile)
+    order = get_object_or_404(LabOrder, id=order_id, chosen_lab=lab_profile)
     
     # Get all tests in this order
     order_tests = order.tests.all()
@@ -886,10 +892,10 @@ def order_detail(request, order_id):
 @login_required
 def confirm_payment(request, order_id):
     # Get the lab profile for the logged-in user
-    lab_profile = get_object_or_404(Lab, user=request.user)
+    lab_profile = get_object_or_404(LabProfile, user=request.user)
     
     # Get the order and verify it belongs to this lab
-    order = get_object_or_404(LabOrder, id=order_id, lab=lab_profile)
+    order = get_object_or_404(LabOrder, id=order_id, chosen_lab=lab_profile)
     
     # Verify the order is in a state where payment can be confirmed
     if order.status != 'PENDING_PAYMENT':
@@ -942,10 +948,10 @@ def confirm_payment(request, order_id):
 @login_required
 def update_sample_status(request, order_id):
     # Get the lab profile for the logged-in user
-    lab_profile = get_object_or_404(Lab, user=request.user)
+    lab_profile = get_object_or_404(LabProfile, user=request.user)
     
     # Get the order and verify it belongs to this lab
-    order = get_object_or_404(LabOrder, id=order_id, lab=lab_profile)
+    order = get_object_or_404(LabOrder, id=order_id, chosen_lab=lab_profile)
     
     # Verify the order is in a state where sample status can be updated
     if order.status != 'PENDING_SAMPLE':
@@ -1006,14 +1012,14 @@ def update_sample_status(request, order_id):
 def upload_result_api(request):
     try:
         # Get the lab profile for the logged-in user
-        lab_profile = get_object_or_404(Lab, user=request.user)
+        lab_profile = get_object_or_404(LabProfile, user=request.user)
         
         # Get the order ID and verify it belongs to this lab
         order_id = request.data.get('order_id')
         if not order_id:
             return Response({'error': 'Order ID is required'}, status=400)
             
-        order = get_object_or_404(LabOrder, id=order_id, lab=lab_profile)
+        order = get_object_or_404(LabOrder, id=order_id, chosen_lab=lab_profile)
         
         # Verify the order is in a state where results can be uploaded
         if order.status != 'SAMPLE_COLLECTED':
@@ -1054,39 +1060,148 @@ def upload_result_api(request):
 @login_required
 def doctor_requests(request):
     # Get the lab profile for the logged-in user
-    lab_profile = get_object_or_404(Lab, user=request.user)
+    lab_profile = get_object_or_404(LabProfile, user=request.user)
     
-    # Get filter parameters
-    status = request.GET.get('status', '')
-    date = request.GET.get('date', '')
+    # Print out key information for debugging
+    print(f"SIMPLIFIED DEBUG: Processing doctor_requests for lab profile: {lab_profile.name} (ID: {lab_profile.id})")
     
-    # Start with base queryset
-    requests = LabOrder.objects.filter(lab=lab_profile)
+    # Check for force create parameter - this will always create a test for debugging
+    force_create = request.GET.get('force_create', 'false') == 'true'
     
-    # Apply filters
-    if status:
-        requests = requests.filter(status=status)
-    if date:
-        requests = requests.filter(created_at__date=date)
+    if force_create:
+        # Import all necessary models correctly
+        from users.models import LabTest, LabTestPrescription, Patient
+        from labs.models import TestDefinition
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        
+        # Find any doctor in the system to assign as creator
+        doctor = User.objects.filter(is_active=True).first()
+        
+        # Find any patient in the system
+        patient = Patient.objects.first()
+        
+        # Create a test definition if needed
+        test_def, created = TestDefinition.objects.get_or_create(
+            name="EMERGENCY TEST", 
+            defaults={
+                'description': 'This is a test created for debugging purposes'
+            }
+        )
+        
+        # Create a new lab test prescription
+        try:
+            prescription = LabTestPrescription.objects.create(
+                doctor=doctor,
+                patient=patient,
+                notes="Force created test prescription",
+                preferred_lab_type='EXTERNAL',
+                external_lab=lab_profile  # This is the key relationship
+            )
+            
+            # Create a lab test linked to this prescription
+            lab_test = LabTest.objects.create(
+                prescription=prescription,
+                test_definition=test_def,
+                status='REQUESTED',
+                collection_type='IN_CLINIC',
+                doctor_notes="Force created test - please process"
+            )
+            
+            messages.success(request, f"Created emergency test successfully! Test ID: {lab_test.id}")
+            print(f"SIMPLIFIED DEBUG: Created emergency test with ID {lab_test.id}")
+        except Exception as e:
+            messages.error(request, f"Error creating test: {str(e)}")
+            print(f"SIMPLIFIED DEBUG: Error creating test: {e}")
     
-    # Order by creation date (newest first)
-    requests = requests.order_by('-created_at')
+    # Get all lab test prescriptions directly linked to this lab
+    from users.models import LabTestPrescription, LabTest
+    
+    # Method 1: Get lab tests via direct relationship
+    direct_prescriptions = LabTestPrescription.objects.filter(external_lab=lab_profile)
+    print(f"SIMPLIFIED DEBUG: Found {direct_prescriptions.count()} prescriptions directly linked to lab")
+    
+    # Get all lab tests from these prescriptions
+    test_ids = []
+    for p in direct_prescriptions:
+        tests = LabTest.objects.filter(prescription=p)
+        test_ids.extend([t.id for t in tests])
+        print(f"SIMPLIFIED DEBUG: Prescription {p.id} has {tests.count()} tests")
+    
+    # Get the actual lab test objects
+    lab_test_requests = LabTest.objects.filter(id__in=test_ids).select_related(
+        'prescription', 
+        'prescription__patient', 
+        'prescription__doctor', 
+        'test_definition'
+    )
+    
+    print(f"SIMPLIFIED DEBUG: Final test count: {lab_test_requests.count()}")
+    
+    # Also get standard lab orders (from the old flow)
+    lab_orders = LabOrder.objects.filter(chosen_lab=lab_profile)
+    print(f"SIMPLIFIED DEBUG: Found {lab_orders.count()} lab orders from old flow")
+    
+    # Combine and paginate results
+    all_requests = []
+    for test in lab_test_requests:
+        try:
+            test_name = test.test_definition.name if test.test_definition else 'Unknown Test'
+            patient_name = test.prescription.patient.get_full_name() if test.prescription and test.prescription.patient else 'Unknown Patient'
+            doctor_name = "Dr. " + (test.prescription.doctor.get_full_name() if hasattr(test.prescription.doctor, 'get_full_name') else test.prescription.doctor.username) if test.prescription and test.prescription.doctor else 'Unknown Doctor'
+            
+            all_requests.append({
+                'id': f'test_{test.id}',
+                'type': 'test',
+                'test_name': test_name,
+                'patient_name': patient_name,
+                'doctor_name': doctor_name,
+                'date': test.prescription.prescription_date if test.prescription else timezone.now(),
+                'status': test.status,
+                'collection_type': test.collection_type,
+                'object': test,
+            })
+            print(f"SIMPLIFIED DEBUG: Added test {test.id} ({test_name}) to results")
+        except Exception as e:
+            print(f"SIMPLIFIED DEBUG: Error adding test to results: {e}")
+    
+    for order in lab_orders:
+        try:
+            all_requests.append({
+                'id': f'order_{order.id}',
+                'type': 'order',
+                'test_name': ', '.join([test.name for test in order.tests.all()]),
+                'patient_name': order.patient.get_full_name() if order.patient else 'Unknown Patient',
+                'doctor_name': order.doctor.name if order.doctor else 'Unknown Doctor',
+                'date': order.order_date,
+                'status': order.status,
+                'collection_type': 'N/A',
+                'object': order,
+            })
+        except Exception as e:
+            print(f"SIMPLIFIED DEBUG: Error adding order to results: {e}")
+    
+    print(f"SIMPLIFIED DEBUG: Total requests to display: {len(all_requests)}")
+    
+    # Sort combined results by date (newest first)
+    all_requests.sort(key=lambda x: x['date'], reverse=True)
     
     # Pagination
     page = request.GET.get('page', 1)
-    paginator = Paginator(requests, 10)  # Show 10 requests per page
+    paginator = Paginator(all_requests, 10)  # Show 10 requests per page
     
     try:
-        requests = paginator.page(page)
+        requests_page = paginator.page(page)
     except PageNotAnInteger:
-        requests = paginator.page(1)
+        requests_page = paginator.page(1)
     except EmptyPage:
-        requests = paginator.page(paginator.num_pages)
+        requests_page = paginator.page(paginator.num_pages)
     
     context = {
-        'requests': requests,
+        'requests': requests_page,
         'is_paginated': paginator.num_pages > 1,
-        'page_obj': requests,
+        'page_obj': requests_page,
+        'lab_profile': lab_profile,
     }
     
     return render(request, 'labs/doctor_requests.html', context)

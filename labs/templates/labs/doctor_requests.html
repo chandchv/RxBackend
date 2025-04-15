@@ -10,14 +10,22 @@
             <form method="get" class="flex items-center space-x-4">
                 <select name="status" class="border rounded px-3 py-2">
                     <option value="">All Status</option>
-                    <option value="PENDING" {% if request.GET.status == 'PENDING' %}selected{% endif %}>Pending</option>
+                    <option value="REQUESTED" {% if request.GET.status == 'REQUESTED' %}selected{% endif %}>Requested</option>
+                    <option value="ASSIGNED" {% if request.GET.status == 'ASSIGNED' %}selected{% endif %}>Assigned</option>
+                    <option value="SAMPLE_COLLECTED" {% if request.GET.status == 'SAMPLE_COLLECTED' %}selected{% endif %}>Sample Collected</option>
+                    <option value="PROCESSING" {% if request.GET.status == 'PROCESSING' %}selected{% endif %}>Processing</option>
                     <option value="COMPLETED" {% if request.GET.status == 'COMPLETED' %}selected{% endif %}>Completed</option>
+                    <option value="REVIEWED" {% if request.GET.status == 'REVIEWED' %}selected{% endif %}>Reviewed</option>
+                    <option value="PENDING" {% if request.GET.status == 'PENDING' %}selected{% endif %}>Pending (Older system)</option>
                 </select>
                 <input type="date" name="date" value="{{ request.GET.date }}" class="border rounded px-3 py-2">
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
                     Filter
                 </button>
             </form>
+            <a href="?force_create=true" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">
+                Force Create Test
+            </a>
         </div>
     </div>
 
@@ -25,41 +33,60 @@
         <table class="min-w-full">
             <thead class="bg-gray-100">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Request ID</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doctor</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
-                {% for request in requests %}
+                {% for request_item in requests %}
                 <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap">{{ request.id }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">Dr. {{ request.doctor.get_full_name }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">{{ request.patient.get_full_name }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">{{ request.test.name }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">{{ request_item.id }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">{{ request_item.doctor_name }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">{{ request_item.patient_name }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">{{ request_item.test_name }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if request_item.type == 'test' %}
+                            <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">Direct Test</span>
+                        {% else %}
+                            <span class="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800">Order</span>
+                        {% endif %}
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="px-2 py-1 text-xs rounded-full
-                            {% if request.status == 'PENDING' %}bg-yellow-100 text-yellow-800
-                            {% elif request.status == 'COMPLETED' %}bg-green-100 text-green-800
-                            {% else %}bg-red-100 text-red-800{% endif %}">
-                            {{ request.status }}
+                            {% if request_item.status == 'REQUESTED' %}bg-yellow-100 text-yellow-800
+                            {% elif request_item.status == 'ASSIGNED' %}bg-blue-100 text-blue-800
+                            {% elif request_item.status == 'SAMPLE_COLLECTED' %}bg-purple-100 text-purple-800
+                            {% elif request_item.status == 'PROCESSING' %}bg-indigo-100 text-indigo-800
+                            {% elif request_item.status == 'COMPLETED' %}bg-green-100 text-green-800
+                            {% elif request_item.status == 'REVIEWED' %}bg-teal-100 text-teal-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ request_item.status }}
                         </span>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap">{{ request.created_at|date:"M d, Y" }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">{{ request_item.date|date:"M d, Y" }}</td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <a href="{% url 'labs:order_detail' request.id %}" class="text-blue-600 hover:text-blue-800">View</a>
-                        {% if request.status == 'PENDING' %}
-                        <a href="{% url 'labs:confirm_payment' request.id %}" class="ml-2 text-green-600 hover:text-green-800">Process</a>
+                        {% if request_item.type == 'test' %}
+                            <a href="{% url 'users:lab_test_detail' request_item.object.id %}" class="text-blue-600 hover:text-blue-800">View</a>
+                            {% if request_item.status == 'REQUESTED' %}
+                                <a href="{% url 'users:update_lab_test_status' request_item.object.id %}" class="ml-2 text-green-600 hover:text-green-800">Process</a>
+                            {% endif %}
+                        {% else %}
+                            <a href="{% url 'labs:order_detail' request_item.object.id %}" class="text-blue-600 hover:text-blue-800">View</a>
+                            {% if request_item.status == 'PENDING' %}
+                                <a href="{% url 'labs:confirm_payment' request_item.object.id %}" class="ml-2 text-green-600 hover:text-green-800">Process</a>
+                            {% endif %}
                         {% endif %}
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" class="px-6 py-4 text-center text-gray-500">No requests found</td>
+                    <td colspan="8" class="px-6 py-4 text-center text-gray-500">No requests found</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -70,19 +97,19 @@
     <div class="mt-4 flex justify-center">
         <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
             {% if page_obj.has_previous %}
-            <a href="?page={{ page_obj.previous_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+            <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.date %}&date={{ request.GET.date }}{% endif %}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
                 Previous
             </a>
             {% endif %}
             
             {% for num in page_obj.paginator.page_range %}
-            <a href="?page={{ num }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium {% if page_obj.number == num %}text-blue-600 bg-blue-50{% else %}text-gray-700 hover:bg-gray-50{% endif %}">
+            <a href="?page={{ num }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.date %}&date={{ request.GET.date }}{% endif %}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium {% if page_obj.number == num %}text-blue-600 bg-blue-50{% else %}text-gray-700 hover:bg-gray-50{% endif %}">
                 {{ num }}
             </a>
             {% endfor %}
             
             {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+            <a href="?page={{ page_obj.next_page_number }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.date %}&date={{ request.GET.date }}{% endif %}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
                 Next
             </a>
             {% endif %}

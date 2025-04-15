@@ -5,10 +5,12 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from ..models import LabTest, LabTechnician, Lab
-from labs.models import TestDefinition
+from labs.models import TestDefinition, LabProfile
 from ..serializers import LabTestSerializer, LabTechnicianSerializer
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
+from django.contrib import messages
+from django.shortcuts import redirect
 
 @login_required
 def lab_dashboard(request):
@@ -56,22 +58,42 @@ def lab_dashboard(request):
 
 @login_required
 def lab_test_detail(request, pk):
-    """View for lab technicians to view and update test details"""
+    """View for lab users to view and update test details"""
     try:
-        if not hasattr(request.user, 'labtechnician'):
-            messages.error(request, 'Access denied. Lab technician privileges required.')
+        # Determine whether this is a lab technician (internal) or LabProfile user (external)
+        is_lab_technician = hasattr(request.user, 'labtechnician')
+        is_lab_profile_user = LabProfile.objects.filter(user=request.user).exists()
+        
+        if not (is_lab_technician or is_lab_profile_user):
+            messages.error(request, 'Access denied. Lab privileges required.')
             return redirect('users:dashboard')
 
-        test = get_object_or_404(
-            LabTest.objects.select_related(
-                'patient',
-                'doctor',
-                'lab',
-                'technician'
-            ),
-            id=pk,
-            lab__clinic=request.user.labtechnician.clinic
-        )
+        # Get the test using the appropriate filter based on user type
+        if is_lab_technician:
+            # For internal lab users
+            test = get_object_or_404(
+                LabTest.objects.select_related(
+                    'prescription',
+                    'prescription__patient',
+                    'prescription__doctor',
+                    'test_definition'
+                ),
+                id=pk,
+                prescription__inhouse_lab__clinic=request.user.labtechnician.clinic
+            )
+        else:
+            # For external lab users
+            lab_profile = get_object_or_404(LabProfile, user=request.user)
+            test = get_object_or_404(
+                LabTest.objects.select_related(
+                    'prescription',
+                    'prescription__patient',
+                    'prescription__doctor',
+                    'test_definition'
+                ),
+                id=pk,
+                prescription__external_lab=lab_profile
+            )
 
         if request.method == 'POST':
             action = request.POST.get('action')
@@ -87,7 +109,7 @@ def lab_test_detail(request, pk):
                 else:
                     messages.error(request, 'Invalid status')
             
-            elif action == 'assign_technician':
+            elif action == 'assign_technician' and is_lab_technician:
                 if not test.technician:
                     test.technician = request.user.labtechnician
                     test.status = 'ASSIGNED'
@@ -100,6 +122,8 @@ def lab_test_detail(request, pk):
             'test': test,
             'status_choices': LabTest.TEST_STATUS,
             'collection_choices': LabTest.COLLECTION_TYPE,
+            'is_lab_technician': is_lab_technician,
+            'is_lab_profile_user': is_lab_profile_user
         }
         
         return render(request, 'lab/lab_test_detail.html', context)
@@ -107,7 +131,7 @@ def lab_test_detail(request, pk):
     except Exception as e:
         print(f"Error in lab test detail: {str(e)}")
         messages.error(request, f'Error accessing test details: {str(e)}')
-        return redirect('users:lab_dashboard')
+        return redirect('labs:doctor_requests')
 
 class LabTestViewSet(viewsets.ModelViewSet):
     serializer_class = LabTestSerializer
@@ -183,4 +207,263 @@ def get_available_labs(request):
         })
         
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500) 
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def update_lab_test_status(request, test_id):
+    """View for lab users to update the status of a lab test"""
+    try:
+        # Check if the user has a lab profile
+        lab_profile = None
+        
+        # Handle both cases - user is associated with an internal lab or external lab profile
+        if hasattr(request.user, 'labtechnician'):
+            # For internal lab users
+            test = get_object_or_404(
+                LabTest,
+                id=test_id,
+                prescription__inhouse_lab__clinic=request.user.labtechnician.clinic
+            )
+        else:
+            # For external lab users
+            lab_profile = get_object_or_404(LabProfile, user=request.user)
+            test = get_object_or_404(
+                LabTest,
+                id=test_id,
+                prescription__external_lab=lab_profile
+            )
+        
+        if request.method == 'POST':
+            new_status = request.POST.get('status')
+            if new_status in dict(LabTest.TEST_STATUS):
+                old_status = test.status
+                test.status = new_status
+                
+                # Handle file uploads for completed tests
+                if new_status == 'COMPLETED' and request.FILES.get('result_file'):
+                    test.result_file = request.FILES.get('result_file')
+                
+                # Save the test with its new status
+                test.save()
+                
+                # Update prescription status if all tests are completed
+                if new_status == 'COMPLETED':
+                    prescription = test.prescription
+                    all_tests = LabTest.objects.filter(prescription=prescription)
+                    if all(t.status == 'COMPLETED' for t in all_tests):
+                        prescription.status = 'COMPLETED'
+                        prescription.save()
+                
+                messages.success(request, f'Test status updated from {old_status} to {new_status}')
+                
+                # Create notification for patient
+                try:
+                    from notifications.utils import create_notification
+                    patient_user = test.prescription.patient.user
+                    
+                    # Get the doctor user
+                    doctor_user = test.prescription.doctor
+                    
+                    # Create message with more details for COMPLETED status
+                    if new_status == 'COMPLETED':
+                        test_name = test.test_definition.name if test.test_definition else 'Unknown Test'
+                        base_message = f"Lab test '{test_name}' has been completed and results are available."
+                        
+                        # Include direct links to the dashboards, not specific test pages
+                        # This ensures users see the notification on their main dashboard
+                        patient_link = "/users/patient/dashboard/"
+                        doctor_link = "/users/doctor/dashboard/"
+                    else:
+                        base_message = f"Your lab test for {test.test_definition.name if test.test_definition else 'Unknown Test'} has been updated to {new_status}"
+                        patient_link = None
+                        doctor_link = None
+                    
+                    # Notify patient
+                    if patient_user:
+                        patient_message = f"Your {base_message} Please check your dashboard to review."
+                        create_notification(
+                            recipient=patient_user,
+                            message=patient_message,
+                            sender=request.user,
+                            notification_type='lab_test_update',
+                            related_object=test,
+                            action_url=patient_link
+                        )
+                    
+                    # Notify doctor for completed tests - always send for COMPLETED status
+                    if new_status == 'COMPLETED' and doctor_user:
+                        doctor_message = f"Lab test '{test_name}' for patient {test.prescription.patient.get_full_name()} has been completed and requires your review. Check your dashboard."
+                        create_notification(
+                            recipient=doctor_user,
+                            message=doctor_message,
+                            sender=request.user,
+                            notification_type='lab_test_completed',
+                            related_object=test,
+                            action_url=doctor_link
+                        )
+                except Exception as e:
+                    # Log but don't fail if notification creation fails
+                    print(f"Error sending notification: {e}")
+                
+            else:
+                messages.error(request, f'Invalid status: {new_status}')
+            
+            # Return to the lab test detail page
+            return redirect('users:lab_test_detail', pk=test.id)
+        
+        # If GET request, show the form
+        context = {
+            'test': test,
+            'status_choices': LabTest.TEST_STATUS,
+            'current_status': test.status,
+        }
+        
+        return render(request, 'lab/update_lab_test_status.html', context)
+    
+    except Exception as e:
+        print(f"Error updating lab test status: {str(e)}")
+        messages.error(request, f'Error updating test status: {str(e)}')
+        return redirect('labs:doctor_requests')
+
+@login_required
+def doctor_lab_test_detail(request, pk):
+    """View for doctors to review lab test details and mark as reviewed"""
+    try:
+        # Ensure the user is a doctor
+        if not hasattr(request.user, 'doctor'):
+            messages.error(request, 'Access denied. Doctor privileges required.')
+            return redirect('users:dashboard')
+            
+        # Get the lab test and verify doctor's access
+        test = get_object_or_404(
+            LabTest.objects.select_related(
+                'prescription',
+                'prescription__patient',
+                'prescription__doctor',
+                'test_definition'
+            ),
+            id=pk
+        )
+        
+        # Verify the requesting doctor is associated with the test
+        if test.prescription.doctor != request.user:
+            messages.error(request, 'You do not have permission to view this test.')
+            return redirect('users:doctor_dashboard')
+        
+        # Handle form submission
+        if request.method == 'POST':
+            action = request.POST.get('action')
+            
+            if action == 'mark_as_reviewed':
+                # Update the status to REVIEWED if it was COMPLETED
+                if test.status == 'COMPLETED':
+                    old_status = test.status
+                    test.status = 'REVIEWED'
+                    test.save()
+                    messages.success(request, 'Test has been marked as reviewed')
+                    
+                    # Notify patient that doctor has reviewed the test
+                    try:
+                        from notifications.utils import create_notification
+                        patient_user = test.prescription.patient.user
+                        if patient_user:
+                            test_name = test.test_definition.name if test.test_definition else 'Unknown Test'
+                            create_notification(
+                                recipient=patient_user,
+                                message=f"Dr. {request.user.get_full_name()} has reviewed your lab test: {test_name}",
+                                sender=request.user,
+                                notification_type='lab_test_reviewed',
+                                related_object=test,
+                                action_url=f"/users/lab-tests/{test.id}/detail/"
+                            )
+                    except Exception as e:
+                        print(f"Error sending notification: {e}")
+            
+            elif action in ['review_and_save', 'update_analysis']:
+                # Save doctor's analysis
+                doctor_analysis = request.POST.get('doctor_analysis', '')
+                test.doctor_analysis = doctor_analysis
+                
+                # If review_and_save is selected, also mark as reviewed
+                if action == 'review_and_save' and test.status == 'COMPLETED':
+                    test.status = 'REVIEWED'
+                    status_message = 'Test has been marked as reviewed and analysis saved'
+                else:
+                    status_message = 'Analysis saved successfully'
+                
+                test.save()
+                messages.success(request, status_message)
+                
+                # Notify patient
+                try:
+                    from notifications.utils import create_notification
+                    patient_user = test.prescription.patient.user
+                    if patient_user:
+                        test_name = test.test_definition.name if test.test_definition else 'Unknown Test'
+                        notification_message = f"Dr. {request.user.get_full_name()} has added analysis to your lab test: {test_name}"
+                        
+                        create_notification(
+                            recipient=patient_user,
+                            message=notification_message,
+                            sender=request.user,
+                            notification_type='lab_test_analysis',
+                            related_object=test,
+                            action_url=f"/users/lab-tests/{test.id}/detail/"
+                        )
+                except Exception as e:
+                    print(f"Error sending notification: {e}")
+            
+        # Get related prescription
+        prescription = test.prescription
+            
+        context = {
+            'test': test,
+            'prescription': prescription,
+            'patient': prescription.patient,
+            'doctor': request.user.doctor,
+        }
+        
+        return render(request, 'doctor/lab_test_detail.html', context)
+        
+    except Exception as e:
+        print(f"Error in doctor lab test detail: {str(e)}")
+        messages.error(request, f'Error accessing test details: {str(e)}')
+        return redirect('users:doctor_dashboard')
+
+@login_required
+def patient_lab_test_detail(request, pk):
+    """View for patients to review their lab test details"""
+    try:
+        # Ensure the user is a patient
+        if not hasattr(request.user, 'patient'):
+            messages.error(request, 'Access denied. Patient privileges required.')
+            return redirect('users:dashboard')
+            
+        # Get the lab test and verify patient's access
+        test = get_object_or_404(
+            LabTest.objects.select_related(
+                'prescription',
+                'prescription__patient',
+                'prescription__doctor',
+                'test_definition'
+            ),
+            id=pk
+        )
+        
+        # Verify the requesting patient is associated with the test
+        if test.prescription.patient.user != request.user:
+            messages.error(request, 'You do not have permission to view this test.')
+            return redirect('users:patient_dashboard')
+            
+        context = {
+            'test': test,
+            'prescription': test.prescription,
+            'doctor': test.prescription.doctor
+        }
+        
+        return render(request, 'patient/lab_test_detail.html', context)
+        
+    except Exception as e:
+        print(f"Error in patient lab test detail: {str(e)}")
+        messages.error(request, f'Error accessing test details: {str(e)}')
+        return redirect('users:patient_dashboard') 

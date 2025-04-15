@@ -4,12 +4,12 @@ from django.contrib import messages
 from django.db.models import Q
 from django.utils import timezone
 from ..models import LabTestPrescription, LabTest, LabTestBooking, Patient
-from ..decorators import doctor_required
-from labs.models import Lab
-from clinic.models import InHouseLab
+from ..decorators import user_is_doctor
+from labs.models import LabProfile
+from users.models import Lab
 
 @login_required
-@doctor_required
+@user_is_doctor
 def create_lab_prescription(request, patient_id):
     patient = get_object_or_404(Patient, id=patient_id)
     
@@ -41,12 +41,12 @@ def create_lab_prescription(request, patient_id):
         return redirect('lab_prescription_detail', prescription_id=prescription.id)
     
     # Get nearby labs
-    nearby_labs = Lab.objects.filter(
+    nearby_labs = LabProfile.objects.filter(
         Q(city=patient.city) | Q(state=patient.state)
     ).order_by('name')
     
     # Get in-house labs
-    inhouse_labs = InHouseLab.objects.filter(
+    inhouse_labs = Lab.objects.filter(
         clinic=request.user.clinic_admin.clinic
     )
     

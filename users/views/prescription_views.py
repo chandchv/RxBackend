@@ -23,225 +23,232 @@ from datetime import date
 from notifications.utils import create_notification
 from django.contrib.auth.models import User
 import logging
+from django.db import transaction
+from ..forms import PrescriptionForm, VitalsForm, BasePrescriptionItemFormSet, BaseLabTestFormSet
+from django.db.models import Count
 
 logger = logging.getLogger(__name__)
 
 @login_required
+@transaction.atomic # Wrap in transaction to ensure atomicity
 def create_prescription(request, patient_id):
     patient = get_object_or_404(Patient, id=patient_id)
     doctor = get_object_or_404(Doctor, user=request.user)
-    
+    latest_vitals = PatientVitals.objects.filter(patient=patient).order_by('-created_at').first()
+
     if request.method == 'POST':
-        try:
-            # Create patient vitals
-            vitals = PatientVitals.objects.create(
-                patient=patient,
-                weight=float(request.POST.get('weight', 0)),
-                height=float(request.POST.get('height', 0)),
-                blood_pressure=request.POST.get('blood_pressure'),
-                temperature=float(request.POST.get('temperature', 0)),
-                heart_rate=float(request.POST.get('heart_rate', 0)),
-                oxygen_saturation=float(request.POST.get('oxygen_saturation', 0)),
-                recorded_by=request.user
-            )
+        vitals_form = VitalsForm(request.POST, prefix='vitals')
+        prescription_form = PrescriptionForm(request.POST, prefix='prescription')
+        # Instantiate formsets with POST data
+        item_formset = BasePrescriptionItemFormSet(request.POST, prefix='items') 
+        lab_formset = BaseLabTestFormSet(request.POST, prefix='labs')
 
-            print(f"Created vitals: {vitals.id}")
-
-            # Create prescription
-            prescription = Prescription.objects.create(
-                patient=patient,
-                doctor=doctor,
-                chief_complaints=request.POST.get('chief_complaints'),
-                clinical_findings=request.POST.get('clinical_findings'),
-                date=timezone.now(),
-                diagnosis=request.POST.get('diagnosis'),
-                advice=request.POST.get('advice', ''),
-                follow_up_date=request.POST.get('follow_up_date') or None
-            )
-
-            # Handle medicines
-            medicines_data = json.loads(request.POST.get('prescription_medicines', '[]'))
-            for medicine in medicines_data:
-                PrescriptionItem.objects.create(
-                    prescription=prescription,
-                    medicine=medicine['name'],
-                    dosage=medicine['dosage'],
-                    duration=medicine['duration'],
-                    duration_unit=medicine['duration_unit'],
-                    instructions=medicine['instructions']
-                )
-
-            # Handle lab tests
-            lab_tests_data = json.loads(request.POST.get('lab_tests', '[]'))
-            lab_prescription = None # Initialize
-            
-            if lab_tests_data:
-                # Create a lab test prescription
-                lab_prescription = LabTestPrescription.objects.create(
-                    doctor=request.user, # Use the actual user object
-                    patient=patient,
-                    notes=request.POST.get('lab_notes', ''),
-                    preferred_lab_type='PATIENT_CHOICE' # Example, adjust if needed
-                )
-                
-                for test_data in lab_tests_data:
-                    lab_id = test_data.get('lab_id')
-                    lab_type = test_data.get('lab_type')
-                    test_name = test_data.get('test_name', 'Unknown Test')
-                    
-                    if not lab_id or not lab_type:
-                        messages.error(request, 'Missing lab ID or type for a test.')
-                        # Consider rolling back or handling differently
-                        return redirect('users:create_prescription', patient_id=patient_id) 
-                    
-                    try:
-                        if lab_type == 'internal':
-                            lab = get_object_or_404(Lab, id=lab_id)
-                            test_definition = lab.test_definitions.filter(name=test_name).first()
-                            if not test_definition:
-                                messages.error(request, f"Internal Lab {lab.name} does not offer: {test_name}")
-                                return redirect('users:create_prescription', patient_id=patient_id)
-                            
-                            LabTest.objects.create(
-                                prescription=lab_prescription,
-                                test_definition=test_definition,
-                                status='REQUESTED',
-                                collection_type=test_data.get('collection_type', 'CLINIC'),
-                                doctor_notes=test_data.get('description', '')
-                            )
-                        elif lab_type == 'external':
-                            lab_profile = get_object_or_404(LabProfile, id=lab_id, is_approved=True)
-                            test_offering = ExternalLabTestOffering.objects.filter(
-                                lab_profile=lab_profile,
-                                test__name=test_name,
-                                is_active=True
-                            ).select_related('test').first()
-                            
-                            if not test_offering:
-                                messages.error(request, f"External Lab {lab_profile.name} does not offer: {test_name}")
-                                return redirect('users:create_prescription', patient_id=patient_id)
-                            
-                            LabTest.objects.create(
-                                prescription=lab_prescription,
-                                test_definition=test_offering.test,
-                                status='REQUESTED',
-                                collection_type=test_data.get('collection_type', 'LAB'),
-                                doctor_notes=test_data.get('description', '')
-                            )
-                        else:
-                             messages.error(request, f"Invalid lab type specified: {lab_type}")
-                             return redirect('users:create_prescription', patient_id=patient_id)
-                             
-                    except (Lab.DoesNotExist, LabProfile.DoesNotExist):
-                        messages.error(request, f"Selected lab (Type: {lab_type}, ID: {lab_id}) not found or not approved.")
-                        return redirect('users:create_prescription', patient_id=patient_id)
-                    except Exception as e:
-                        logger.error(f"Error creating LabTest for {test_name}: {e}")
-                        messages.error(request, f"An error occurred while adding lab test {test_name}.")
-                        return redirect('users:create_prescription', patient_id=patient_id)
-
-            # --- Notifications --- 
-            # Notify Patient about the Prescription
+        if vitals_form.is_valid() and prescription_form.is_valid() and item_formset.is_valid() and lab_formset.is_valid():
             try:
-                create_notification(
-                    recipient=prescription.patient.user,
-                    message=f"Dr. {prescription.doctor.name} has created a new prescription for you. You can view it in your portal.",
-                    sender=request.user, 
-                    notification_type='prescription_new',
-                    related_object=prescription
-                )
-            except Exception as e:
-                logger.error(f"Error creating patient prescription notification: {e}")
-                messages.warning(request, "Prescription created, but failed to send patient notification.")
+                # Save Vitals
+                vitals = vitals_form.save(commit=False)
+                # Check if any vital sign was actually entered before saving
+                if any(vitals_form.cleaned_data.values()):
+                    vitals.patient = patient
+                    vitals.recorded_by = request.user
+                    vitals.save()
+                    logger.info(f"Saved vitals {vitals.id} for patient {patient_id}")
+                else:
+                    logger.info(f"No vitals entered for patient {patient_id}, skipping save.")
+                    vitals = None # No vitals object created
 
-            # Notify Labs if tests were prescribed
-            if lab_prescription: 
-                notified_labs = set() # Keep track of notified labs (type, id)
-                try:
-                    for test_data in lab_tests_data: # Re-iterate to easily get lab details for notification
-                        lab_id = test_data.get('lab_id')
-                        lab_type = test_data.get('lab_type')
-                        test_name = test_data.get('test_name', 'Unknown Test')
-                        
-                        if not lab_id or not lab_type: continue
-                        lab_key = (lab_type, lab_id)
-                        if lab_key in notified_labs: continue
+                # Save Prescription
+                prescription = prescription_form.save(commit=False)
+                prescription.patient = patient
+                prescription.doctor = doctor
+                prescription.date = timezone.now()
+                prescription.save()
+                logger.info(f"Saved prescription {prescription.id} for patient {patient_id}")
 
-                        try:
-                            recipient_user = None
-                            lab_display_name = "Unknown Lab"
-                            message_detail = f"New lab test request from Dr. {doctor.name}. Patient: {patient.get_full_name()}. Test: {test_name}"
+                # Save Prescription Items (Medicines)
+                items = item_formset.save(commit=False)
+                for item in items:
+                    item.prescription = prescription
+                    item.save()
+                # Handle deleted items if using can_delete=True
+                for form in item_formset.deleted_forms:
+                     if form.instance.pk: # Check if it's an existing item being deleted
+                         form.instance.delete()
+                item_formset.save_m2m() # Save any m2m if needed (not in this form)
+                logger.info(f"Saved {len(items)} items for prescription {prescription.id}")
+
+                # Process and Save Lab Tests
+                lab_prescription = None
+                processed_labs = [] # To store successfully created LabTest objects
+                if lab_formset.has_changed(): # Check if any lab forms have data
+                    lab_prescription = LabTestPrescription.objects.create(
+                        doctor=request.user,
+                        patient=patient,
+                        notes="", # Add field for lab notes if needed
+                        preferred_lab_type='PATIENT_CHOICE' # Or get from form
+                    )
+                    logger.info(f"Created LabTestPrescription {lab_prescription.id} for patient {patient_id}")
+                    
+                    for form in lab_formset:
+                        if form.is_valid() and form.has_changed() and not form.cleaned_data.get('DELETE'):
+                            lab_data = form.cleaned_data
+                            combined_lab_id = lab_data['lab_id']
+                            test_name = lab_data['test_name']
                             
-                            if lab_type == 'internal':
-                                lab = Lab.objects.get(id=lab_id)
-                                lab_display_name = lab.name
-                                # Notify clinic admins/staff associated with the internal lab's clinic
-                                # Assuming Staff model has clinic fk and is_admin/appropriate role field
-                                clinic_recipients = User.objects.filter(staff__clinic=doctor.clinic, staff__is_admin=True) # Adjust query as needed
-                                if not clinic_recipients.exists():
-                                    logger.warning(f"No admin staff found for clinic {doctor.clinic.id} to notify about internal lab test request for lab {lab_display_name} ({lab_id}).")
-                                else:
-                                    for recipient in clinic_recipients:
-                                        create_notification(
-                                            recipient=recipient,
-                                            message=f"{message_detail} for your internal lab {lab_display_name}.",
-                                            sender=request.user,
-                                            notification_type='lab_test_new',
-                                            related_object=lab_prescription
-                                        )
-                                    notified_labs.add(lab_key)
+                            # Parse lab_type and lab_pk from the combined_lab_id
+                            try:
+                                lab_type, lab_pk_str = combined_lab_id.split('-', 1)
+                                lab_pk = int(lab_pk_str)
+                            except (ValueError, TypeError):
+                                messages.error(request, f"Invalid lab identifier format for test '{test_name}'. Please re-select the lab.")
+                                # Rollback transaction by raising error
+                                raise ValueError("Invalid lab identifier format.") 
 
-                            elif lab_type == 'external':
-                                lab_profile = LabProfile.objects.select_related('user').get(id=lab_id)
-                                lab_display_name = lab_profile.name
-                                if lab_profile.user:
+                            test_definition = None
+                            lab_display_name = "Unknown Lab"
+
+                            try:
+                                if lab_type == 'internal':
+                                    lab = get_object_or_404(Lab, pk=lab_pk)
+                                    lab_display_name = lab.name
+                                    test_definition = lab.test_definitions.filter(name=test_name).first()
+                                    if not test_definition:
+                                        messages.error(request, f"Internal Lab '{lab.name}' does not offer test: '{test_name}'.")
+                                        raise ValueError(f"Test not offered by internal lab {lab.name}")
+                                
+                                elif lab_type == 'external':
+                                    lab_profile = get_object_or_404(LabProfile, pk=lab_pk, is_approved=True)
+                                    lab_display_name = lab_profile.name
+                                    test_offering = ExternalLabTestOffering.objects.filter(
+                                        lab_profile=lab_profile,
+                                        test__name=test_name,
+                                        is_active=True
+                                    ).select_related('test').first()
+                                    if not test_offering:
+                                        messages.error(request, f"External Lab '{lab_profile.name}' does not offer test: '{test_name}'.")
+                                        raise ValueError(f"Test not offered by external lab {lab_profile.name}")
+                                    test_definition = test_offering.test
+                                else:
+                                    messages.error(request, f"Invalid lab type '{lab_type}' for test '{test_name}'.")
+                                    raise ValueError("Invalid lab type specified.")
+
+                                # Create LabTest object
+                                lab_test = LabTest.objects.create(
+                                    prescription=lab_prescription,
+                                    test_definition=test_definition,
+                                    status='REQUESTED',
+                                    collection_type=lab_data['collection_type'],
+                                    doctor_notes=lab_data.get('description', '')
+                                )
+                                processed_labs.append({'lab_test': lab_test, 'lab_type': lab_type, 'lab_pk': lab_pk, 'lab_name': lab_display_name})
+                                logger.info(f"Saved LabTest for '{test_name}' (Lab: {lab_display_name}) for prescription {prescription.id}")
+                                
+                                if lab_type == 'external':
+                                    lab_prescription.external_lab = lab_profile
+                                    lab_prescription.save()
+                            
+                            except (Lab.DoesNotExist, LabProfile.DoesNotExist):
+                                messages.error(request, f"Selected lab (Type: {lab_type}, ID: {lab_pk}) not found or not approved for test '{test_name}'.")
+                                raise ValueError("Lab not found or not approved.")
+                            except Exception as e: # Catch other errors during test definition lookup/saving
+                                logger.error(f"Error processing lab test '{test_name}' for lab {lab_pk} ({lab_type}): {e}")
+                                messages.error(request, f"An error occurred while processing lab test '{test_name}'.")
+                                raise e # Reraise to trigger transaction rollback
+
+                # --- Notifications --- (Keep existing notification logic, adjust as needed)
+                # Notify Patient
+                try:
+                    if prescription.patient and prescription.patient.user:
+                        create_notification(
+                            recipient=prescription.patient.user,
+                            message=f"Dr. {prescription.doctor.name} has created a new prescription for you. View in portal.",
+                            sender=request.user, notification_type='prescription_new', related_object=prescription
+                        )
+                    else:
+                        logger.warning(f"Patient {patient_id} has no associated user account. Skipping notification.")
+                except Exception as e:
+                    logger.error(f"Error creating patient prescription notification: {e}")
+                    # Don't rollback, just warn
+                    messages.warning(request, "Prescription saved, but failed to send patient notification.") 
+
+                # Notify Labs 
+                if lab_prescription and processed_labs:
+                    notified_labs = set() # (lab_type, lab_pk)
+                    for lab_info in processed_labs:
+                        lab_key = (lab_info['lab_type'], lab_info['lab_pk'])
+                        if lab_key in notified_labs: continue
+                        
+                        message_detail = f"New lab test request from Dr. {doctor.name}. Patient: {patient.get_full_name()}. Test: {lab_info['lab_test'].test_definition.name}"
+                        try:
+                            if lab_info['lab_type'] == 'internal':
+                                clinic_recipients = User.objects.filter(staff__clinic=doctor.clinic, staff__is_admin=True)
+                                if clinic_recipients.exists():
+                                    for recipient in clinic_recipients:
+                                        if recipient:  # Check that recipient is not None
+                                            create_notification(
+                                                recipient=recipient,
+                                                message=f"{message_detail} for internal lab {lab_info['lab_name']}. Collection type: {lab_info['lab_test'].get_collection_type_display()}. {lab_info['lab_test'].doctor_notes or ''}",
+                                                sender=request.user, notification_type='lab_test_new', related_object=lab_prescription
+                                            )
+                                    notified_labs.add(lab_key)
+                                else:
+                                    logger.warning(f"No admin staff found for clinic {doctor.clinic.id} to notify for lab {lab_info['lab_name']}.")
+                            
+                            elif lab_info['lab_type'] == 'external':
+                                lab_profile = LabProfile.objects.select_related('user').get(pk=lab_info['lab_pk'])
+                                if lab_profile and lab_profile.user:
                                     create_notification(
                                         recipient=lab_profile.user,
-                                        message=f"{message_detail} for your lab {lab_display_name} (from Clinic: {doctor.clinic.name}).",
-                                        sender=request.user,
-                                        notification_type='lab_test_new',
-                                        related_object=lab_prescription
+                                        message=f"{message_detail} for your lab {lab_info['lab_name']}. Collection type: {lab_info['lab_test'].get_collection_type_display()}. {lab_info['lab_test'].doctor_notes or ''}",
+                                        sender=request.user, notification_type='lab_test_new', related_object=lab_prescription
                                     )
                                     notified_labs.add(lab_key)
                                 else:
-                                    logger.warning(f"External LabProfile {lab_profile.id} ({lab_display_name}) has no associated user to notify.")
-
-                        except (Lab.DoesNotExist, LabProfile.DoesNotExist):
-                            logger.error(f"Notification Error: Could not find lab - Type={lab_type}, ID={lab_id}")
+                                    logger.warning(f"External LabProfile {lab_info['lab_pk']} has no user to notify.")
+                        
                         except Exception as e:
-                            logger.error(f"Notification Error: Error processing lab {lab_key}: {e}")
-                            
-                except Exception as e:
-                    logger.error(f"General error during lab notification processing: {e}")
-                    messages.warning(request, "Prescription created, but failed to send some lab notifications.")
-            # --- End Notifications ---
-            
-            messages.success(request, 'Prescription created successfully')
-            return redirect('users:prescription_detail', pk=prescription.id)
+                            logger.error(f"Error sending notification for lab {lab_key}: {e}")
+                            # Don't rollback, just warn
+                            messages.warning(request, f"Prescription saved, but failed to send notification for lab {lab_info['lab_name']}.")
 
-        except ValueError as e:
-            print(f"ValueError in create_prescription: {e}")
-            messages.error(request, f'Invalid value entered for vitals: {str(e)}')
-            return redirect('users:create_prescription', patient_id=patient_id)
-        except Exception as e:
-            print(f"Exception in create_prescription: {e}")
-            messages.error(request, f'Error creating prescription: {str(e)}')
-            return redirect('users:patient_detail', patient_id=patient_id)
+                messages.success(request, 'Prescription created successfully')
+                return redirect('users:prescription_detail', pk=prescription.id)
 
-    # Get latest vitals for pre-filling the form
-    latest_vitals = PatientVitals.objects.filter(patient=patient).order_by('-created_at').first()
+            except Exception as e: # Catch errors during saving or processing
+                logger.error(f"Error during prescription creation process: {e}", exc_info=True)
+                # Transaction automatically rolls back here due to the raised exception or this catch
+                messages.error(request, f'An unexpected error occurred: {str(e)}. Please try again.')
+                # Re-render form with errors below
 
-    # Get available labs
-    internal_labs = Lab.objects.filter(clinic=doctor.clinic)
-    external_labs = LabProfile.objects.filter(is_approved=True)
+        else: # Forms are not valid
+            # Log form errors for debugging
+            logger.warning(f"Prescription form errors: Vitals={vitals_form.errors} Prescription={prescription_form.errors} Items={item_formset.errors} Labs={lab_formset.errors}")
+            messages.error(request, 'Please correct the errors below.')
+
+    else: # GET request
+        vitals_form = VitalsForm(prefix='vitals', instance=latest_vitals) # Pre-fill vitals
+        prescription_form = PrescriptionForm(prefix='prescription')
+        item_formset = BasePrescriptionItemFormSet(prefix='items', queryset=PrescriptionItem.objects.none()) # Empty formset for GET
+        lab_formset = BaseLabTestFormSet(prefix='labs') # Empty formset for GET
+
+    # Get available labs (needed for both GET and POST error re-render)
+    internal_labs = Lab.objects.filter(clinic=doctor.clinic).values('id', 'name')
+    external_labs = LabProfile.objects.filter(is_approved=True).values('id', 'name')
+    # Combine labs for JavaScript, adding type info
+    available_labs_json = json.dumps(
+        [{'id': lab['id'], 'name': lab['name'], 'type': 'internal'} for lab in internal_labs] + 
+        [{'id': lab['id'], 'name': lab['name'], 'type': 'external'} for lab in external_labs]
+    )
 
     context = {
         'patient': patient,
         'doctor': doctor,
-        'vitals': latest_vitals,
+        'vitals_form': vitals_form,
+        'prescription_form': prescription_form,
+        'item_formset': item_formset,
+        'lab_formset': lab_formset,
+        'available_labs_json': available_labs_json, # Pass labs as JSON for JS
         'has_lab': internal_labs.exists() or external_labs.exists(),
-        'internal_labs': internal_labs,
-        'external_labs': external_labs
     }
     return render(request, 'doctor/create_prescription.html', context)
 
@@ -271,6 +278,8 @@ def prescription_detail(request, pk):
             if prescription.patient != request.user.patient:
                 messages.error(request, 'You are not authorized to view this prescription.')
                 return redirect('users:patient_dashboard')
+            # Set the template for patient view
+            template = 'patient/prescription_detail.html' 
         
         else:
             messages.error(request, 'Access denied.')
@@ -290,7 +299,7 @@ def prescription_detail(request, pk):
         
         lab_tests = []
         for lab_prescription in lab_prescriptions:
-            lab_tests.extend(LabTest.objects.filter(prescription=lab_prescription))
+            lab_tests.extend(LabTest.objects.filter(prescription=lab_prescription).select_related('test_definition'))
         
         context = {
             'prescription': prescription,
@@ -520,4 +529,44 @@ def prescription_detail_api(request, pk):
     except Exception as e:
         print(f"Error in prescription_detail_api: {str(e)}")
         return Response({'error': str(e)}, status=500)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_diagnosis_drug_suggestions(request):
+    """
+    API endpoint to suggest medicines based on doctor's past prescriptions 
+    for a given diagnosis term.
+    Expects a 'diagnosis' query parameter.
+    """
+    if not hasattr(request.user, 'doctor'):
+        return Response({'error': 'User is not a doctor'}, status=status.HTTP_403_FORBIDDEN)
+
+    doctor = request.user.doctor
+    diagnosis_query = request.query_params.get('diagnosis', '').strip()
+
+    if not diagnosis_query or len(diagnosis_query) < 3: # Require minimum length
+        return Response({'suggestions': []}, status=status.HTTP_200_OK) 
+        # Return empty list if query is too short or empty, not an error
+
+    try:
+        # Find prescriptions by this doctor matching the diagnosis term (case-insensitive)
+        # Aggregate the count of each medicine prescribed for those diagnoses.
+        suggestions = PrescriptionItem.objects.filter(
+            prescription__doctor=doctor,
+            prescription__diagnosis__icontains=diagnosis_query
+        ).values(
+            'medicine' # Group by medicine name
+        ).annotate(
+            frequency=Count('medicine') # Count occurrences
+        ).order_by(
+            '-frequency', 'medicine' # Order by most frequent first, then alphabetically
+        ).values_list(
+            'medicine', flat=True # Select only the medicine name
+        )[:10] # Limit to top 10 suggestions
+
+        return Response({'suggestions': list(suggestions)}, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        logger.error(f"Error fetching diagnosis drug suggestions for doctor {doctor.id} and diagnosis '{diagnosis_query}': {e}", exc_info=True)
+        return Response({'error': 'Failed to fetch suggestions'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
