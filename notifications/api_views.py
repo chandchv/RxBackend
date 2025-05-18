@@ -11,7 +11,7 @@ def get_unread_notification_count(request):
     """
     API endpoint to get the count of unread notifications for the logged-in user.
     """
-    count = Notification.objects.filter(recipient=request.user, read=False).count()
+    count = Notification.objects.filter(recipient=request.user, is_read=False).count()
     return Response({'unread_count': count}, status=status.HTTP_200_OK)
 
 class NotificationListView(generics.ListAPIView):
@@ -27,7 +27,7 @@ class NotificationListView(generics.ListAPIView):
         read_status = self.request.query_params.get('read')
         if read_status is not None:
             read_bool = read_status.lower() in ['true', '1']
-            queryset = queryset.filter(read=read_bool)
+            queryset = queryset.filter(is_read=read_bool)
         return queryset
 
 @api_view(['POST'])
@@ -38,8 +38,8 @@ def mark_notification_as_read(request, notification_id):
     """
     try:
         notification = Notification.objects.get(id=notification_id, recipient=request.user)
-        if not notification.read:
-            notification.read = True
+        if not notification.is_read:
+            notification.is_read = True
             notification.save()
         serializer = NotificationSerializer(notification)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -52,5 +52,5 @@ def mark_all_notifications_as_read(request):
     """
     API endpoint to mark all unread notifications for the logged-in user as read.
     """
-    updated_count = Notification.objects.filter(recipient=request.user, read=False).update(read=True)
+    updated_count = Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
     return Response({'message': f'{updated_count} notifications marked as read.'}, status=status.HTTP_200_OK) 

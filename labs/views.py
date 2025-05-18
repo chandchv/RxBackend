@@ -5,12 +5,12 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import JsonResponse, HttpResponse, Http404
 from django.contrib.auth import get_user_model
-from .forms import LabRegistrationForm, LabTestOfferingForm, ExternalLabTestOfferingForm
+from .forms import LabOrderForm, LabRegistrationForm, LabTestOfferingForm, ExternalLabTestOfferingForm
 from .models import ExternalLabTestOffering, LabProfile, LabTestOffering, TestDefinition, LabOrder, LabOrderTest, LabResult, CommissionLedger
 from users.models import Appointment, Doctor, Patient, Lab, LabTest, LabTestPrescription
 from django.db.models import Q, Sum, Count
 import os
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 import csv
 import io
@@ -20,6 +20,7 @@ from datetime import timedelta
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.contrib.auth.models import Group
 from notifications.models import Notification
+from rest_framework.permissions import IsAuthenticated
 
 User = get_user_model()
 
@@ -230,37 +231,74 @@ def lab_dashboard(request):
     # Get available tests
     available_tests = ExternalLabTestOffering.objects.filter(lab_profile=lab_profile, is_active=True).order_by('test__name')[:5]
     
-    # Get recent doctor requests
-    recent_requests = LabOrder.objects.filter(
+    # Get recent doctor requests (combine both LabTest and LabOrder)
+    # Get lab tests from prescriptions
+    lab_tests = LabTest.objects.filter(
+        prescription__external_lab=lab_profile,
+        status__in=['REQUESTED', 'ASSIGNED']
+    ).select_related(
+        'prescription__patient',
+        'prescription__doctor',
+        'test_definition'
+    ).order_by('-created_at')[:5]
+    
+    # Format lab tests
+    doctor_requests = []
+    for test in lab_tests:
+        doctor_requests.append({
+            'id': f'test_{test.id}',
+            'type': 'test',
+            'test_name': test.test_definition.name if test.test_definition else 'Unknown Test',
+            'patient_name': test.prescription.patient.get_full_name(),
+            'doctor_name': f"Dr. {test.prescription.doctor.get_full_name()}",
+            'date': test.created_at,
+            'status': test.status,
+        })
+    
+    # Get recent lab orders
+    recent_lab_orders = LabOrder.objects.filter(
         chosen_lab=lab_profile,
         status='PENDING'
-    ).order_by('-order_date')[:5]
+    ).select_related('doctor', 'patient').order_by('-order_date')[:5]
+    
+    # Add lab orders to doctor requests
+    for order in recent_lab_orders:
+        doctor_requests.append({
+            'id': f'order_{order.id}',
+            'type': 'order',
+            'test_name': ', '.join([test.name for test in order.tests.all()]),
+            'patient_name': order.patient.get_full_name() if order.patient else 'Unknown Patient',
+            'doctor_name': f"Dr. {order.doctor.get_full_name()}" if order.doctor else 'Unknown Doctor',
+            'date': order.order_date,
+            'status': order.status,
+        })
+    
+    # Sort combined requests by date
+    doctor_requests.sort(key=lambda x: x['date'], reverse=True)
     
     # Get payment statistics
     payment_stats = {
-        'pending_payments': LabOrder.objects.filter(
+        'pending': LabOrder.objects.filter(
             chosen_lab=lab_profile,
             status='PENDING'
         ).aggregate(total=Sum('total_price'))['total'] or 0,
-        'completed_payments': LabOrder.objects.filter(
+        'completed': LabOrder.objects.filter(
             chosen_lab=lab_profile,
             status='COMPLETED'
         ).aggregate(total=Sum('total_price'))['total'] or 0,
-        'total_revenue': stats['total_revenue']
+        'total': LabOrder.objects.filter(
+            chosen_lab=lab_profile
+        ).aggregate(total=Sum('total_price'))['total'] or 0
     }
-    
-    # Get notifications for the user
-    notifications = Notification.objects.filter(recipient=request.user).order_by('-timestamp')[:5]
     
     context = {
         'lab_profile': lab_profile,
         'stats': stats,
         'recent_orders': recent_orders,
         'available_tests': available_tests,
-        'recent_requests': recent_requests,
+        'doctor_requests': doctor_requests,
         'payment_stats': payment_stats,
-        'notifications': notifications,
-        'is_superuser': request.user.is_superuser
+        'is_superuser': request.user.is_superuser,
     }
     
     return render(request, 'labs/lab_dashboard.html', context)
@@ -303,8 +341,8 @@ def add_test_offering(request):
                 )
                 
                 # Check if this is a custom test
-                if 'is_custom_test' in request.POST and request.POST.get('custom_test_name'):
-                    custom_test_name = request.POST.get('custom_test_name').strip()
+                if ('is_custom_test' in request.POST and request.POST.get('is_custom_test') == 'true') or ('custom_test_name' in request.POST and request.POST.get('custom_test_name').strip()):
+                    custom_test_name = request.POST.get('custom_test_name', '').strip()
                     if custom_test_name:
                         from labs.models import TestDefinition
                         test, created = TestDefinition.objects.get_or_create(name=custom_test_name)
@@ -345,10 +383,8 @@ def edit_test_offering(request, offering_id):
                 test_offering = form.save(commit=False)
                 
                 # Check if this is a custom test
-                custom_test_name = request.POST.get('custom_test_name')
-                if custom_test_name:
-                    # Check if it's a valid string and not empty
-                    custom_test_name = custom_test_name.strip()
+                if ('is_custom_test' in request.POST and request.POST.get('is_custom_test') == 'true') or ('custom_test_name' in request.POST and request.POST.get('custom_test_name').strip()):
+                    custom_test_name = request.POST.get('custom_test_name', '').strip()
                     if custom_test_name:
                         # Import at the module level instead
                         from labs.models import TestDefinition
@@ -393,6 +429,80 @@ def delete_test_offering(request, offering_id):
         raise PermissionDenied("You are not authorized to access this page.")
 
 @login_required
+def order_tests(request):
+    lab_profile = None
+    try:
+        # Check if the user is associated with a lab
+        lab_profile = LabProfile.objects.get(user=request.user)
+        
+        if not lab_profile.is_approved:
+            messages.error(request, 'Your lab must be approved to order tests.')
+            return redirect('labs:lab_dashboard')
+
+        if request.method == 'POST':
+            form = LabOrderForm(request.POST)
+            if form.is_valid():
+                # Save the order without committing to get the patient
+                lab_order = form.save(commit=False)
+                lab_order.chosen_lab = lab_profile
+                lab_order.status = 'PENDING_PAYMENT'
+                lab_order.save()  # Save to generate ID
+                
+                # Calculate total price and add selected tests
+                total_price = 0
+                for test in form.cleaned_data['tests']:
+                    try:
+                        # Get the lab's price for this test
+                        test_offering = ExternalLabTestOffering.objects.get(
+                            lab_profile=lab_profile,
+                            test=test,
+                            is_active=True
+                        )
+                        total_price += test_offering.price
+                        lab_order.tests.add(test)
+                    except ExternalLabTestOffering.DoesNotExist:
+                        continue
+
+                # Update the total price
+                lab_order.total_price = total_price
+                lab_order.save()
+                
+                messages.success(request, 'Lab tests ordered successfully.')
+                return redirect('labs:lab_dashboard')
+            else:
+                messages.error(request, 'Please correct the errors below.')
+        else:
+            form = LabOrderForm()
+            
+            # Only show tests that this lab offers
+            available_tests = TestDefinition.objects.filter(
+                offered_by_external_labs__lab_profile=lab_profile,
+                offered_by_external_labs__is_active=True
+            ).distinct()
+            
+            if not available_tests.exists():
+                messages.warning(request, 'Please add some test offerings before creating orders.')
+                return redirect('labs:manage_tests')
+            
+            if not available_tests.exists():
+                messages.warning(request, 'Please add some test offerings before creating orders.')
+                return redirect('labs:manage_tests')
+                
+            form.fields['tests'].queryset = available_tests
+        
+        return render(request, 'labs/order_lab_tests.html', {
+            'form': form,
+            'lab_profile': lab_profile
+        })
+        
+    except LabProfile.DoesNotExist:
+        messages.error(request, 'You must be associated with a lab to access this page.')
+        return redirect('labs:lab_dashboard')
+    except Exception as e:
+        messages.error(request, f'Error ordering tests: {str(e)}')
+        return redirect('labs:lab_dashboard')
+
+@login_required
 def order_lab_tests(request, patient_id):
     try:
         doctor = request.user.doctor
@@ -403,10 +513,12 @@ def order_lab_tests(request, patient_id):
             raise PermissionDenied("You are not authorized to order tests for this patient.")
         
         if request.method == 'POST':
-            # Get selected tests and recommended lab
-            test_ids = request.POST.getlist('tests')
-            recommended_lab_id = request.POST.get('recommended_lab')
-            
+            form = ExternalLabTestOfferingForm(request.POST)
+            if form.is_valid():
+                # Get selected tests and recommended lab
+                test_ids = request.POST.getlist('tests')
+                recommended_lab_id = request.POST.get('recommended_lab')
+                
             if not test_ids:
                 messages.error(request, 'Please select at least one test.')
                 return redirect('labs:order_tests', patient_id=patient_id)
@@ -456,7 +568,6 @@ def order_lab_tests(request, patient_id):
     except Exception as e:
         messages.error(request, f'Error ordering tests: {str(e)}')
         return redirect('users:patient_detail', patient_id=patient_id)
-
 
 @login_required
 def patient_choose_lab(request, order_id):
@@ -682,7 +793,7 @@ def edit_test_offering(request, offering_id):
     return render(request, 'labs/add_edit_offering.html', {'form': form, 'title': 'Edit Test Offering'})
 
 
-@api_view(['GET'])
+@login_required
 def available_labs(request):
     try:
         # Get in-house labs
@@ -720,10 +831,18 @@ def available_labs(request):
                 'type': 'EXTERNAL'
             })
         
-        return Response({'labs': labs})
+        # Check if the request is from React Native (API request)
+        if request.headers.get('Accept') == 'application/json':
+            return JsonResponse({'labs': labs})
+        
+        # Default to existing HTML/HTMX response
+        return render(request, 'labs/dashboard.html', {'labs': labs})
         
     except Exception as e:
-        return Response({'error': str(e)}, status=500)
+        if request.headers.get('Accept') == 'application/json':
+            return JsonResponse({'error': str(e)}, status=500)
+        messages.error(request, f'Error fetching labs: {str(e)}')
+        return redirect('labs:dashboard')
 
 @login_required
 def bulk_upload_tests(request):
@@ -1062,126 +1181,67 @@ def doctor_requests(request):
     # Get the lab profile for the logged-in user
     lab_profile = get_object_or_404(LabProfile, user=request.user)
     
-    # Print out key information for debugging
-    print(f"SIMPLIFIED DEBUG: Processing doctor_requests for lab profile: {lab_profile.name} (ID: {lab_profile.id})")
-    
-    # Check for force create parameter - this will always create a test for debugging
-    force_create = request.GET.get('force_create', 'false') == 'true'
-    
-    if force_create:
-        # Import all necessary models correctly
-        from users.models import LabTest, LabTestPrescription, Patient
-        from labs.models import TestDefinition
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        
-        # Find any doctor in the system to assign as creator
-        doctor = User.objects.filter(is_active=True).first()
-        
-        # Find any patient in the system
-        patient = Patient.objects.first()
-        
-        # Create a test definition if needed
-        test_def, created = TestDefinition.objects.get_or_create(
-            name="EMERGENCY TEST", 
-            defaults={
-                'description': 'This is a test created for debugging purposes'
-            }
-        )
-        
-        # Create a new lab test prescription
-        try:
-            prescription = LabTestPrescription.objects.create(
-                doctor=doctor,
-                patient=patient,
-                notes="Force created test prescription",
-                preferred_lab_type='EXTERNAL',
-                external_lab=lab_profile  # This is the key relationship
-            )
-            
-            # Create a lab test linked to this prescription
-            lab_test = LabTest.objects.create(
-                prescription=prescription,
-                test_definition=test_def,
-                status='REQUESTED',
-                collection_type='IN_CLINIC',
-                doctor_notes="Force created test - please process"
-            )
-            
-            messages.success(request, f"Created emergency test successfully! Test ID: {lab_test.id}")
-            print(f"SIMPLIFIED DEBUG: Created emergency test with ID {lab_test.id}")
-        except Exception as e:
-            messages.error(request, f"Error creating test: {str(e)}")
-            print(f"SIMPLIFIED DEBUG: Error creating test: {e}")
+    # Get filter parameters
+    status = request.GET.get('status', '')
+    date = request.GET.get('date', '')
     
     # Get all lab test prescriptions directly linked to this lab
-    from users.models import LabTestPrescription, LabTest
-    
-    # Method 1: Get lab tests via direct relationship
-    direct_prescriptions = LabTestPrescription.objects.filter(external_lab=lab_profile)
-    print(f"SIMPLIFIED DEBUG: Found {direct_prescriptions.count()} prescriptions directly linked to lab")
+    prescriptions = LabTestPrescription.objects.filter(external_lab=lab_profile)
     
     # Get all lab tests from these prescriptions
-    test_ids = []
-    for p in direct_prescriptions:
-        tests = LabTest.objects.filter(prescription=p)
-        test_ids.extend([t.id for t in tests])
-        print(f"SIMPLIFIED DEBUG: Prescription {p.id} has {tests.count()} tests")
-    
-    # Get the actual lab test objects
-    lab_test_requests = LabTest.objects.filter(id__in=test_ids).select_related(
-        'prescription', 
-        'prescription__patient', 
-        'prescription__doctor', 
+    lab_tests = LabTest.objects.filter(
+        prescription__in=prescriptions
+    ).select_related(
+        'prescription__patient',
+        'prescription__doctor',
         'test_definition'
     )
     
-    print(f"SIMPLIFIED DEBUG: Final test count: {lab_test_requests.count()}")
+    # Apply filters to lab tests
+    if status:
+        lab_tests = lab_tests.filter(status=status)
+    if date:
+        lab_tests = lab_tests.filter(created_at__date=date)
     
-    # Also get standard lab orders (from the old flow)
+    # Get standard lab orders (from the old flow)
     lab_orders = LabOrder.objects.filter(chosen_lab=lab_profile)
-    print(f"SIMPLIFIED DEBUG: Found {lab_orders.count()} lab orders from old flow")
     
-    # Combine and paginate results
+    # Apply filters to lab orders
+    if status:
+        lab_orders = lab_orders.filter(status=status)
+    if date:
+        lab_orders = lab_orders.filter(order_date__date=date)
+    
+    # Combine and format results
     all_requests = []
-    for test in lab_test_requests:
-        try:
-            test_name = test.test_definition.name if test.test_definition else 'Unknown Test'
-            patient_name = test.prescription.patient.get_full_name() if test.prescription and test.prescription.patient else 'Unknown Patient'
-            doctor_name = "Dr. " + (test.prescription.doctor.get_full_name() if hasattr(test.prescription.doctor, 'get_full_name') else test.prescription.doctor.username) if test.prescription and test.prescription.doctor else 'Unknown Doctor'
-            
-            all_requests.append({
-                'id': f'test_{test.id}',
-                'type': 'test',
-                'test_name': test_name,
-                'patient_name': patient_name,
-                'doctor_name': doctor_name,
-                'date': test.prescription.prescription_date if test.prescription else timezone.now(),
-                'status': test.status,
-                'collection_type': test.collection_type,
-                'object': test,
-            })
-            print(f"SIMPLIFIED DEBUG: Added test {test.id} ({test_name}) to results")
-        except Exception as e:
-            print(f"SIMPLIFIED DEBUG: Error adding test to results: {e}")
     
+    # Add lab tests
+    for test in lab_tests:
+        all_requests.append({
+            'id': f'test_{test.id}',  # Format: test_123
+            'type': 'test',
+            'test_name': test.test_definition.name if test.test_definition else 'Unknown Test',
+            'patient_name': test.prescription.patient.get_full_name(),
+            'doctor_name': f"Dr. {test.prescription.doctor.get_full_name()}",
+            'date': test.created_at,
+            'status': test.status,
+            'collection_type': test.collection_type,
+            'object': test,
+        })
+    
+    # Add lab orders
     for order in lab_orders:
-        try:
-            all_requests.append({
-                'id': f'order_{order.id}',
-                'type': 'order',
-                'test_name': ', '.join([test.name for test in order.tests.all()]),
-                'patient_name': order.patient.get_full_name() if order.patient else 'Unknown Patient',
-                'doctor_name': order.doctor.name if order.doctor else 'Unknown Doctor',
-                'date': order.order_date,
-                'status': order.status,
-                'collection_type': 'N/A',
-                'object': order,
-            })
-        except Exception as e:
-            print(f"SIMPLIFIED DEBUG: Error adding order to results: {e}")
-    
-    print(f"SIMPLIFIED DEBUG: Total requests to display: {len(all_requests)}")
+        all_requests.append({
+            'id': f'order_{order.id}',  # Format: order_123
+            'type': 'order',
+            'test_name': ', '.join([test.name for test in order.tests.all()]),
+            'patient_name': order.patient.get_full_name() if order.patient else 'Unknown Patient',
+            'doctor_name': f"Dr. {order.doctor.get_full_name()}" if order.doctor else 'Unknown Doctor',
+            'date': order.order_date,
+            'status': order.status,
+            'collection_type': 'N/A',
+            'object': order,
+        })
     
     # Sort combined results by date (newest first)
     all_requests.sort(key=lambda x: x['date'], reverse=True)
@@ -1270,3 +1330,150 @@ def deactivate_lab(request, lab_id):
     }
     return render(request, 'labs/confirm_deactivate.html', context)
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_available_labs(request):
+    """
+    API endpoint specifically for React Native app to fetch available labs.
+    """
+    try:
+        # Get in-house labs
+        inhouse_labs = Lab.objects.filter(is_active=True).values(
+            'id', 'name', 'address', 'phone_number', 'email'
+        )
+        
+        # Get external labs
+        external_labs = LabProfile.objects.filter(is_approved=True).values(
+            'id', 'name', 'address', 'phone_number', 'email'
+        )
+        
+        # Combine and format the results
+        labs = []
+        
+        # Add in-house labs
+        for lab in inhouse_labs:
+            labs.append({
+                'id': lab['id'],
+                'name': lab['name'],
+                'address': lab['address'],
+                'phone_number': lab['phone_number'],
+                'email': lab['email'],
+                'type': 'INHOUSE'
+            })
+        
+        # Add external labs
+        for lab in external_labs:
+            labs.append({
+                'id': lab['id'],
+                'name': lab['name'],
+                'address': lab['address'],
+                'phone_number': lab['phone_number'],
+                'email': lab['email'],
+                'type': 'EXTERNAL'
+            })
+        
+        return Response({
+            'status': 'success',
+            'labs': labs
+        })
+        
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'error': str(e)
+        }, status=500)
+
+@login_required
+def process_lab_request(request, request_id, request_type):
+    """
+    View for processing lab requests (both LabTest and LabOrder)
+    """
+    lab_profile = get_object_or_404(LabProfile, user=request.user)
+    
+    if request_type == 'test':
+        # Handle LabTest flow
+        test_id = request_id.split('_')[1]
+        test = get_object_or_404(LabTest, id=test_id, prescription__external_lab=lab_profile)
+        
+        if request.method == 'POST':
+            action = request.POST.get('action')
+            
+            if action == 'assign_technician':
+                test.assigned_technician = request.POST.get('technician_name')
+                test.status = 'ASSIGNED'
+                test.save()
+                messages.success(request, 'Technician assigned successfully')
+            
+            elif action == 'update_collection':
+                test.status = 'SAMPLE_COLLECTED'
+                test.collection_time = timezone.now()
+                test.collection_notes = request.POST.get('collection_notes')
+                test.save()
+                messages.success(request, 'Sample collection recorded')
+            
+            elif action == 'start_processing':
+                test.status = 'PROCESSING'
+                test.processing_notes = request.POST.get('processing_notes')
+                test.expected_completion_date = request.POST.get('expected_completion_date')
+                test.save()
+                messages.success(request, 'Test processing started')
+            
+            elif action == 'complete_test':
+                test.status = 'COMPLETED'
+                test.test_results = request.POST.get('test_results')
+                if 'result_file' in request.FILES:
+                    test.result_file = request.FILES['result_file']
+                test.save()
+                messages.success(request, 'Test completed successfully')
+            
+            return redirect('labs:doctor_requests')
+        
+        context = {
+            'request_item': test,
+            'type': 'test',
+            'status_choices': LabTest.TEST_STATUS,
+        }
+        
+    else:  # request_type == 'order'
+        # Handle LabOrder flow
+        order_id = request_id.split('_')[1]
+        order = get_object_or_404(LabOrder, id=order_id, chosen_lab=lab_profile)
+        
+        if request.method == 'POST':
+            action = request.POST.get('action')
+            
+            if action == 'confirm_payment':
+                order.payment_status = 'PAID'
+                order.status = 'PROCESSING'
+                order.save()
+                messages.success(request, 'Payment confirmed and order processing started')
+            
+            elif action == 'upload_result':
+                # Create lab result
+                result = LabResult.objects.create(
+                    order=order,
+                    technician_name=request.POST.get('technician_name'),
+                    test_method=request.POST.get('test_method'),
+                    result_file=request.FILES.get('result_file'),
+                    uploaded_by_lab=lab_profile
+                )
+                order.status = 'COMPLETED'
+                order.save()
+                messages.success(request, 'Results uploaded successfully')
+            
+            elif action == 'update_status':
+                new_status = request.POST.get('status')
+                if new_status in dict(LabOrder.STATUS_CHOICES):
+                    order.status = new_status
+                    order.save()
+                    messages.success(request, 'Status updated successfully')
+            
+            return redirect('labs:doctor_requests')
+        
+        context = {
+            'request_item': order,
+            'type': 'order',
+            'status_choices': LabOrder.STATUS_CHOICES,
+        }
+    
+    return render(request, 'labs/process_lab_request.html', context)

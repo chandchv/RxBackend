@@ -1,0 +1,76 @@
+{% extends 'scheduling/base_scheduling.html' %}
+
+{% block title %}Appointment Types{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h3 class="mb-0">Appointment Types</h3>
+            <a href="{% url 'scheduling:appointment_type_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add New Type
+            </a>
+        </div>
+        <div class="card-body">
+            {% if appointment_types %}
+            <div class="table-responsive">
+                <table class="table table-hover table-striped">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Color</th>
+                            <th>Name</th>
+                            <th>Duration</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for type in appointment_types %}
+                        <tr>
+                            <td>
+                                <span class="badge rounded-pill" style="background-color: {{ type.color }}">
+                                    <i class="fas fa-circle"></i>
+                                </span>
+                            </td>
+                            <td>{{ type.name }}</td>
+                            <td>{{ type.duration }} minutes</td>
+                            <td>{{ type.description|truncatechars:50 }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'scheduling:appointment_type_update' type.id %}" class="btn btn-outline-primary">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'scheduling:appointment_type_delete' type.id %}" class="btn btn-outline-danger">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <p class="mb-0">No appointment types found. <a href="{% url 'scheduling:appointment_type_create' %}">Add one now</a>.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="card shadow-sm mt-4">
+        <div class="card-header bg-light">
+            <h4 class="mb-0">About Appointment Types</h4>
+        </div>
+        <div class="card-body">
+            <p>Appointment types allow you to categorize and manage different kinds of appointments. Each type:</p>
+            <ul>
+                <li>Has a unique color for easy identification in the calendar</li>
+                <li>Defines a standard duration (in minutes)</li>
+                <li>Can include a description for additional information</li>
+            </ul>
+            <p>Use these types to organize your schedule and improve efficiency.</p>
+        </div>
+    </div>
+</div>
+{% endblock %} 

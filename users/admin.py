@@ -51,14 +51,37 @@ class ClinicAdmin(admin.ModelAdmin):
 
 @admin.register(Doctor)
 class DoctorAdmin(admin.ModelAdmin):
-    list_display = ('name', 'license_number', 'specialization', 'verified')
-    search_fields = ('name', 'license_number')
-    list_filter = ('verified', 'specialization')
-    actions = ['verify_doctors']
+    list_display = ('name', 'license_number', 'specialization', 'clinic', 'verified', 'is_active')
+    list_filter = ('verified', 'is_active', 'clinic', 'specialization')
+    search_fields = ('name', 'license_number', 'email', 'phone_number')
+    readonly_fields = ('id',)  # Make ID field read-only
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('user', 'clinic', 'name', 'specialization', 'license_number', 'medical_council')
+        }),
+        ('Contact Details', {
+            'fields': ('email', 'phone_number', 'address', 'pincode')
+        }),
+        ('Professional Details', {
+            'fields': ('consultation_fee', 'date_of_registration', 'qualification', 'experience')
+        }),
+        ('Status', {
+            'fields': ('is_active', 'verified', 'verification_details')
+        }),
+    )
+    actions = ['verify_doctors', 'activate_doctors', 'deactivate_doctors']
 
     def verify_doctors(self, request, queryset):
         queryset.update(verified=True)
     verify_doctors.short_description = "Mark selected doctors as verified"
+
+    def activate_doctors(self, request, queryset):
+        queryset.update(is_active=True)
+    activate_doctors.short_description = "Activate selected doctors"
+
+    def deactivate_doctors(self, request, queryset):
+        queryset.update(is_active=False)
+    deactivate_doctors.short_description = "Deactivate selected doctors"
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):

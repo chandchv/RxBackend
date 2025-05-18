@@ -33,11 +33,11 @@ def admin_dashboard(request):
 def billing_overview(request):
     # Logic for admin's billing overview
     context = {
-        'total_patients': 0,  # Replace with actual logic
-        'total_appointments': 0,  # Replace with actual logic
+        'total_patients': Patient.objects.count() or 0,  # Replace with actual logic
+        'total_appointments': Appointment.objects.count() or 0,  # Replace with actual logic
         'total_billing': 0,  # Replace with actual logic
     }
-    return render(request, 'admin/billing_overview.html', context) 
+    return render(request, 'billing/admin/billing_dashboard.html', context) 
 
 def is_superuser(user):
     return user.is_superuser

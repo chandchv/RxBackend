@@ -1,0 +1,78 @@
+{% extends 'scheduling/base_scheduling.html' %}
+
+{% block title %}
+    {% if form.instance.id %}Edit Appointment Type{% else %}Create Appointment Type{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-light">
+            <h3 class="mb-0">
+                {% if form.instance.id %}
+                    Edit Appointment Type
+                {% else %}
+                    Create New Appointment Type
+                {% endif %}
+            </h3>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                {% if form.errors %}
+                    <div class="alert alert-danger">
+                        <strong>There were errors in your form submission:</strong>
+                        <ul>
+                            {% for field, errors in form.errors.items %}
+                                {% for error in errors %}
+                                    <li>{{ field|title }}: {{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="{{ form.name.id_for_label }}" class="form-label">Name</label>
+                            {{ form.name }}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.duration.id_for_label }}" class="form-label">Duration (minutes)</label>
+                            {{ form.duration }}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="{{ form.color.id_for_label }}" class="form-label">Color</label>
+                            {{ form.color }}
+                            <div class="form-text">Pick a color to identify this appointment type in the calendar</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
+                            {{ form.description }}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        {% if form.instance.id %}
+                            Update Appointment Type
+                        {% else %}
+                            Create Appointment Type
+                        {% endif %}
+                    </button>
+                    <a href="{% url 'scheduling:appointment_types' %}" class="btn btn-outline-secondary ms-2">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

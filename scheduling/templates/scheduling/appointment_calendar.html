@@ -1,0 +1,260 @@
+{% extends 'scheduling/base_scheduling.html' %}
+{% load static %}
+
+{% block title %}Appointment Calendar{% endblock %}
+
+{% block extra_css %}
+<!-- FullCalendar CSS -->
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.css" rel="stylesheet">
+<style>
+    .fc-event {
+        cursor: pointer;
+    }
+    
+    .fc-daygrid-day.holiday {
+        background-color: rgba(254, 226, 226, 0.4);
+    }
+    
+    .fc-event-title {
+        white-space: normal;
+    }
+    
+    #calendar {
+        height: 700px;
+    }
+    
+    @media (max-width: 768px) {
+        #calendar {
+            height: 600px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-4">
+    <div class="flex flex-wrap justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">Appointment Calendar</h2>
+        <div class="space-x-2">
+            <a href="{% url 'scheduling:appointment_create' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                <i class="fas fa-plus mr-2"></i> New Appointment
+            </a>
+            <a href="{% url 'scheduling:appointment_list' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
+                <i class="fas fa-list mr-2"></i> List View
+            </a>
+        </div>
+    </div>
+    
+    <div class="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6">
+        <div class="w-full md:w-1/4">
+            <div class="bg-white rounded-lg shadow-sm">
+                <div class="bg-gray-50 px-4 py-3 rounded-t-lg border-b border-gray-200">
+                    <h5 class="font-semibold text-gray-700">Filters</h5>
+                </div>
+                <div class="p-4">
+                    <div class="mb-4">
+                        <label for="doctor-filter" class="block text-sm font-medium text-gray-700 mb-1">Doctor</label>
+                        <select id="doctor-filter" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                            <option value="">All Doctors</option>
+                            {% for doctor in doctors %}
+                                <option value="{{ doctor.id }}">{{ doctor.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="clinic-filter" class="block text-sm font-medium text-gray-700 mb-1">Clinic</label>
+                        <select id="clinic-filter" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                            <option value="">All Clinics</option>
+                            {% for clinic in clinics %}
+                                <option value="{{ clinic.id }}">{{ clinic.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <hr class="my-4 border-gray-200">
+                    
+                    <div>
+                        <h6 class="font-medium text-sm text-gray-700 mb-2">Legend</h6>
+                        <div class="space-y-2 mt-3">
+                            <div class="flex items-center">
+                                <div class="w-5 h-5 rounded bg-blue-500 mr-2"></div>
+                                <span class="text-sm text-gray-600">Scheduled</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-5 h-5 rounded bg-green-500 mr-2"></div>
+                                <span class="text-sm text-gray-600">Confirmed</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-5 h-5 rounded bg-gray-500 mr-2"></div>
+                                <span class="text-sm text-gray-600">Completed</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-5 h-5 rounded bg-red-500 mr-2"></div>
+                                <span class="text-sm text-gray-600">Cancelled</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-5 h-5 rounded bg-yellow-500 mr-2"></div>
+                                <span class="text-sm text-gray-600">No Show</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-5 h-5 rounded bg-blue-400 mr-2"></div>
+                                <span class="text-sm text-gray-600">Rescheduled</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="w-full md:w-3/4">
+            <div class="bg-white rounded-lg shadow-sm p-4">
+                <div id="calendar"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Appointment Modal -->
+<div id="appointmentModal" class="fixed inset-0 flex items-center justify-center z-50 hidden">
+    <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity" id="modal-backdrop"></div>
+    <div class="bg-white rounded-lg overflow-hidden shadow-xl transform transition-all w-full max-w-lg z-50 relative">
+        <div class="bg-gray-100 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+            <h5 class="text-lg font-medium text-gray-900">Appointment Details</h5>
+            <button type="button" class="text-gray-400 hover:text-gray-500" id="modal-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="p-4">
+            <table class="min-w-full divide-y divide-gray-200">
+                <tr class="border-b">
+                    <th class="bg-gray-50 px-4 py-2 w-1/3 text-left text-sm font-medium text-gray-500">Patient</th>
+                    <td class="px-4 py-2 text-sm text-gray-900" id="modal-patient"></td>
+                </tr>
+                <tr class="border-b">
+                    <th class="bg-gray-50 px-4 py-2 w-1/3 text-left text-sm font-medium text-gray-500">Doctor</th>
+                    <td class="px-4 py-2 text-sm text-gray-900" id="modal-doctor"></td>
+                </tr>
+                <tr class="border-b">
+                    <th class="bg-gray-50 px-4 py-2 w-1/3 text-left text-sm font-medium text-gray-500">Date & Time</th>
+                    <td class="px-4 py-2 text-sm text-gray-900" id="modal-datetime"></td>
+                </tr>
+                <tr class="border-b">
+                    <th class="bg-gray-50 px-4 py-2 w-1/3 text-left text-sm font-medium text-gray-500">Status</th>
+                    <td class="px-4 py-2 text-sm text-gray-900" id="modal-status"></td>
+                </tr>
+                <tr>
+                    <th class="bg-gray-50 px-4 py-2 w-1/3 text-left text-sm font-medium text-gray-500">Reason</th>
+                    <td class="px-4 py-2 text-sm text-gray-900" id="modal-reason"></td>
+                </tr>
+            </table>
+        </div>
+        <div class="bg-gray-50 px-4 py-3 border-t border-gray-200 flex justify-end space-x-2">
+            <a id="modal-details-link" href="#" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                View Details
+            </a>
+            <button type="button" class="inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-gray-700 rounded-md hover:bg-gray-50 transition-colors" id="modal-close-btn">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- FullCalendar JavaScript -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            },
+            initialView: 'dayGridMonth',
+            height: 'auto',
+            navLinks: true,
+            selectable: true,
+            selectMirror: true,
+            editable: false,
+            dayMaxEvents: true,
+            eventTimeFormat: {
+                hour: 'numeric',
+                minute: '2-digit',
+                meridiem: 'short'
+            },
+            select: function(info) {
+                // Redirect to create appointment with pre-filled date
+                const date = info.startStr;
+                window.location.href = "{% url 'scheduling:appointment_create' %}?appointment_date=" + date;
+            },
+            eventClick: function(info) {
+                // Show appointment details in modal
+                const event = info.event;
+                const props = event.extendedProps;
+                
+                document.getElementById('modal-patient').textContent = props.patient;
+                document.getElementById('modal-doctor').textContent = props.doctor;
+                document.getElementById('modal-datetime').textContent = event.start.toLocaleString();
+                document.getElementById('modal-status').textContent = props.status;
+                document.getElementById('modal-reason').textContent = props.reason || 'No reason provided';
+                
+                document.getElementById('modal-details-link').href = event.url;
+                
+                // Prevent navigating to the URL
+                info.jsEvent.preventDefault();
+                
+                // Show the modal
+                document.getElementById('appointmentModal').classList.remove('hidden');
+            },
+            events: function(info, successCallback, failureCallback) {
+                // Get filter values
+                const doctorId = document.getElementById('doctor-filter').value;
+                const clinicId = document.getElementById('clinic-filter').value;
+                
+                // Fetch events from API
+                fetch('{% url "scheduling:get_calendar_appointments" %}?' + new URLSearchParams({
+                    start: info.startStr,
+                    end: info.endStr,
+                    doctor: doctorId,
+                    clinic: clinicId
+                }))
+                .then(response => response.json())
+                .then(data => {
+                    successCallback(data);
+                })
+                .catch(error => {
+                    failureCallback(new Error('Could not load appointments'));
+                });
+            }
+        });
+        
+        calendar.render();
+        
+        // Update calendar when filters change
+        document.getElementById('doctor-filter').addEventListener('change', function() {
+            calendar.refetchEvents();
+        });
+        
+        document.getElementById('clinic-filter').addEventListener('change', function() {
+            calendar.refetchEvents();
+        });
+        
+        // Modal close functionality
+        document.getElementById('modal-close').addEventListener('click', function() {
+            document.getElementById('appointmentModal').classList.add('hidden');
+        });
+        
+        document.getElementById('modal-close-btn').addEventListener('click', function() {
+            document.getElementById('appointmentModal').classList.add('hidden');
+        });
+        
+        document.getElementById('modal-backdrop').addEventListener('click', function() {
+            document.getElementById('appointmentModal').classList.add('hidden');
+        });
+    });
+</script>
+{% endblock %} 

@@ -1,6 +1,8 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
+from .views import create_prescription_view
+
 from .views import doctor_views, staff_views, admin_views, lab_views
 from .views import auth_views
 from .views import (
@@ -161,6 +163,7 @@ api_urlpatterns = [
     path('appointments/create/', AppointmentCreateView.as_view(), name='appointment_create_api'),
     path('prescriptions/patient/<int:patient_id>/', PatientPrescriptionsView.as_view(), name='doctor_patient_prescriptions_api'),
     path('prescriptions/<int:pk>/details/', prescription_detail_api, name='prescription_detail_api'),
+    path('patients/prescriptions/<int:pk>/details/', prescription_detail_api, name='patient_prescription_detail_api'),
     path('prescriptions/mine/', PatientPrescriptionsView.as_view(), name='my_prescriptions_api'),
     path('prescriptions/create/', CreatePrescriptionView.as_view(), name='create_prescription_api'),
     path('drug-suggestions/', api_drug_suggestions, name='api_drug_suggestions'),
@@ -189,13 +192,14 @@ urlpatterns = [
     # Appointment URLs
     path('appointments/', appointments_view, name='appointments'),
     path('appointments/create/', create_appointment, name='create_appointment'),
-    path('appointment/<int:pk>/', AppointmentView.as_view(), name='appointment_detail'),
-    path('appointment/<int:pk>/delete/', appointment_delete, name='appointment_delete'),
+    path('appointment/<uuid:pk>/', appointment_detail, name='appointment_detail'),
+    path('appointment/<uuid:pk>/delete/', appointment_delete, name='appointment_delete'),
     
     # Staff URLs
     path('staff/dashboard/', staff_views.staff_dashboard, name='staff_dashboard'),
     path('staff/appointments/', staff_views.staff_appointments, name='staff_appointments'),
-    path('staff/calendar/', staff_views.staff_calendar_events, name='staff_calendar_events'),
+    path('staff/calendar/', staff_views.staff_calendar, name='staff_calendar'),
+    path('staff/calendar/events/', staff_views.staff_calendar_events, name='staff_calendar_events'),
     path('staff/patients/', staff_views.staff_patients, name='staff_patients'),
     path('staff/lab-tests/', staff_views.staff_lab_tests, name='staff_lab_tests'),
     path('staff/lab-tests/create/', staff_views.create_lab_test, name='staff_create_lab_test'),
@@ -205,9 +209,9 @@ urlpatterns = [
     path('staff/billing/<int:billing_id>/update/', staff_views.staff_update_billing, name='staff_update_billing'),
     path('staff/billing/<int:billing_id>/delete/', staff_views.staff_delete_billing, name='staff_delete_billing'),
     path('staff/appointments/create/', staff_views.staff_create_appointment, name='staff_create_appointment'),
-    path('staff/appointments/<int:appointment_id>/update/', staff_views.staff_update_appointment, name='staff_update_appointment'),
-    path('staff/appointments/<int:appointment_id>/cancel/', staff_views.staff_cancel_appointment, name='staff_cancel_appointment'),
-    path('staff/appointments/<int:appointment_id>/', staff_views.staff_appointment_detail, name='staff_appointment_detail'),
+    path('staff/appointments/<uuid:appointment_id>/update/', staff_views.staff_update_appointment, name='staff_update_appointment'),
+    path('staff/appointments/<uuid:appointment_id>/cancel/', staff_views.staff_cancel_appointment, name='staff_cancel_appointment'),
+    path('staff/appointments/<uuid:appointment_id>/', staff_views.staff_appointment_detail, name='staff_appointment_detail'),
     path('staff/patients/<int:patient_id>/', staff_views.staff_patient_detail, name='staff_patient_detail'),
     path('staff/lab-tests/<int:test_id>/', staff_views.staff_lab_test_detail, name='staff_lab_test_detail'),
     path('staff/lab-tests/<int:test_id>/update/', staff_views.staff_update_lab_test, name='staff_update_lab_test'),
@@ -233,15 +237,12 @@ urlpatterns = [
     path('dashboard/', dashboard_views.dashboard_redirect, name='dashboard'),
 
     #Prescription URLs
-    path('prescriptions/create/', create_prescription, name='create_prescription'),
+    
     path('prescriptions/<int:pk>/', prescription_detail, name='prescription_detail'),
     path('api/doctor/prescriptions/<int:pk>/api/', prescription_views.prescription_detail_api, name='prescription_detail_api'),
     path('prescriptions/list/', prescriptions_view, name='prescriptions_list'),
     path('prescriptions/patient/<int:patient_id>/', patient_prescriptions, name='patient_prescriptions'),
     path('prescriptions/', prescriptions_view, name='prescriptions'),
-    path('prescriptions/create/<int:patient_id>/', create_prescription, name='create_prescription'),
-    path('prescriptions/<int:pk>/', prescription_detail, name='prescription_detail'),
-    
     path('patients/<int:patient_id>/prescriptions/', patient_prescriptions, name='patient_prescriptions'),
    
     # API URLs
@@ -280,8 +281,11 @@ urlpatterns = [
     path('clinic-admin/staff/<int:staff_id>/toggle-status/', toggle_staff_status, name='toggle_staff_status'),
 
     # Doctor URLs
-    path('doctor/appointments/', doctor_views.doctor_appointments_view, name='doctor_appointments_view'),
+    path('doctor/appointments/', doctor_views.doctor_appointments, name='doctor_appointments_view'),
     path('doctor/appointments/create/', doctor_views.doctor_create_appointment, name='doctor_create_appointment'),
+    path('doctor/appointments/<uuid:appointment_id>/', doctor_views.appointment_detail_doctor, name='appointment_detail_doctor'),
+    path('doctor/appointments/<uuid:appointment_id>/status/', doctor_views.update_appointment_status, name='update_appointment_status'),
+    path('doctor/appointments/<uuid:appointment_id>/edit/', doctor_views.edit_appointment, name='edit_appointment'),
     path('doctor/signup/', doctor_signup_view, name='doctor_signup'),
     path('doctor/signup/api/', doctor_signup_api, name='doctor_signup_api'),
     path('doctor/patients/', patient_views.patients_list, name='patients_list'),
@@ -306,20 +310,23 @@ urlpatterns = [
     path('patient/signup/', patient_signup_view, name='patient_signup'),
     path('patient/signup/api/', patient_signup_api, name='patient_signup_api'),
     path('patient/dashboard/', patient_views.patient_dashboard, name='patient_dashboard'),
-    path('patient/prescriptions/', patient_prescriptions, name='patient_prescriptions'),  
-    path('patient/prescriptions/<int:pk>/', prescription_detail, name='prescription_detail'),
-    path('patient/appointments/create/', patient_views.patient_create_appointment, name='patient_create_appointment'),
+    path('patient/prescriptions/', patient_views.patient_prescriptions, name='patient_prescriptions'),
+    path('patient/medical-history/', patient_views.patient_medical_history, name='patient_medical_history'),
     path('patient/profile/', patient_views.patient_profile, name='patient_profile'),
+    path('patient/create-appointment/', patient_views.patient_create_appointment, name='patient_create_appointment'),
+    path('patient/test-results/', patient_views.patient_test_results, name='patient_test_results'),
+    path('patient/health-records/', patient_views.patient_health_records, name='patient_health_records'),
+    path('patient/appointments/', patient_views.patient_appointments, name='patient_appointments_list'),
+    path('patient/lab-test/<int:pk>/', lab_views.patient_lab_test_detail, name='patient_lab_test_detail'),
+    path('lab-prescription/<int:prescription_id>/', lab_test_views.lab_prescription_detail, name='lab_prescription_detail'),
+    path('book-lab-test/<int:prescription_id>/', lab_test_views.book_lab_test, name='book_lab_test'),
     
     
     # Prescription URLs
-    path('doctor/patients/<int:patient_id>/prescriptions/create/', 
-         prescription_views.create_prescription, name='create_prescription'),
-    path('doctor/prescriptions/<int:pk>/', 
-            prescription_views.prescription_detail, 
-            name='prescription_detail'),
-    path('doctor/patients/<int:patient_id>/prescriptions/', 
-         prescription_views.patient_prescriptions, name='patient_prescriptions'),
+    #path('doctor/patients/<int:patient_id>/prescriptions/create/', prescription_views.create_prescription, name='create_prescription'),
+    path('doctor/patients/<int:patient_id>/prescriptions/create/', create_prescription_view.create_prescription, name='create_prescription'),
+    path('doctor/prescriptions/<int:pk>/', prescription_views.prescription_detail, name='prescription_detail_view'),
+    path('doctor/patients/<int:patient_id>/prescriptions/', prescription_views.patient_prescriptions, name='patient_prescriptions'),
     
     path('doctor/patients/<int:patient_id>/', patient_views.patient_detail, name='patient_detail'),
     path('doctor/prescriptions/<int:pk>/pdf/', pdf_views.generate_prescription_pdf, name='prescription_pdf'),
@@ -329,9 +336,8 @@ urlpatterns = [
     
     # API URLs
     path('api/appointments/', api_views.appointment_list, name='api_appointments'),
-    path('api/appointments/<int:appointment_id>/status/', 
-         api_views.update_appointment_status, name='api_update_appointment_status'),
-    path('api/doctor/appointments/<int:appointment_id>/update-status/', appointment_views.update_appointment_status_api, name='update_appointment_status_api'),
+    path('api/appointments/<uuid:appointment_id>/status/', api_views.update_appointment_status, name='api_update_appointment_status'),
+    path('api/doctor/appointments/<uuid:appointment_id>/update-status/', appointment_views.update_appointment_status_api, name='update_appointment_status_api'),
     
     # Default dashboard
     #path('dashboard/', doctor_views.doctor_dashboard, name='dashboard'),
@@ -339,7 +345,7 @@ urlpatterns = [
     # Add to your urlpatterns
     path('patient/appointments/create/', patient_views.patient_create_appointment, name='patient_create_appointment'),
     
-    path('api/appointments/<int:appointment_id>/cancel/', api_views.cancel_appointment, name='cancel_appointment'),
+    path('api/appointments/<uuid:appointment_id>/cancel/', api_views.cancel_appointment, name='cancel_appointment'),
     
     path('admin/dashboard/', admin_views.admin_dashboard, name='admin_dashboard'),
     path('api/drug-suggestions/', drug_suggestions, name='drug_suggestions'),
@@ -379,6 +385,8 @@ urlpatterns = [
     path('doctor/leaves/', doctor_views.manage_leaves, name='manage_leaves'),
     path('doctor/leaves/approve/<int:leave_id>/', clinic_admin_views.approve_doctor_leave, name='approve_doctor_leave'),
     path('doctor/leaves/reject/<int:leave_id>/', clinic_admin_views.reject_doctor_leave, name='reject_doctor_leave'),
+    path('doctor/calendar/', doctor_views.doctor_calendar, name='doctor_calendar'),
+    path('doctor/calendar/events/', doctor_views.doctor_calendar_events, name='doctor_calendar_events'),
     path('profile/setup/', dashboard_views.profile_setup, name='profile_setup'),
     path('patient/medical-history/', 
          patient_views.patient_medical_history, 
@@ -386,17 +394,19 @@ urlpatterns = [
     path('api/patient/medical-history/', api_views.patient_medical_history_api, name='patient_medical_history_api'),
     path('billing/<int:billing_id>/', billing_views.billing_detail, name='billing_detail'),
     path('reports/monthly/', report_views.generate_report, name='monthly_report'),
-    path('doctor/billing/', doctor_views.billing_overview, name='doctor_billing_overview'),
-    path('doctor/reports/', doctor_views.report_overview, name='doctor_report_overview'),
-    path('staff/billing/', staff_views.billing_overview, name='staff_billing_overview'),
-    path('admin/billing/', admin_views.billing_overview, name='admin_billing_overview'),
+    path('doctor/billing/', billing_views.doctor_billing_summary, name='doctor_billing_summary'),
+    path('doctor/billing/overview/', billing_views.doctor_billing_overview, name='doctor_billing_overview'),
+    path('doctor/report/overview/', report_views.doctor_report_overview, name='doctor_report_overview'),
+    path('doctor/billing/create/<uuid:appointment_id>/', billing_views.create_bill, name='create_bill'),
+    path('admin/billing/', billing_views.admin_billing_dashboard, name='admin_billing_dashboard'),
+    path('admin/billing/payment/<int:bill_id>/', billing_views.record_payment, name='record_payment'),
     path('clinic_admin/appointments/create/', appointment_views.admin_create_appointment, name='admin_create_appointment'),
     #path('appointments/<int:appointment_id>/update-status/', appointment_views.update_appointment_status, 
          #name='update_appointment_status'),
     #path('appointments/<int:appointment_id>/', appointment_views.appointment_detail, name='appointment_detail'),
-    path('appointments/<int:appointment_id>/update-status/', appointment_views.update_appointment_status, name='appointment_update_status'),
-    path('appointments/<int:appointment_id>/delete/', appointment_views.appointment_delete, name='appointment_delete'),
-    path('appointments/<int:appointment_id>/edit/', appointment_views.appointment_edit, name='appointment_edit'),
+    path('appointments/<uuid:appointment_id>/update-status/', appointment_views.update_appointment_status, name='appointment_update_status'),
+    path('appointments/<uuid:appointment_id>/delete/', appointment_views.appointment_delete, name='appointment_delete'),
+    path('appointments/<uuid:appointment_id>/edit/', appointment_views.appointment_edit, name='appointment_edit'),
     path('api/available-slots/patient/<int:doctor_id>/<str:date>/', 
          patient_views.get_available_slots_patient, 
          name='get_available_slots_patient'),
@@ -405,8 +415,8 @@ urlpatterns = [
          name='get_available_slots_doctor'),
 
     path('doctor/appointments/create/', doctor_views.create_appointment, name='create_appointment'),
-    path('doctor/appointments/<int:appointment_id>/status/', doctor_views.update_appointment_status, name='update_appointment_status'),
-    path('doctor/appointments/<int:appointment_id>/edit/', doctor_views.edit_appointment, name='edit_appointment'),
+    path('doctor/appointments/<uuid:appointment_id>/status/', doctor_views.update_appointment_status, name='update_appointment_status'),
+    path('doctor/appointments/<uuid:appointment_id>/edit/', doctor_views.edit_appointment, name='edit_appointment'),
     
     # Patient billing URLs
     path('patient/billing/', billing_views.patient_billing_history, name='patient_billing_history'),
@@ -414,8 +424,8 @@ urlpatterns = [
     
     # Doctor billing URLs
     path('doctor/billing/', billing_views.doctor_billing_summary, name='doctor_billing_summary'),
-    path('doctor/billing/create/<int:appointment_id>/', billing_views.create_bill, name='create_bill'),
-    
+    path('doctor/billing/create/<uuid:appointment_id>/', billing_views.create_bill, name='create_bill'),
+
     # Admin billing URLs
     path('admin/billing/', billing_views.admin_billing_dashboard, name='admin_billing_dashboard'),
     path('admin/billing/payment/<int:bill_id>/', billing_views.record_payment, name='record_payment'),
@@ -431,7 +441,7 @@ urlpatterns = [
     # Add this URL pattern
     path('api/doctor/patient/<int:patient_id>/', doctor_views.get_patient_details, name='get_patient_details'),
 
-    path('api/doctor/appointments/<int:appointment_id>/', doctor_views.api_appointment_detail, name='api_appointment_detail'),
+    path('api/doctor/appointments/<uuid:appointment_id>/', doctor_views.api_appointment_detail, name='api_appointment_detail'),
 
     # Add this to your urlpatterns
     path('api/drugs/suggestions/', api_drug_suggestions, name='api_drug_suggestions'),
@@ -487,6 +497,7 @@ urlpatterns = [
     # LabTest URLs
     path('lab-tests/<int:pk>/', lab_views.lab_test_detail, name='lab_test_detail'),
     path('lab-tests/<int:test_id>/update-status/', lab_views.update_lab_test_status, name='update_lab_test_status'),
+    path('doctor/lab-tests/', lab_views.doctor_lab_tests, name='doctor_lab_tests'),
     path('doctor/lab-test/<int:pk>/', lab_views.doctor_lab_test_detail, name='doctor_lab_test_detail'),
     path('patient/lab-test/<int:pk>/', lab_views.patient_lab_test_detail, name='patient_lab_test_detail'),
     # Staff Calendar API
@@ -508,4 +519,4 @@ urlpatterns += path('api/', include(router.urls)),
 
 urlpatterns += [
     path('api/', include(router.urls)),
-] 
+]

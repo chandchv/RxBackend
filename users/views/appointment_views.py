@@ -108,9 +108,9 @@ def create_appointment(request):
     }) 
 
 @login_required
-def appointment_detail(request, appointment_id):
-    """View for showing appointment details in a modal"""
-    appointment = get_object_or_404(Appointment, id=appointment_id)
+def appointment_detail(request, pk):
+    """View for showing appointment details"""
+    appointment = get_object_or_404(Appointment, id=pk)
     
     # Check permissions
     if not (request.user.is_staff or request.user == appointment.doctor.user or 
@@ -119,59 +119,35 @@ def appointment_detail(request, appointment_id):
     
     context = {
         'appointment': appointment,
+        'patient': appointment.patient,
     }
-    return render(request, 'appointment_detail_modal.html', context)
+    
+    # If it's an HTMX request, return the modal template
+    if request.headers.get('HX-Request'):
+        return render(request, 'appointment_detail_modal.html', context)
+    
+    # For regular requests, use the full page template
+    if hasattr(request.user, 'patient'):
+        return render(request, 'patient/appointment_detail.html', context)
+    elif hasattr(request.user, 'doctor'):
+        return render(request, 'doctor/appointment_detail.html', context)
+    else:
+        return render(request, 'staff/appointment_detail.html', context)
 
 @login_required
 def appointment_delete(request, appointment_id):
-    """View for deleting/canceling appointments"""
-    try:
-        appointment = get_object_or_404(Appointment, id=appointment_id)
-        
-        # Check permissions
-        if not (request.user.is_staff or request.user == appointment.doctor.user or 
-                request.user == appointment.patient.user):
-            return HttpResponse("Permission denied", status=403)
-        
-        # Mark as cancelled instead of deleting
-        appointment.status = 'cancelled'
-        appointment.save()
-        
-        # --- Add Notifications --- 
-        try:
-            if request.user != appointment.patient.user:
-                 # Notify Patient if not cancelled by patient themselves
-                create_notification(
-                    recipient=appointment.patient.user,
-                    message=f"Your appointment with Dr. {appointment.doctor.name} on {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')} has been cancelled.",
-                    sender=request.user,
-                    notification_type='appointment_cancelled',
-                    related_object=appointment
-                )
-            if request.user != appointment.doctor.user:
-                 # Notify Doctor if not cancelled by doctor themselves
-                create_notification(
-                    recipient=appointment.doctor.user,
-                    message=f"Your appointment with {appointment.patient.get_full_name()} on {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')} has been cancelled.",
-                    sender=request.user,
-                    notification_type='appointment_cancelled',
-                    related_object=appointment
-                )
-        except Exception as e:
-            print(f"Error creating notification in appointment_delete: {e}")
-            messages.warning(request, "Appointment cancelled, but failed to send notifications.")
-        # --- End Notifications ---
-        
-        # If it's an HTMX request, return updated row
-        if request.headers.get('HX-Request'):
-            return render(request, 'appointment_row.html', {'appointment': appointment})
-        
-        messages.success(request, 'Appointment cancelled successfully')
-        return redirect('users:appointments_list')
-        
-    except Exception as e:
-        print(f"Error cancelling appointment: {str(e)}")
-        return HttpResponse("Error cancelling appointment", status=500)
+    """Delete an appointment"""
+    appointment = get_object_or_404(Appointment, id=appointment_id)
+    
+    # Check permissions
+    if not (request.user.is_staff or request.user == appointment.doctor.user):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    
+    if request.method == 'POST':
+        appointment.delete()
+        return JsonResponse({"status": "success"})
+    
+    return JsonResponse({"error": "Invalid request"}, status=400)
 
 @login_required
 def admin_create_appointment(request):
@@ -284,116 +260,102 @@ def send_appointment_notifications(appointment):
 @csrf_exempt
 @require_POST
 def update_appointment_status(request, appointment_id):
+    """Update appointment status"""
     try:
         appointment = get_object_or_404(Appointment, id=appointment_id)
         
-        # Get status from either POST data or JSON body
-        if request.content_type == 'application/json':
+        # Check permissions
+        if not (request.user.is_staff or request.user == appointment.doctor.user):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+        
+        # Parse JSON data from request body
+        try:
             data = json.loads(request.body)
             new_status = data.get('status')
-        else:
+        except json.JSONDecodeError:
             new_status = request.POST.get('status')
-        
-        # Verify the user has permission to update this appointment
-        if request.user.doctor != appointment.doctor and not request.user.is_staff:
-            return JsonResponse({
-                'success': False,
-                'message': 'Permission denied'
-            }, status=403)
             
-        # Convert status to lowercase to match model choices
-        new_status = new_status.lower()
-        
-        # Check if status is valid
-        valid_statuses = ['scheduled', 'completed', 'cancelled', 'no_show', 'missed']
-        if new_status not in valid_statuses:
-            return JsonResponse({
-                'success': False,
-                'message': f'Invalid status. Must be one of: {", ".join(valid_statuses)}'
-            }, status=400)
+        if new_status in dict(Appointment.STATUS_CHOICES):
+            appointment.status = new_status
+            appointment.save()
             
-        # Update the appointment status
-        appointment.status = new_status
-        appointment.save()
+            # Create notification for patient
+            try:
+                create_notification(
+                    recipient=appointment.patient.user,
+                    message=f"Your appointment with Dr. {appointment.doctor.name} has been marked as {new_status}.",
+                    notification_type='appointment_status_update',
+                    sender=request.user,
+                    related_object=appointment,
+                    action_url=f'/appointments/{appointment.id}/detail/'
+                )
+            except Exception as e:
+                print(f"Error creating notification: {str(e)}")
+            
+            return JsonResponse({
+                "status": "success",
+                "new_status": new_status,
+                "message": f"Appointment marked as {new_status}"
+            })
         
-        # Send notification to patient
-        try:
-            # --- Add Notification --- 
-            create_notification(
-                recipient=appointment.patient.user,
-                message=f"Your appointment with Dr. {appointment.doctor.name} on {appointment.appointment_date.strftime('%d-%b-%Y')} has been updated to: {new_status.capitalize()}.",
-                sender=request.user,
-                notification_type='appointment_status_update',
-                related_object=appointment
-            )
-            # --- End Notification ---
-        except Exception as e:
-            print(f"Error sending notification: {str(e)}")
-        
-        return JsonResponse({
-            'success': True,
-            'message': f'Appointment marked as {new_status}',
-            'new_status': new_status
-        })
+        return JsonResponse({"error": "Invalid status"}, status=400)
         
     except Exception as e:
         print(f"Error updating appointment status: {str(e)}")
-        return JsonResponse({
-            'success': False,
-            'message': 'Error updating appointment status'
-        }, status=500)
+        return JsonResponse({"error": str(e)}, status=500)
 
 @login_required
 def appointment_edit(request, appointment_id):
-    appointment = get_object_or_404(Appointment, id=appointment_id)
-    
-    # Check permissions
-    if not (request.user.is_staff or request.user == appointment.doctor.user):
-        messages.error(request, 'Permission denied')
-        return HttpResponse("Permission denied", status=403)
-    
-    if request.method == 'POST':
-        try:
-            # Get form data
-            new_date = request.POST.get('appointment_date')
-            new_time = request.POST.get('appointment_time')
-            new_reason = request.POST.get('reason')
-            
-            # Update appointment
-            appointment.appointment_date = new_date
-            appointment.appointment_time = new_time
-            appointment.reason = new_reason
-            appointment.save()
-            
-            # Send notification
+    """Edit an appointment"""
+    try:
+        appointment = get_object_or_404(Appointment, id=appointment_id)
+        
+        # Check permissions
+        if not (request.user.is_staff or request.user == appointment.doctor.user):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+        
+        if request.method == 'POST':
             try:
-                 # --- Add Notification --- 
-                create_notification(
-                    recipient=appointment.patient.user,
-                    message=f"Your appointment with Dr. {appointment.doctor.name} has been rescheduled to {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')}.",
-                    sender=request.user,
-                    notification_type='appointment_rescheduled',
-                    related_object=appointment
-                )
-                 # --- End Notification ---
+                data = json.loads(request.body)
+                appointment.appointment_date = data.get('appointment_date')
+                appointment.appointment_time = data.get('appointment_time')
+                appointment.reason = data.get('reason')
+                appointment.save()
+                
+                # Create notification for patient
+                try:
+                    create_notification(
+                        recipient=appointment.patient.user,
+                        message=f"Your appointment with Dr. {appointment.doctor.name} has been rescheduled to {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')}.",
+                        sender=request.user,
+                        notification_type='appointment_rescheduled',
+                        related_object=appointment
+                    )
+                except Exception as e:
+                    print(f"Error creating notification: {str(e)}")
+                
+                return JsonResponse({
+                    "status": "success",
+                    "message": "Appointment updated successfully",
+                    "redirect_url": request.META.get('HTTP_REFERER', '/') 
+                })
+            except json.JSONDecodeError:
+                return JsonResponse({"error": "Invalid JSON data"}, status=400)
             except Exception as e:
-                print(f"Error sending notification: {str(e)}")
-                messages.warning(request, "Appointment updated, but failed to send notification.")
-            
-            messages.success(request, 'Appointment updated successfully')
-            
-            # If it's an HTMX request, return the updated row
-            if request.headers.get('HX-Request'):
-                return render(request, 'appointment_row.html', {'appointment': appointment})
-            return redirect('users:appointments_list')
-            
-        except Exception as e:
-            print(f"Error updating appointment: {str(e)}")
-            messages.error(request, 'Error updating appointment')
-            return HttpResponse("Error updating appointment", status=500)
-    
-    # Render edit form
-    return render(request, 'appointment_edit_modal.html', {'appointment': appointment})
+                return JsonResponse({"error": str(e)}, status=400)
+        
+        context = {
+            'appointment': appointment,
+            'min_date': timezone.now().date(),
+        }
+        
+        if request.headers.get('HX-Request'):
+            return render(request, 'appointment_edit_modal.html', context)
+        return render(request, 'appointment_edit.html', context)
+        
+    except Exception as e:
+        print(f"Error in appointment_edit: {str(e)}")
+        return JsonResponse({"error": str(e)}, status=500)
 
 @login_required
 @require_http_methods(["GET"])

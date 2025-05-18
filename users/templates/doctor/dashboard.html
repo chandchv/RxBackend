@@ -2,185 +2,349 @@
 
 {% block title %}Doctor Dashboard{% endblock %}
 
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<style>
+    /* Dashboard Calendar Styling */
+        .dashboard-calendar-container {
+            height: 220px; /* Slightly taller than before */
+            overflow-y: auto; /* Allow vertical scroll */
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background-color: white;
+        }
+
+        /* Make calendar compact */
+        .dashboard-calendar .fc {
+            font-size: 0.65rem !important; /* Smaller text */
+        }
+
+        .dashboard-calendar .fc-view-harness {
+            min-height: 200px !important;
+            height: 200px !important;
+            max-height: 200px !important;
+            overflow-y: auto;
+        }
+
+        /* Remove spacing in toolbar */
+        .dashboard-calendar .fc-toolbar {
+            margin-bottom: 0 !important;
+            padding: 0.25rem !important;
+        }
+        .dashboard-calendar .fc-toolbar-title {
+            font-size: 0.85rem !important;
+        }
+
+        /* Extremely compact day grid */
+        .dashboard-calendar .fc-daygrid-day {
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        .dashboard-calendar .fc-daygrid-day-frame {
+            padding: 0px !important;
+            margin: 0 !important;
+            min-height: 18px !important;
+            height: 18px !important;
+            max-height: 18px !important;
+            overflow: hidden !important;
+        }
+        .dashboard-calendar .fc-daygrid-day-number {
+            font-size: 0.6rem !important;
+            line-height: 1 !important;
+            padding: 0 !important;
+            text-align: right;
+        }
+
+        /* Show event dots but keep it minimal */
+        .dashboard-calendar .fc-daygrid-day-events {
+            display: block !important;
+            margin-top: 0px !important;
+            padding: 0 2px !important;
+            height: 8px !important;
+            overflow: hidden;
+        }
+        .dashboard-calendar .fc-event {
+            font-size: 0 !important; /* Hide text */
+            height: 5px !important;
+            margin: 1px 0;
+        }
+        .dashboard-calendar .fc-event-dot {
+            width: 5px !important;
+            height: 5px !important;
+        }
+
+        /* Background colors for booking status */
+        .booking-status-free {
+            background-color: #4caf50 !important;
+            opacity: 0.2 !important;
+        }
+        .booking-status-partial {
+            background-color: #ffc107 !important;
+            opacity: 0.2 !important;
+        }
+        .booking-status-full {
+            background-color: #f44336 !important;
+            opacity: 0.2 !important;
+        }
+    
+    /* Enhanced tooltip for detailed information */
+    .appointment-tooltip {
+        position: absolute;
+        z-index: 9999 !important;
+        background-color: rgb(155, 150, 150);
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        padding: 12px;
+        max-width: 280px;
+        min-width: 220px;
+        display: none;
+        border: 1px solid #e2e8f0;
+        pointer-events: none;
+    }
+    
+    .tooltip-date {
+        font-weight: 600;
+        font-size: 1em;
+        margin-bottom: 8px;
+        color: #1e40af;
+        border-bottom: 1px solid #e5e7eb;
+        padding-bottom: 4px;
+    }
+    
+    .tooltip-status {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+        font-weight: 500;
+    }
+    
+    .tooltip-status-icon {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    
+    .tooltip-appointments {
+        margin-top: 8px;
+        max-height: 150px;
+        overflow-y: auto;
+    }
+    
+    .tooltip-appointment {
+        padding: 4px 0;
+        border-bottom: 1px dotted #e5e7eb;
+        font-size: 0.85em;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-6">Welcome {{ user.get_full_name }}</h1>
-    <!-- Stats Overview -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold text-gray-700">Today's Appointments</h3>
-            <p class="text-3xl font-bold text-blue-600">{{ today_appointments_count }}</p>
+<div class="bg-gray-100">
+    {% csrf_token %}
+    <!-- Main Content -->
+    <div class="transition-all duration-300 ease-in-out">    
+    
+        <h1 class="text-2xl font-bold mb-6">Welcome {{ user.get_full_name }}</h1>
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-700">Today's Appointments</h3>
+                <p class="text-3xl font-bold text-blue-600">{{ today_appointments_count }}</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-700">Total Patients</h3>
+                <p class="text-3xl font-bold text-green-600">{{ total_patients }}</p> 
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-700">Pending Appointments</h3>
+                <p class="text-3xl font-bold text-yellow-600">{{ pending_appointments }}</p>
+            </div>
         </div>
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold text-gray-700">Total Patients</h3>
-            <p class="text-3xl font-bold text-green-600">{{ total_patients }}</p> 
-        </div>
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold text-gray-700">Pending Appointments</h3>
-            <p class="text-3xl font-bold text-yellow-600">{{ pending_appointments }}</p>
-        </div>
-    </div>
 
-    <!-- Quick Actions -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <a href="{% url 'users:create_patient_doctor' %}" 
-           class="bg-blue-300 hover:bg-blue-600 text-bold rounded-lg p-4 text-center">
-            <i class="fas fa-user-plus mb-2"></i>
-            <span class="block">Add New Patient</span>
-        </a>
-        <a href="{% url 'users:manage_availability' %}" 
-           class="bg-green-300 hover:bg-green-600 text-white rounded-lg p-4 text-center">
-            <i class="fas fa-calendar-alt mb-2"></i>
-            <span class="block">Manage Schedule</span>
-        </a>
-        <a href="{% url 'users:manage_leaves' %}" 
-           class="bg-red-300 hover:bg-red-600 text-white rounded-lg p-4 text-center">
-            <i class="fas fa-calendar-times mb-2"></i>
-            <span class="block">Manage Leaves</span>
-        </a>
-        <a href="{% url 'users:doctor_create_appointment' %}" 
-           class="bg-purple-300 hover:bg-purple-600 text-white rounded-lg p-4 text-center">
-            <i class="fas fa-calendar-check mb-2"></i>
-            <span class="block">Create Appointments</span>
-        </a>
-        <a href="{% url 'users:doctor_appointments_view' %}" 
-           class="bg-purple-300 hover:bg-purple-600 text-white rounded-lg p-4 text-center">
-            <i class="fas fa-calendar-check mb-2"></i>
-            <span class="block">View Appointments</span>
-        </a>
-        <a href="{% url 'users:patients_list' %}" 
-           class="bg-indigo-300 hover:bg-indigo-600 text-white rounded-lg p-4 text-center">
-            <i class="fas fa-users mb-2"></i>
-            <span class="block">Patient List</span>
-        </a>
-    </div>
+        <!-- Quick Actions -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <a href="{% url 'users:create_patient_doctor' %}" 
+               class="bg-blue-300 hover:bg-blue-600 text-bold rounded-lg p-4 text-center">
+                <i class="fas fa-user-plus mb-2"></i>
+                <span class="block">Add New Patient</span>
+            </a>
+            <a href="{% url 'users:manage_availability' %}" 
+               class="bg-green-300 hover:bg-green-600 text-white rounded-lg p-4 text-center">
+                <i class="fas fa-calendar-alt mb-2"></i>
+                <span class="block">Manage Schedule</span>
+            </a>
+            <a href="{% url 'users:manage_leaves' %}" 
+               class="bg-red-300 hover:bg-red-600 text-white rounded-lg p-4 text-center">
+                <i class="fas fa-calendar-times mb-2"></i>
+                <span class="block">Manage Leaves</span>
+            </a>
+            <a href="{% url 'users:doctor_create_appointment' %}" 
+               class="bg-purple-300 hover:bg-purple-600 text-white rounded-lg p-4 text-center">
+                <i class="fas fa-calendar-check mb-2"></i>
+                <span class="block">Create Appointments</span>
+            </a>
+            <a href="{% url 'users:doctor_appointments_view' %}" 
+               class="bg-purple-300 hover:bg-purple-600 text-white rounded-lg p-4 text-center">
+                <i class="fas fa-calendar-check mb-2"></i>
+                <span class="block">View Appointments</span>
+            </a>
+            <a href="{% url 'users:doctor_calendar' %}" 
+               class="bg-blue-300 hover:bg-blue-600 text-white rounded-lg p-4 text-center">
+                <i class="fas fa-calendar-alt mb-2"></i>
+                <span class="block">Calendar View</span>
+            </a>
+            <a href="{% url 'users:patients_list' %}" 
+               class="bg-indigo-300 hover:bg-indigo-600 text-white rounded-lg p-4 text-center">
+                <i class="fas fa-users mb-2"></i>
+                <span class="block">Patient List</span>
+            </a>
+        </div>
 
-    <!-- Today's Schedule -->
-    <div class="bg-white rounded-lg shadow p-6 mb-8">
-        <h2 class="text-xl font-bold mb-4">Today's Schedule Total: {{ today_appointments_count }}</h2>
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead>
-                    <tr>
-                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
-                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% if today_appointments %}
-                        {% for appointment in today_appointments %}
+        <!-- Main Dashboard Content - Calendar and Today's Schedule -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Calendar Overview -->
+            <div class="bg-white rounded-lg shadow p-6 overflow-hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">Appointment Calendar</h2>
+                    <a href="{% url 'users:doctor_calendar' %}" class="text-blue-500 hover:text-blue-600 text-sm">
+                        View Full Calendar
+                    </a>
+                </div>
+                <div class="dashboard-calendar-container">
+                    <div id="dashboard-calendar" class="dashboard-calendar w-full" 
+                         data-calendar-events-url="{% url 'users:doctor_calendar_events' %}"></div>
+                </div>
+                <div id="appointment-tooltip" class="appointment-tooltip"></div>
+            </div>
+
+            <!-- Today's Schedule -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-bold mb-4">Today's Schedule Total: {{ today_appointments_count }}</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead>
+                            <tr>
+                                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
+                                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% if today_appointments %}
+                                {% for appointment in today_appointments %}
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        {{ appointment.appointment_time|time:"H:i" }}
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        {{ appointment.patient.get_full_name }}
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                                   {% if appointment.status == 'scheduled' %}bg-yellow-100 text-yellow-800
+                                                   {% elif appointment.status == 'completed' %}bg-green-100 text-green-800
+                                                   {% else %}bg-red-100 text-red-800{% endif %}">
+                                            {{ appointment.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex space-x-2">
+                                            <a href="{% url 'users:appointment_detail_doctor' appointment.id %}"
+                                            class="text-blue-600 hover:text-blue-900"
+                                            hx-get="{% url 'users:appointment_detail_doctor' appointment.id %}"
+                                            hx-target="#modal"
+                                            hx-trigger="click">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                            
+                                            <a href="{% url 'users:patient_detail' appointment.patient.id %}" 
+                                               class="text-indigo-600 hover:text-indigo-900">
+                                                <i class="fas fa-user"></i> Patient
+                                            </a>
+                                            
+                                            {% if appointment.status == 'scheduled' or appointment.status == 'PENDING' %}
+                                            <button onclick="updateAppointmentStatus('{{ appointment.id }}', 'completed')"
+                                                    class="text-green-600 hover:text-green-900">
+                                                <i class="fas fa-check"></i> Complete
+                                            </button>
+                                            
+                                            <button onclick="editAppointment('{{ appointment.id }}')"
+                                                    class="text-blue-600 hover:text-blue-900">
+                                                <i class="fas fa-edit"></i> Change Date
+                                            </button>
+                                            
+                                            <button onclick="updateAppointmentStatus('{{ appointment.id }}', 'cancelled')"
+                                                    class="text-red-600 hover:text-red-900">
+                                                <i class="fas fa-times"></i> Cancel
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                                        No appointments scheduled for today ({{ today_date|date:"Y-m-d" }})
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lab Tests Needing Review -->
+        {% if completed_lab_tests %}
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 class="text-xl font-bold mb-4">Lab Tests Needing Review</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead>
                         <tr>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                {{ appointment.appointment_time|time:"H:i" }}
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test Name</th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed Date</th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for test in completed_lab_tests %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap font-medium">
+                                {{ test.test_definition.name }}
                             </td>
                             <td class="px-6 py-4">
-                                {{ appointment.patient.get_full_name }}
+                                {{ test.prescription.patient.get_full_name }}
                             </td>
                             <td class="px-6 py-4">
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                           {% if appointment.status == 'scheduled' %}bg-yellow-100 text-yellow-800
-                                           {% elif appointment.status == 'completed' %}bg-green-100 text-green-800
-                                           {% else %}bg-red-100 text-red-800{% endif %}">
-                                    {{ appointment.get_status_display }}
-                                </span>
+                                {{ test.updated_at|date:"F j, Y" }}
                             </td>
                             <td class="px-6 py-4">
-                                <div class="flex space-x-2">
-                                    <a href="{% url 'users:appointment_detail_doctor' appointment.id %}"
-                                    class="text-blue-600 hover:text-blue-900"
-                                    hx-get="{% url 'users:appointment_detail_doctor' appointment.id %}"
-                                    hx-target="#modal"
-                                    hx-trigger="click">
-                                        <i class="fas fa-eye"></i> View
-                                    </a>
-                                    
-                                    <a href="{% url 'users:patient_detail' appointment.patient.id %}" 
-                                       class="text-indigo-600 hover:text-indigo-900">
-                                        <i class="fas fa-user"></i> Patient
-                                    </a>
-                                    
-                                    {% if appointment.status == 'scheduled' or appointment.status == 'PENDING' %}
-                                    <button onclick="updateAppointmentStatus('{{ appointment.id }}', 'completed')"
-                                            class="text-green-600 hover:text-green-900">
-                                        <i class="fas fa-check"></i> Complete
-                                    </button>
-                                    
-                                    <button onclick="editAppointment('{{ appointment.id }}')"
-                                            class="text-blue-600 hover:text-blue-900">
-                                        <i class="fas fa-edit"></i> Change Date
-                                    </button>
-                                    
-                                    <button onclick="updateAppointmentStatus('{{ appointment.id }}', 'cancelled')"
-                                            class="text-red-600 hover:text-red-900">
-                                        <i class="fas fa-times"></i> Cancel
-                                    </button>
-                                    {% endif %}
-                                </div>
+                                <a href="{% url 'users:doctor_lab_test_detail' test.id %}" class="bg-blue-300 hover:bg-blue-700 text-white px-3 py-1 rounded">
+                                    Review Now
+                                </a>
                             </td>
                         </tr>
                         {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="4" class="px-6 py-4 text-center text-gray-500">
-                                No appointments scheduled for today ({{ today_date|date:"Y-m-d" }})
-                            </td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="bg-white rounded-lg shadow p-4 mb-8">
+            <h2 class="text-xl font-bold mb-4">Quick Links</h2>
+            <div class="flex flex-wrap gap-4">
+                <a href="{% url 'users:doctor_billing_overview' %}" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-md">Billing Overview</a>
+                <a href="{% url 'users:doctor_report_overview' %}" class="bg-green-100 hover:bg-green-200 text-green-800 px-4 py-2 rounded-md">Report Overview</a>
+            </div>
         </div>
     </div>
-
-    <!-- Lab Tests Needing Review -->
-    {% if completed_lab_tests %}
-    <div class="bg-white rounded-lg shadow p-6 mb-8">
-        <h2 class="text-xl font-bold mb-4">
-            <span class="text-red-600">⚠️ Lab Tests Needing Review</span>
-            <span class="bg-red-500 text-white px-2 py-1 rounded-full text-xs ml-2">{{ completed_lab_tests|length }}</span>
-        </h2>
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead>
-                    <tr>
-                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test Name</th>
-                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
-                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed Date</th>
-                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for test in completed_lab_tests %}
-                    <tr class="bg-yellow-50">
-                        <td class="px-6 py-4 whitespace-nowrap font-medium">
-                            {{ test.test_definition.name }}
-                        </td>
-                        <td class="px-6 py-4">
-                            {{ test.prescription.patient.get_full_name }}
-                        </td>
-                        <td class="px-6 py-4">
-                            {{ test.updated_at|date:"F j, Y" }}
-                        </td>
-                        <td class="px-6 py-4">
-                            <a href="{% url 'users:doctor_lab_test_detail' test.id %}" class="bg-blue-300 hover:bg-blue-700 text-white px-3 py-1 rounded">
-                                Review Now
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    {% endif %}
-
-    <nav>
-        <ul>
-            <li><a href="{% url 'users:doctor_billing_overview' %}">Billing Overview</a></li>
-            <li><a href="{% url 'users:doctor_report_overview' %}">Report Overview</a></li>
-        </ul>
-    </nav>
 </div>
 
 <!-- Add modal container at the bottom of the page -->
@@ -188,6 +352,11 @@
     <!-- Modal content will be loaded here -->
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
 document.addEventListener('htmx:afterSwap', function(evt) {
     if (evt.target.id === 'modal') {
@@ -267,6 +436,319 @@ function getCookie(name) {
         }
     }
     return cookieValue;
+}
+
+// Define global URL variables for use in JavaScript
+window.DOCTOR_APPOINTMENT_URL = "{% url 'users:appointment_detail_doctor' 999 %}".replace('999', '');
+window.DOCTOR_CALENDAR_URL = "{% url 'users:doctor_calendar' %}";
+
+// Initialize dashboard calendar
+document.addEventListener('DOMContentLoaded', function() {
+    initializeDashboardCalendar();
+});
+
+function initializeDashboardCalendar() {
+    const calendarEl = document.getElementById('dashboard-calendar');
+    const appointmentTooltip = document.getElementById('appointment-tooltip');
+    
+    if (!calendarEl) return;
+    
+    // Get calendar events URL from data attribute
+    const eventsUrl = calendarEl.getAttribute('data-calendar-events-url');
+    
+    // Initialize FullCalendar with more compact settings for dashboard
+    window.calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+            left: 'prev,next',
+            center: 'title',
+            right: ''
+        },
+        height: 'auto',
+        contentHeight: 'auto',
+        aspectRatio: 1,
+        handleWindowResize: true,
+        stickyHeaderDates: true,
+        fixedWeekCount: true, // Ensure 6 weeks are always shown
+        showNonCurrentDates: true, // Show days from adjacent months
+        dayMaxEvents: 0, // Hide all events in month view
+        navLinks: true,
+        themeSystem: 'standard',
+        events: function(info, successCallback, failureCallback) {
+            // Store this for later reference
+            window.calendarStartDate = info.start;
+            window.calendarEndDate = info.end;
+            
+            // Fetch events for the date range
+            fetch(`${eventsUrl}?start=${info.startStr}&end=${info.endStr}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Store all events for direct access
+                    window.allCalendarEvents = data.events || [];
+                    
+                    // Process events and create booking status for each day
+                    const processedEvents = window.allCalendarEvents;
+                    
+                    // Group appointments by date
+                    const appointmentsByDate = {};
+                    const availabilityByDate = {};
+                    
+                    // Process availability summary events
+                    processedEvents.forEach(event => {
+                        if (event.eventType === 'availabilitySummary') {
+                            // Extract date from the ISO string
+                            let date = event.start.split('T')[0];
+                            
+                            // Store with consistent formatting
+                            availabilityByDate[date] = {
+                                availableCount: event.available_count,
+                                start_time: event.start_time,
+                                end_time: event.end_time
+                            };
+                        }
+                    });
+                    
+                    // Process appointment events
+                    processedEvents.forEach(event => {
+                        if (event.eventType === 'appointment') {
+                            // Extract date from the ISO string
+                            let date = event.start.split('T')[0];
+                            
+                            if (!appointmentsByDate[date]) {
+                                appointmentsByDate[date] = [];
+                            }
+                            
+                            appointmentsByDate[date].push({
+                                id: event.id,
+                                title: event.title,
+                                patient: event.patient,
+                                start: event.start,
+                                end: event.end,
+                                status: event.status,
+                                reason: event.reason
+                            });
+                        }
+                    });
+                    
+                    // Store this for later reference
+                    window.appointmentsByDate = appointmentsByDate;
+                    window.availabilityByDate = availabilityByDate;
+                    
+                    // Create day status events
+                    const dayStatusEvents = [];
+                    
+                    // Process each day in the range
+                    const startDate = new Date(info.start);
+                    const endDate = new Date(info.end);
+                    const currentDate = new Date(startDate);
+                    
+                    while (currentDate < endDate) {
+                        // Format date consistently
+                        const year = currentDate.getUTCFullYear();
+                        const month = String(currentDate.getUTCMonth() + 1).padStart(2, '0');
+                        const day = String(currentDate.getUTCDate()).padStart(2, '0');
+                        const dateStr = `${year}-${month}-${day}`;
+                        
+                        const dayAppointments = appointmentsByDate[dateStr] || [];
+                        const dayAvailability = availabilityByDate[dateStr] || { availableCount: 0 };
+                        
+                        // Determine booking status and colors
+                        let bookingStatus = 'free';
+                        let statusColor = '#4caf50'; // Bright green for free
+                        
+                        if (dayAppointments.length > 0) {
+                            if (dayAvailability.availableCount === 0) {
+                                bookingStatus = 'full';
+                                statusColor = '#f44336'; // Bright red for fully booked
+                            } else {
+                                bookingStatus = 'partial';
+                                statusColor = '#ffc107'; // Bright yellow for partially booked
+                            }
+                        }
+                        
+                        // Create a day status event with explicit color
+                        dayStatusEvents.push({
+                            start: dateStr,
+                            allDay: true,
+                            display: 'background',
+                            backgroundColor: statusColor,
+                            classNames: [`booking-status-${bookingStatus}`],
+                            extendedProps: {
+                                bookingStatus: bookingStatus,
+                                appointmentsCount: dayAppointments.length,
+                                availableCount: dayAvailability.availableCount,
+                                appointments: dayAppointments,
+                                dateStr: dateStr, // Store the date string consistently
+                                dayOfMonth: currentDate.getUTCDate(), // Store day number
+                                formattedDate: new Date(dateStr).toLocaleDateString('en-US', {
+                                    weekday: 'long',
+                                    month: 'long',
+                                    day: 'numeric'
+                                })
+                            }
+                        });
+                        
+                        // Move to next day
+                        currentDate.setDate(currentDate.getDate() + 1);
+                    }
+                    
+                    // Return the day status events and the original appointment events
+                    // We'll hide appointment events in the calendar but keep them for reference
+                    successCallback([...dayStatusEvents]);
+                })
+                .catch(error => {
+                    console.error('Error loading events:', error);
+                    failureCallback(error);
+                });
+        },
+        dateClick: function(info) {
+            // Navigate to full calendar view with the selected date
+            window.location.href = window.DOCTOR_CALENDAR_URL + '?date=' + info.dateStr;
+        },
+        dayCellDidMount: function(info) {
+            // Set a data attribute with the day number for easy access
+            const dayNum = info.date.getDate();
+            info.el.setAttribute('data-day', dayNum);
+            
+            // Add event listeners to each day cell
+            info.el.addEventListener('mouseenter', function(e) {
+                // Use the day number from the data attribute
+                const dayNum = parseInt(this.getAttribute('data-day'));
+                showDayTooltipByDayNum(dayNum, info.el);
+            });
+            
+            info.el.addEventListener('mouseleave', function(e) {
+                hideDayTooltip();
+            });
+        }
+    });
+    
+    calendar.render();
+    
+    // After calendar is rendered, force tooltip containers to be visible
+    const tooltipEl = document.getElementById('appointment-tooltip');
+    if (tooltipEl) {
+        tooltipEl.style.zIndex = '1000';
+    }
+}
+
+// Function to show tooltip by day number
+function showDayTooltipByDayNum(dayNum, element) {
+    console.log("Showing tooltip for day:", dayNum);
+    
+    // Get all events
+    const events = window.calendar.getEvents();
+    
+    // Find the event with matching day number
+    const dayEvent = events.find(event => {
+        return event.extendedProps && 
+               event.extendedProps.dayOfMonth === dayNum;
+    });
+    
+    if (!dayEvent) {
+        console.log("No event found for day:", dayNum);
+        return;
+    }
+    
+    const props = dayEvent.extendedProps;
+    const bookingStatus = props.bookingStatus;
+    const appointmentsCount = props.appointmentsCount;
+    const availableCount = props.availableCount;
+    const appointments = props.appointments || [];
+    
+    // Get status text and color with new color scheme
+    let statusText, statusColor;
+    
+    switch (bookingStatus) {
+        case 'free':
+            statusText = 'Free - No Appointments';
+            statusColor = '#4caf50'; // Bright green
+            break;
+        case 'partial':
+            statusText = 'Partially Booked';
+            statusColor = '#ffc107'; // Bright yellow
+            break;
+        case 'full':
+            statusText = 'Fully Booked';
+            statusColor = '#f44336'; // Bright red
+            break;
+        default:
+            statusText = 'Unknown Status';
+            statusColor = '#9e9e9e'; // Gray
+    }
+    
+    // Build appointments list
+    let appointmentsHtml = '';
+    
+    if (appointments.length > 0) {
+        appointments.forEach(appt => {
+            const time = new Date(appt.start).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            appointmentsHtml += `
+                <div class="tooltip-appointment">
+                    <div><strong>${time}</strong> - ${appt.patient}</div>
+                    ${appt.reason ? `<div class="text-gray-600 text-xs">${appt.reason}</div>` : ''}
+                </div>
+            `;
+        });
+    } else {
+        appointmentsHtml = '<div class="tooltip-appointment">No appointments scheduled</div>';
+    }
+    
+    // Build tooltip HTML with more prominent styling
+    const tooltipHtml = `
+        <div class="tooltip-date">${props.formattedDate}</div>
+        <div class="tooltip-status">
+            <span class="tooltip-status-icon" style="background-color: ${statusColor}"></span>
+            <strong>${statusText}</strong>
+        </div>
+        <div class="text-sm font-medium mt-2">
+            <div>Appointments: ${appointmentsCount}</div>
+            <div>Available Slots: ${availableCount}</div>
+        </div>
+        ${appointments.length > 0 ? '<div class="font-medium mt-2">Scheduled Appointments:</div>' : ''}
+        <div class="tooltip-appointments">
+            ${appointmentsHtml}
+        </div>
+        <div class="text-xs font-bold text-blue-600 mt-2">Click for detailed view</div>
+    `;
+    
+    // Update tooltip content
+    const tooltipEl = document.getElementById('appointment-tooltip');
+    if (tooltipEl) {
+        tooltipEl.innerHTML = tooltipHtml;
+        
+        // Position the tooltip
+        const rect = element.getBoundingClientRect();
+        const calendarEl = document.getElementById('dashboard-calendar');
+        const calendarRect = calendarEl.getBoundingClientRect();
+        
+        tooltipEl.style.left = rect.right + 10 + 'px';
+        tooltipEl.style.top = rect.top + window.scrollY + 'px';
+        
+        // Make sure tooltip doesn't go off the right edge
+        const tooltipRect = tooltipEl.getBoundingClientRect();
+        if (tooltipRect.right > calendarRect.right) {
+            tooltipEl.style.left = rect.left - tooltipRect.width - 10 + 'px';
+        }
+        
+        tooltipEl.style.display = 'block';
+    }
+}
+
+function hideDayTooltip() {
+    const tooltipEl = document.getElementById('appointment-tooltip');
+    if (tooltipEl) {
+        tooltipEl.style.display = 'none';
+    }
 }
 </script>
 

@@ -1,12 +1,79 @@
 {% extends 'base.html' %}
 
-{% block title %}Doctor Report Overview{% endblock %}
+{% block title %}Report Overview{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-6">Report Overview</h1>
-    <div class="bg-white rounded-lg shadow p-6">
-        <!-- Add report details here -->
+<div class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-2xl font-bold mb-6">Monthly Report Overview - {{ current_month }}</h1>
+        
+        <!-- Statistics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- Appointments Stats -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Appointments</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Total</span>
+                        <span class="text-xl font-bold text-blue-600">{{ total_appointments }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Completed</span>
+                        <span class="text-xl font-bold text-green-600">{{ completed_appointments }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Cancelled</span>
+                        <span class="text-xl font-bold text-red-600">{{ cancelled_appointments }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Patient Stats -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Patients</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Total Patients</span>
+                        <span class="text-xl font-bold text-blue-600">{{ total_patients }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">New This Month</span>
+                        <span class="text-xl font-bold text-green-600">{{ new_patients }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Medical Stats -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Medical Records</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Prescriptions</span>
+                        <span class="text-xl font-bold text-blue-600">{{ total_prescriptions }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Lab Tests</span>
+                        <span class="text-xl font-bold text-purple-600">{{ total_lab_tests }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Completed Tests</span>
+                        <span class="text-xl font-bold text-green-600">{{ completed_lab_tests }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Actions -->
+        <div class="flex justify-end space-x-4">
+            <a href="{% url 'users:monthly_report' %}" 
+               class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md">
+                Generate Detailed Report
+            </a>
+            <a href="{% url 'users:doctor_dashboard' %}" 
+               class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md">
+                Back to Dashboard
+            </a>
+        </div>
     </div>
 </div>
 {% endblock %} 

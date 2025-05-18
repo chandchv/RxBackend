@@ -1,0 +1,48 @@
+{% extends 'users/base.html' %}
+{% load static %}
+
+{% block title %}Bill Details{% endblock %}
+
+{% block extra_css %}
+<style>
+    .bill-details-container {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 bill-details-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h3 mb-0">Bill Details</h2>
+        <a href="{% url 'billing:patient_billing_history' %}" class="btn btn-outline-primary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Billing History
+        </a>
+    </div>
+
+    <!-- Bill Details Modal -->
+    <div class="modal fade" id="billDetailModal" tabindex="-1" aria-labelledby="billModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content" id="billModalContent">
+                {% include 'billing/patient/bill_detail.html' %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Show modal automatically when page loads
+        var billModal = new bootstrap.Modal(document.getElementById('billDetailModal'));
+        billModal.show();
+        
+        // If modal is closed, redirect back to billing history
+        document.getElementById('billDetailModal').addEventListener('hidden.bs.modal', function () {
+            window.location.href = "{% url 'billing:patient_billing_history' %}";
+        });
+    });
+</script>
+{% endblock %} 

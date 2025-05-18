@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Lab Test Results{% endblock %}
+
+{% block content %}
+<div class="flex h-screen bg-gray-100">
+   
+    <div class="flex-1 overflow-y-auto transition-all duration-300 ease-in-out">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-800">My Lab Test Results</h1>
+            <a href="{% url 'users:patient_dashboard' %}" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm">
+                Back to Dashboard
+            </a>
+        </div>
+
+        {% if lab_tests %}
+            <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Test Name
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Date
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Lab
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Action
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for test in lab_tests %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">
+                                    {{ test.test_definition.name }}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-500">
+                                    {{ test.created_at|date:"M d, Y" }}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                    {% if test.status == 'COMPLETED' %}bg-green-100 text-green-800
+                                    {% elif test.status == 'PENDING' %}bg-yellow-100 text-yellow-800
+                                    {% elif test.status == 'REQUESTED' %}bg-blue-100 text-blue-800
+                                    {% elif test.status == 'REJECTED' %}bg-red-100 text-red-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {{ test.get_status_display }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ test.lab.name|default:"Not assigned" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <a href="{% url 'users:patient_lab_test_detail' test.id %}" class="text-indigo-600 hover:text-indigo-900">View Details</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if lab_tests.has_other_pages %}
+            <div class="flex justify-center mt-6">
+                <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    {% if lab_tests.has_previous %}
+                    <a href="?page={{ lab_tests.previous_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">Previous</span>
+                        <!-- Heroicon name: solid/chevron-left -->
+                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </a>
+                    {% endif %}
+
+                    {% for i in lab_tests.paginator.page_range %}
+                        {% if lab_tests.number == i %}
+                        <span class="relative inline-flex items-center px-4 py-2 border border-indigo-500 bg-indigo-50 text-sm font-medium text-indigo-600">
+                            {{ i }}
+                        </span>
+                        {% else %}
+                        <a href="?page={{ i }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                            {{ i }}
+                        </a>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if lab_tests.has_next %}
+                    <a href="?page={{ lab_tests.next_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">Next</span>
+                        <!-- Heroicon name: solid/chevron-right -->
+                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </a>
+                    {% endif %}
+                </nav>
+            </div>
+            {% endif %}
+            
+        {% else %}
+            <div class="bg-white p-6 rounded-lg shadow-md text-center">
+                <p class="text-gray-600">You don't have any lab test results yet.</p>
+                <p class="mt-2 text-sm text-gray-500">Lab test results will appear here when your doctor prescribes tests for you.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 

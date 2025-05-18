@@ -809,7 +809,7 @@ def doctor_patients(request):
 @permission_classes([IsAuthenticated])
 def patient_medical_history_api(request):
     patient = Patient.objects.get(user=request.user)
-    medical_history = MedicalHistory.objects.filter(patient=patient)
+    medical_history = medical_history.objects.filter(patient=patient)
     serializer = MedicalHistorySerializer(medical_history, many=True)
     return Response(serializer.data)
 

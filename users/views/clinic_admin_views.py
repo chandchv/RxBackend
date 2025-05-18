@@ -1,17 +1,14 @@
+from datetime import datetime
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils import timezone
 from django.core.exceptions import PermissionDenied
 from ..decorators import user_is_admin
-
-from users.forms import ClinicProfileForm
-from ..models import Clinic, Doctor, DoctorLeave, Notification, Staff, StaffLeave, UserProfile, Lab, LabTest, LabStaff
-from datetime import datetime, timedelta
+from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
 from ..scripts.scrapeGpt1 import verify_doctor as verify_doctor_api
 from ..constants import MEDICAL_COUNCILS  # Import the constants 
@@ -23,9 +20,10 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from ..models import Patient, Appointment
+from ..models import Clinic, Doctor, DoctorLeave, Lab, LabStaff, LabTest, Patient, Appointment, Staff, StaffLeave
 from ..permissions import IsClinicAdmin
-from ..forms import LabForm  # We'll create this form
+from ..forms import ClinicProfileForm, DoctorForm, LabForm  # We'll create this form
+from notifications.models import Notification
 
 
 

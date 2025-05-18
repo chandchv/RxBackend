@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block title %}Login - Scheduling System{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-primary text-white text-center py-3">
+                    <h3 class="mb-0">RxDoctor Scheduling</h3>
+                </div>
+                <div class="card-body p-4">
+                    <div class="text-center mb-4">
+                        <i class="fas fa-calendar-alt fa-3x text-primary mb-3"></i>
+                        <h4>Welcome Back</h4>
+                        <p class="text-muted">Please sign in to continue</p>
+                    </div>
+                    
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    {% if form.errors %}
+                        <div class="alert alert-danger">
+                            <p><strong>Error:</strong> Please correct the errors below.</p>
+                            {% for field in form %}
+                                {% if field.errors %}
+                                    <p>{{ field.label }}: {{ field.errors|striptags }}</p>
+                                {% endif %}
+                            {% endfor %}
+                            {% if form.non_field_errors %}
+                                {{ form.non_field_errors }}
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                    
+                    <form method="post" action="{% url 'scheduling:login' %}">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="id_username" class="form-label">Username</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-user"></i></span>
+                                <input type="text" name="username" class="form-control" id="id_username" placeholder="Enter your username" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="id_password" class="form-label">Password</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                <input type="password" name="password" class="form-control" id="id_password" placeholder="Enter your password" required>
+                            </div>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="rememberMe">
+                            <label class="form-check-label" for="rememberMe">Remember me</label>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">Sign In</button>
+                        </div>
+                        <input type="hidden" name="next" value="{{ next }}">
+                    </form>
+                    
+                    <div class="text-center mt-4">
+                        <a href="#" class="text-decoration-none">Forgot your password?</a>
+                    </div>
+                </div>
+                <div class="card-footer bg-light text-center py-3">
+                    <p class="mb-0">Don't have an account? <a href="#" class="text-decoration-none">Contact administrator</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

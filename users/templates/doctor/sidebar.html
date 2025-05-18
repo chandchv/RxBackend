@@ -1,0 +1,314 @@
+<!-- Mobile Menu Toggle Button -->
+<button id="sidebar-toggle" class="fixed top-4 left-4 z-20 md:hidden p-2 rounded-md bg-blue-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+    <svg id="menu-open-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+    <svg id="menu-close-icon" xmlns="http://www.w3.org/2000/svg" class="hidden h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+</button>
+
+<!-- Doctor Sidebar Navigation -->
+<div id="sidebar" class="fixed h-full w-64 bg-white shadow-lg border-r border-gray-200 z-10 transition-transform duration-300 ease-in-out transform -translate-x-full md:translate-x-0">
+    <!-- Branding/Logo Area -->
+    <div class="px-6 py-4 border-b border-gray-200">
+        <div class="flex items-center">
+            <img src="/static/img/logo.png" alt="RxDoctor Logo" class="h-8 w-auto mr-2">
+            <span class="text-xl font-semibold text-blue-700">RxDoctor</span>
+        </div>
+        <p class="text-sm text-gray-600 mt-1">Doctor Portal</p>
+    </div>
+
+    <!-- User Profile Summary -->
+    <div class="px-6 py-4 border-b border-gray-200">
+        <div class="flex items-center space-x-3">
+            <div class="flex-shrink-0">
+                <img class="h-10 w-10 rounded-full bg-gray-300" src="/static/img/default-avatar.png" alt="{{ doctor.user.get_full_name }}">
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-900 truncate">
+                    Dr. {{ doctor.user.get_full_name }}
+                </p>
+                <p class="text-xs text-gray-500 truncate">
+                    {{ doctor.specialization }}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Links -->
+    <nav class="mt-2 px-2 overflow-y-auto" style="max-height: calc(100vh - 200px);">
+        <ul class="space-y-1">
+            <!-- Dashboard -->
+            <li>
+                <a href="{% url 'users:doctor_dashboard' %}" 
+                   class="group flex items-center px-4 py-3 text-sm font-medium rounded-md 
+                          {% if request.resolver_match.url_name == 'doctor_dashboard' %}
+                            bg-blue-50 text-blue-700 border-l-4 border-blue-500
+                          {% else %}
+                            text-gray-700 hover:bg-gray-50 hover:text-blue-600
+                          {% endif %}">
+                    <svg class="mr-3 h-5 w-5 
+                              {% if request.resolver_match.url_name == 'doctor_dashboard' %}
+                                text-blue-600
+                              {% else %}
+                                text-gray-500 group-hover:text-blue-500
+                              {% endif %}" 
+                         xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                    Dashboard
+                </a>
+            </li>
+            
+            <!-- Appointments -->
+            <li>
+                <a href="{% url 'users:doctor_appointments_view' %}" 
+                   class="group flex items-center px-4 py-3 text-sm font-medium rounded-md 
+                          {% if 'appointment' in request.resolver_match.url_name %}
+                            bg-blue-50 text-blue-700 border-l-4 border-blue-500
+                          {% else %}
+                            text-gray-700 hover:bg-gray-50 hover:text-blue-600
+                          {% endif %}">
+                    <svg class="mr-3 h-5 w-5 
+                              {% if 'appointment' in request.resolver_match.url_name %}
+                                text-blue-600
+                              {% else %}
+                                text-gray-500 group-hover:text-blue-500
+                              {% endif %}"
+                         xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Appointments
+                </a>
+            </li>
+            
+            <!-- Schedule Management -->
+            <li>
+                <a href="{% url 'users:manage_availability' %}" 
+                   class="group flex items-center px-4 py-3 text-sm font-medium rounded-md 
+                          {% if 'availability' in request.resolver_match.url_name %}
+                            bg-blue-50 text-blue-700 border-l-4 border-blue-500
+                          {% else %}
+                            text-gray-700 hover:bg-gray-50 hover:text-blue-600
+                          {% endif %}">
+                    <svg class="mr-3 h-5 w-5 
+                              {% if 'availability' in request.resolver_match.url_name %}
+                                text-blue-600
+                              {% else %}
+                                text-gray-500 group-hover:text-blue-500
+                              {% endif %}" 
+                         xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Schedule
+                </a>
+            </li>
+            
+            <!-- Patients -->
+            <li>
+                <a href="{% url 'users:patients_list' %}" 
+                   class="group flex items-center px-4 py-3 text-sm font-medium rounded-md 
+                          {% if 'patient' in request.resolver_match.url_name %}
+                            bg-blue-50 text-blue-700 border-l-4 border-blue-500
+                          {% else %}
+                            text-gray-700 hover:bg-gray-50 hover:text-blue-600
+                          {% endif %}">
+                    <svg class="mr-3 h-5 w-5 
+                              {% if 'patient' in request.resolver_match.url_name %}
+                                text-blue-600
+                              {% else %}
+                                text-gray-500 group-hover:text-blue-500
+                              {% endif %}" 
+                         xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    Patients
+                </a>
+            </li>
+            
+            <!-- Prescriptions -->
+            <li>
+                <a href="{% url 'users:prescriptions_list' %}" 
+                   class="group flex items-center px-4 py-3 text-sm font-medium rounded-md 
+                          {% if 'prescription' in request.resolver_match.url_name %}
+                            bg-blue-50 text-blue-700 border-l-4 border-blue-500
+                          {% else %}
+                            text-gray-700 hover:bg-gray-50 hover:text-blue-600
+                          {% endif %}">
+                    <svg class="mr-3 h-5 w-5 
+                              {% if 'prescription' in request.resolver_match.url_name %}
+                                text-blue-600
+                              {% else %}
+                                text-gray-500 group-hover:text-blue-500
+                              {% endif %}" 
+                         xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Prescriptions
+                </a>
+            </li>
+            
+            <!-- Lab Tests -->
+            <li>
+                <a href="{% url 'users:doctor_lab_tests' %}" 
+                   class="group flex items-center px-4 py-3 text-sm font-medium rounded-md 
+                          {% if 'lab_test' in request.resolver_match.url_name %}
+                            bg-blue-50 text-blue-700 border-l-4 border-blue-500
+                          {% else %}
+                            text-gray-700 hover:bg-gray-50 hover:text-blue-600
+                          {% endif %}">
+                    <svg class="mr-3 h-5 w-5 
+                              {% if 'lab_test' in request.resolver_match.url_name %}
+                                text-blue-600
+                              {% else %}
+                                text-gray-500 group-hover:text-blue-500
+                              {% endif %}" 
+                         xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                    </svg>
+                    Lab Tests
+                </a>
+            </li>
+            
+            <!-- Billing -->
+            <li>
+                <a href="{% url 'users:doctor_billing_overview' %}" 
+                   class="group flex items-center px-4 py-3 text-sm font-medium rounded-md 
+                          {% if 'billing' in request.resolver_match.url_name %}
+                            bg-blue-50 text-blue-700 border-l-4 border-blue-500
+                          {% else %}
+                            text-gray-700 hover:bg-gray-50 hover:text-blue-600
+                          {% endif %}">
+                    <svg class="mr-3 h-5 w-5 
+                              {% if 'billing' in request.resolver_match.url_name %}
+                                text-blue-600
+                              {% else %}
+                                text-gray-500 group-hover:text-blue-500
+                              {% endif %}" 
+                         xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                    </svg>
+                    Billing
+                </a>
+            </li>
+            
+            <!-- Reports -->
+            <li>
+                <a href="{% url 'users:doctor_report_overview' %}" 
+                   class="group flex items-center px-4 py-3 text-sm font-medium rounded-md 
+                          {% if 'report' in request.resolver_match.url_name %}
+                            bg-blue-50 text-blue-700 border-l-4 border-blue-500
+                          {% else %}
+                            text-gray-700 hover:bg-gray-50 hover:text-blue-600
+                          {% endif %}">
+                    <svg class="mr-3 h-5 w-5 
+                              {% if 'report' in request.resolver_match.url_name %}
+                                text-blue-600
+                              {% else %}
+                                text-gray-500 group-hover:text-blue-500
+                              {% endif %}" 
+                         xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Reports
+                </a>
+            </li>
+        </ul>
+    </nav>
+    
+    <!-- Bottom Actions -->
+    <div class="absolute bottom-0 w-full border-t border-gray-200 bg-gray-50">
+        <div class="px-4 py-4">
+            <ul class="space-y-2">
+                <li>
+                    <a href="{% url 'users:doctor_profile' %}" class="flex items-center text-sm text-gray-600 hover:text-blue-600">
+                        <svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Profile Settings
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url 'users:manage_leaves' %}" class="flex items-center text-sm text-gray-600 hover:text-blue-600">
+                        <svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Manage Leaves
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url 'users:logout' %}" class="flex items-center text-sm text-gray-600 hover:text-blue-600">
+                        <svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Sign out
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Sidebar Backdrop (mobile) -->
+<div id="sidebar-backdrop" class="fixed inset-0 bg-gray-600 bg-opacity-50 z-[5] hidden md:hidden" aria-hidden="true"></div>
+
+<script>
+    // Sidebar toggle functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const sidebar = document.getElementById('sidebar');
+        const toggleBtn = document.getElementById('sidebar-toggle');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        const openIcon = document.getElementById('menu-open-icon');
+        const closeIcon = document.getElementById('menu-close-icon');
+        
+        // Function to toggle sidebar
+        function toggleSidebar() {
+            sidebar.classList.toggle('-translate-x-full');
+            backdrop.classList.toggle('hidden');
+            openIcon.classList.toggle('hidden');
+            closeIcon.classList.toggle('hidden');
+            
+            // Prevent body scrolling when sidebar is open on mobile
+            document.body.classList.toggle('overflow-hidden', !sidebar.classList.contains('-translate-x-full'));
+        }
+        
+        // Toggle sidebar when button is clicked
+        toggleBtn.addEventListener('click', toggleSidebar);
+        
+        // Close sidebar when backdrop is clicked
+        backdrop.addEventListener('click', toggleSidebar);
+        
+        // Close sidebar when a link is clicked (on mobile)
+        const sidebarLinks = sidebar.querySelectorAll('a');
+        sidebarLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                if (window.innerWidth < 768) { // only on mobile
+                    toggleSidebar();
+                }
+            });
+        });
+        
+        // Handle resize event
+        window.addEventListener('resize', function() {
+            if (window.innerWidth >= 768) {
+                // Ensure sidebar is visible on desktop
+                sidebar.classList.remove('-translate-x-full');
+                backdrop.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+                openIcon.classList.remove('hidden');
+                closeIcon.classList.add('hidden');
+            } else if (!backdrop.classList.contains('hidden')) {
+                // If backdrop is visible on mobile, sidebar is open
+                openIcon.classList.add('hidden');
+                closeIcon.classList.remove('hidden');
+            } else {
+                // If backdrop is hidden on mobile, sidebar is closed
+                sidebar.classList.add('-translate-x-full');
+                openIcon.classList.remove('hidden');
+                closeIcon.classList.add('hidden');
+            }
+        });
+    });
+</script> 

@@ -3,134 +3,147 @@
 {% block title %}Lab Test Review{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto px-4 py-8">
-    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
-        <!-- Header -->
-        <div class="border-b p-6">
-            <div class="flex justify-between items-center">
-                <div>
-                    <h1 class="text-2xl font-bold">{{ test.test_definition.name }}</h1>
-                    <p class="text-gray-600">Test ID: {{ test.id }}</p>
-                </div>
-                <div class="text-right">
-                    <span class="px-3 py-1 rounded-full text-sm font-semibold
-                        {% if test.status == 'REQUESTED' %}bg-yellow-100 text-yellow-800
-                        {% elif test.status == 'ASSIGNED' %}bg-blue-100 text-blue-800
-                        {% elif test.status == 'SAMPLE_COLLECTED' %}bg-purple-100 text-purple-800
-                        {% elif test.status == 'PROCESSING' %}bg-indigo-100 text-indigo-800
-                        {% elif test.status == 'COMPLETED' %}bg-green-100 text-green-800
-                        {% elif test.status == 'REVIEWED' %}bg-green-700 text-white
-                        {% else %}bg-gray-100 text-gray-800{% endif %}">
-                        {{ test.get_status_display }}
-                    </span>
-                </div>
-            </div>
+<div class="bg-gray-100">
+    <!-- Main Content -->
+    <div class="transition-all duration-300 ease-in-out">  
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-800">Lab Test Review</h1>
+            <a href="{% url 'users:doctor_dashboard' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                <svg class="-ml-1 mr-2 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L7.414 9H15a1 1 0 110 2H7.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                </svg>
+                Back to Dashboard
+            </a>
         </div>
-
-        <!-- Test Details -->
-        <div class="p-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <h2 class="text-lg font-semibold mb-4">Patient Information</h2>
-                    <div class="space-y-2">
-                        <p><strong>Name:</strong> {{ test.prescription.patient.get_full_name }}</p>
-                        <p><strong>ID:</strong> {{ test.prescription.patient.patient_id }}</p>
-                        <p><strong>Gender:</strong> {{ test.prescription.patient.get_gender_display }}</p>
-                        <p><strong>Age:</strong> {{ test.prescription.patient.get_age }} years</p>
+        
+        <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+            <!-- Header -->
+            <div class="border-b p-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-2xl font-bold">{{ test.test_definition.name }}</h1>
+                        <p class="text-gray-600">Test ID: {{ test.id }}</p>
                     </div>
-                </div>
-                <div>
-                    <h2 class="text-lg font-semibold mb-4">Test Information</h2>
-                    <div class="space-y-2">
-                        <p><strong>Test Name:</strong> {{ test.test_definition.name }}</p>
-                        <p><strong>Collection Type:</strong> {{ test.get_collection_type_display }}</p>
-                        {% if test.doctor_notes %}
-                        <p><strong>Notes:</strong> {{ test.doctor_notes }}</p>
-                        {% endif %}
-                        <p><strong>Prescribed Date:</strong> {{ test.prescription.prescription_date|date:"F j, Y" }}</p>
-                        <p><strong>Last Updated:</strong> {{ test.updated_at|date:"F j, Y H:i" }}</p>
+                    <div class="text-right">
+                        <span class="px-3 py-1 rounded-full text-sm font-semibold
+                            {% if test.status == 'REQUESTED' %}bg-yellow-100 text-yellow-800
+                            {% elif test.status == 'ASSIGNED' %}bg-blue-100 text-blue-800
+                            {% elif test.status == 'SAMPLE_COLLECTED' %}bg-purple-100 text-purple-800
+                            {% elif test.status == 'PROCESSING' %}bg-indigo-100 text-indigo-800
+                            {% elif test.status == 'COMPLETED' %}bg-green-100 text-green-800
+                            {% elif test.status == 'REVIEWED' %}bg-green-700 text-white
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ test.get_status_display }}
+                        </span>
                     </div>
                 </div>
             </div>
 
-            <!-- Test Results -->
-            {% if test.status == 'COMPLETED' or test.status == 'REVIEWED' %}
-            <div class="mt-8">
-                <h2 class="text-lg font-semibold mb-4">Test Results</h2>
-                
-                {% if test.result_file %}
-                <div class="bg-gray-50 p-4 rounded-lg mb-4">
-                    <div class="mb-2">
-                        <strong>Result Document:</strong>
+            <!-- Test Details -->
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h2 class="text-lg font-semibold mb-4">Patient Information</h2>
+                        <div class="space-y-2">
+                            <p><strong>Name:</strong> {{ test.prescription.patient.get_full_name }}</p>
+                            <p><strong>ID:</strong> {{ test.prescription.patient.patient_id }}</p>
+                            <p><strong>Gender:</strong> {{ test.prescription.patient.get_gender_display }}</p>
+                            <p><strong>Age:</strong> {{ test.prescription.patient.get_age }} years</p>
+                        </div>
                     </div>
-                    <iframe src="{{ test.result_file.url }}" class="w-full h-96 border rounded"></iframe>
-                    <div class="mt-4">
-                        <a href="{{ test.result_file.url }}" target="_blank" class="text-blue-600 hover:text-blue-800 font-medium">
-                            <i class="fas fa-external-link-alt mr-1"></i> Open in New Tab
-                        </a>
-                        <a href="{{ test.result_file.url }}" download class="text-blue-600 hover:text-blue-800 font-medium ml-4">
-                            <i class="fas fa-download mr-1"></i> Download
-                        </a>
+                    <div>
+                        <h2 class="text-lg font-semibold mb-4">Test Information</h2>
+                        <div class="space-y-2">
+                            <p><strong>Test Name:</strong> {{ test.test_definition.name }}</p>
+                            <p><strong>Collection Type:</strong> {{ test.get_collection_type_display }}</p>
+                            {% if test.doctor_notes %}
+                            <p><strong>Notes:</strong> {{ test.doctor_notes }}</p>
+                            {% endif %}
+                            <p><strong>Prescribed Date:</strong> {{ test.prescription.prescription_date|date:"F j, Y" }}</p>
+                            <p><strong>Last Updated:</strong> {{ test.updated_at|date:"F j, Y H:i" }}</p>
+                        </div>
                     </div>
+                </div>
+
+                <!-- Test Results -->
+                {% if test.status == 'COMPLETED' or test.status == 'REVIEWED' %}
+                <div class="mt-8">
+                    <h2 class="text-lg font-semibold mb-4">Test Results</h2>
+                    
+                    {% if test.result_file %}
+                    <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                        <div class="mb-2">
+                            <strong>Result Document:</strong>
+                        </div>
+                        <iframe src="{{ test.result_file.url }}" class="w-full h-96 border rounded"></iframe>
+                        <div class="mt-4">
+                            <a href="{{ test.result_file.url }}" target="_blank" class="text-blue-600 hover:text-blue-800 font-medium">
+                                <i class="fas fa-external-link-alt mr-1"></i> Open in New Tab
+                            </a>
+                            <a href="{{ test.result_file.url }}" download class="text-blue-600 hover:text-blue-800 font-medium ml-4">
+                                <i class="fas fa-download mr-1"></i> Download
+                            </a>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                        <p class="text-yellow-700">The lab has marked this test as completed but no result file has been uploaded yet. Please contact the lab for more information.</p>
+                    </div>
+                    {% endif %}
                 </div>
                 {% else %}
-                <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                    <p class="text-yellow-700">The lab has marked this test as completed but no result file has been uploaded yet. Please contact the lab for more information.</p>
+                <div class="mt-8 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <p class="text-blue-700">This test is still in progress. Results will be available once the lab completes the processing.</p>
+                    <p class="text-blue-700 mt-2">Current status: <strong>{{ test.get_status_display }}</strong></p>
                 </div>
                 {% endif %}
-            </div>
-            {% else %}
-            <div class="mt-8 bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <p class="text-blue-700">This test is still in progress. Results will be available once the lab completes the processing.</p>
-                <p class="text-blue-700 mt-2">Current status: <strong>{{ test.get_status_display }}</strong></p>
-            </div>
-            {% endif %}
 
-            <!-- Doctor's Analysis Section -->
-            {% if test.status == 'COMPLETED' or test.status == 'REVIEWED' %}
-            <div class="mt-8">
-                <h2 class="text-lg font-semibold mb-4">Doctor's Analysis</h2>
-                <form method="POST" action="" class="space-y-4">
-                    {% csrf_token %}
-                    <div>
-                        <label for="doctor_analysis" class="block text-sm font-medium text-gray-700">Add your analysis (this will be visible to the patient)</label>
-                        <textarea id="doctor_analysis" name="doctor_analysis" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">{{ test.doctor_analysis }}</textarea>
-                    </div>
-                    
-                    <div class="flex justify-end mt-4">
-                        {% if test.status == 'COMPLETED' %}
-                        <button type="submit" name="action" value="review_and_save" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                            <i class="fas fa-check-circle mr-2"></i> Review & Save Analysis
-                        </button>
-                        {% else %}
-                        <button type="submit" name="action" value="update_analysis" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            <i class="fas fa-save mr-2"></i> Update Analysis
-                        </button>
-                        {% endif %}
-                    </div>
-                </form>
-            </div>
-            {% endif %}
-
-            <!-- Actions -->
-            <div class="mt-8 border-t pt-6 flex justify-between">
-                <a href="{% url 'users:doctor_dashboard' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                    <i class="fas fa-arrow-left mr-2"></i> Back to Dashboard
-                </a>
-                
-                {% if test.status == 'COMPLETED' %}
-                <form method="POST" action="">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="mark_as_reviewed">
-                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                        <i class="fas fa-clipboard-check mr-2"></i> Mark as Reviewed
-                    </button>
-                </form>
+                <!-- Doctor's Analysis Section -->
+                {% if test.status == 'COMPLETED' or test.status == 'REVIEWED' %}
+                <div class="mt-8">
+                    <h2 class="text-lg font-semibold mb-4">Doctor's Analysis</h2>
+                    <form method="POST" action="" class="space-y-4">
+                        {% csrf_token %}
+                        <div>
+                            <label for="doctor_analysis" class="block text-sm font-medium text-gray-700">Add your analysis (this will be visible to the patient)</label>
+                            <textarea id="doctor_analysis" name="doctor_analysis" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">{{ test.doctor_analysis }}</textarea>
+                        </div>
+                        
+                        <div class="flex justify-end mt-4">
+                            {% if test.status == 'COMPLETED' %}
+                            <button type="submit" name="action" value="review_and_save" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                                <i class="fas fa-check-circle mr-2"></i> Review & Save Analysis
+                            </button>
+                            {% else %}
+                            <button type="submit" name="action" value="update_analysis" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                <i class="fas fa-save mr-2"></i> Update Analysis
+                            </button>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
                 {% endif %}
-                
-                <a href="{% url 'users:patient_detail' test.prescription.patient.id %}" class="inline-flex items-center px-4 py-2 border border-blue-700 shadow-sm text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50">
-                    <i class="fas fa-user mr-2"></i> Patient Profile
-                </a>
+
+                <!-- Actions -->
+                <div class="mt-8 border-t pt-6 flex justify-between">
+                    <a href="{% url 'users:doctor_dashboard' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        <i class="fas fa-arrow-left mr-2"></i> Back to Dashboard
+                    </a>
+                    
+                    {% if test.status == 'COMPLETED' %}
+                    <form method="POST" action="">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="mark_as_reviewed">
+                        <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                            <i class="fas fa-clipboard-check mr-2"></i> Mark as Reviewed
+                        </button>
+                    </form>
+                    {% endif %}
+                    
+                    <a href="{% url 'users:patient_detail' test.prescription.patient.id %}" class="inline-flex items-center px-4 py-2 border border-blue-700 shadow-sm text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50">
+                        <i class="fas fa-user mr-2"></i> Patient Profile
+                    </a>
+                </div>
             </div>
         </div>
     </div>

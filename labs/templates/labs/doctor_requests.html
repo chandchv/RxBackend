@@ -29,8 +29,8 @@
         </div>
     </div>
 
-    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-        <table class="min-w-full">
+    <div class="bg-white rounded-lg shadow-md overflow-auto">
+        <table class="min-w-full" width="100%">
             <thead class="bg-gray-100">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
@@ -71,18 +71,15 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">{{ request_item.date|date:"M d, Y" }}</td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        {% if request_item.type == 'test' %}
-                            <a href="{% url 'users:lab_test_detail' request_item.object.id %}" class="text-blue-600 hover:text-blue-800">View</a>
-                            {% if request_item.status == 'REQUESTED' %}
-                                <a href="{% url 'users:update_lab_test_status' request_item.object.id %}" class="ml-2 text-green-600 hover:text-green-800">Process</a>
-                            {% endif %}
-                        {% else %}
-                            <a href="{% url 'labs:order_detail' request_item.object.id %}" class="text-blue-600 hover:text-blue-800">View</a>
-                            {% if request_item.status == 'PENDING' %}
-                                <a href="{% url 'labs:confirm_payment' request_item.object.id %}" class="ml-2 text-green-600 hover:text-green-800">Process</a>
-                            {% endif %}
-                        {% endif %}
+                        <div class="flex space-x-2">
+                            <a href="{% url 'labs:process_lab_request' request_item.id request_item.type %}" 
+                               class="text-blue-600 hover:text-blue-800 px-3 py-1 rounded border border-blue-600 hover:bg-blue-50">
+                               Process
+                            </a>
+                        </div>
                     </td>
+
+                    
                 </tr>
                 {% empty %}
                 <tr>

@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Appointment Detail{% endblock %}
+
+{% block content %}
+<div class="flex h-screen bg-gray-100">
+   
+    <div class="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto transition-all duration-300 ease-in-out">
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold text-gray-900">Appointment Details</h1>
+                <a href="{% url 'users:patient_appointments' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    Back to Appointments
+                </a>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Appointment Information -->
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-900">Appointment Information</h3>
+                        <div class="mt-4 space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-gray-500">Date & Time</h4>
+                                <p class="mt-1 text-lg text-gray-900">
+                                    {{ appointment.appointment_date|date:"F j, Y" }} at 
+                                    {{ appointment.appointment_time|time:"g:i A" }}
+                                </p>
+                            </div>
+
+                            <div>
+                                <h4 class="text-sm font-medium text-gray-500">Status</h4>
+                                <p class="mt-1">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                        {% if appointment.status == 'scheduled' %}bg-yellow-100 text-yellow-800
+                                        {% elif appointment.status == 'completed' %}bg-green-100 text-green-800
+                                        {% elif appointment.status == 'missed' %}bg-orange-100 text-orange-800
+                                        {% else %}bg-red-100 text-red-800{% endif %}">
+                                        {{ appointment.get_status_display }}
+                                    </span>
+                                </p>
+                            </div>
+
+                            {% if appointment.reason %}
+                            <div>
+                                <h4 class="text-sm font-medium text-gray-500">Reason for Visit</h4>
+                                <p class="mt-1 text-gray-900">{{ appointment.reason }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Doctor Information -->
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-900">Doctor Information</h3>
+                        <div class="mt-4 space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-gray-500">Doctor Name</h4>
+                                <p class="mt-1 text-lg text-gray-900">Dr. {{ appointment.doctor.user.get_full_name }}</p>
+                            </div>
+
+                            <div>
+                                <h4 class="text-sm font-medium text-gray-500">Specialty</h4>
+                                <p class="mt-1 text-gray-900">{{ appointment.doctor.specialty }}</p>
+                            </div>
+
+                            <div>
+                                <h4 class="text-sm font-medium text-gray-500">Clinic</h4>
+                                <p class="mt-1 text-gray-900">{{ appointment.doctor.clinic.name }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if appointment.status == 'scheduled' %}
+            <div class="mt-8 border-t border-gray-200 pt-6">
+                <div class="flex space-x-4">
+                    <button onclick="updateAppointmentStatus('{{ appointment.id }}', 'cancelled')"
+                            class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        Cancel Appointment
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function updateAppointmentStatus(appointmentId, status) {
+    if (!confirm('Are you sure you want to ' + status + ' this appointment?')) {
+        return;
+    }
+
+    fetch(`/users/appointment/${appointmentId}/status/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ status: status })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            window.location.reload();
+        } else {
+            alert('Error updating appointment status');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating appointment status');
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %} 

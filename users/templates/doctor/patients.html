@@ -3,8 +3,11 @@
 {% block title %}Patients List{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 py-8">
-    <div class="bg-white shadow-lg rounded-lg p-6">
+<div class="flex h-screen bg-gray-100">
+    {% include 'doctor/sidebar.html' %}
+    <div class="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto transition-all duration-300 ease-in-out">
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <div class="bg-white shadow-lg rounded-lg p-6">
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold">Patients List</h2>
             <a href="{% url 'users:create_patient' %}" 
@@ -74,7 +77,9 @@
         {% else %}
         <p class="text-gray-500 text-center py-4">No patients found.</p>
         {% endif %}
+        </div>
     </div>
+
 </div>
 {% block extra_scripts %}
 <script>
@@ -116,4 +121,3 @@ function getCookie(name) {
 }
 </script>
 {% endblock %}
-{% endblock %} 

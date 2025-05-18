@@ -1,0 +1,514 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+    .avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 9999px;
+        background-color: #3b82f6;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+    
+    .sidebar {
+        width: 240px;
+        min-height: calc(100vh - 64px);
+        background-color: #f8fafc;
+        border-right: 1px solid #e5e7eb;
+        transition: all 0.3s;
+    }
+    
+    .sidebar-collapsed {
+        width: 70px;
+    }
+    
+    .sidebar-collapsed .nav-text {
+        display: none;
+    }
+    
+    .content-wrapper {
+        margin-left: 240px;
+        width: calc(100% - 240px);
+        transition: all 0.3s;
+    }
+    
+    .content-wrapper-expanded {
+        margin-left: 70px;
+        width: calc(100% - 70px);
+    }
+    
+    .rx-back-button:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<nav class="bg-blue-600 shadow-md text-white">
+    <div class="container mx-auto px-4 py-2 flex items-center justify-between">
+        <div class="flex items-center">
+            <a href="/" class="flex items-center px-3 py-2 rounded-md hover:bg-blue-700 transition-colors mr-3" title="Back to RxDoctor Dashboard">
+                <i class="fas fa-chevron-left mr-1"></i>
+                <span>RxDoctor</span>
+            </a>
+            
+            <a href="{% url 'scheduling:dashboard' %}" class="flex items-center text-xl font-bold">
+                <i class="fas fa-calendar-alt mr-2"></i>
+                Scheduling
+            </a>
+        </div>
+        
+        <div class="hidden md:flex items-center space-x-4">
+            <a href="{% url 'scheduling:dashboard' %}" class="px-3 py-2 rounded-md hover:bg-blue-700 transition-colors {% if request.resolver_match.view_name == 'scheduling:dashboard' %}bg-blue-700{% endif %}">
+                <i class="fas fa-tachometer-alt mr-1"></i> Dashboard
+            </a>
+            <a href="{% url 'scheduling:appointment_list' %}" class="px-3 py-2 rounded-md hover:bg-blue-700 transition-colors {% if request.resolver_match.view_name == 'scheduling:appointment_list' %}bg-blue-700{% endif %}">
+                <i class="fas fa-list mr-1"></i> Appointments
+            </a>
+            <a href="{% url 'scheduling:appointment_calendar' %}" class="px-3 py-2 rounded-md hover:bg-blue-700 transition-colors {% if request.resolver_match.view_name == 'scheduling:appointment_calendar' %}bg-blue-700{% endif %}">
+                <i class="fas fa-calendar mr-1"></i> Calendar
+            </a>
+            {% if user.doctor %}
+            <a href="#" class="px-3 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                <i class="fas fa-user-md mr-1"></i> My Schedule
+            </a>
+            {% endif %}
+            
+            {% if user.is_staff or user.is_superuser %}
+            <div class="relative" x-data="{ open: false }">
+                <button @click="open = !open" class="flex items-center px-3 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-cog mr-1"></i> Administration
+                    <i class="fas fa-chevron-down ml-1 text-sm"></i>
+                </button>
+                <div x-show="open" @click.away="open = false" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg text-gray-700 z-10">
+                    <a href="{% url 'scheduling:doctor_list' %}" class="block px-4 py-2 hover:bg-gray-100">
+                        <i class="fas fa-user-md mr-2"></i>Manage Doctors
+                    </a>
+                    <a href="{% url 'scheduling:schedule_list' %}" class="block px-4 py-2 hover:bg-gray-100">
+                        <i class="fas fa-calendar-plus mr-2"></i>Manage Schedules
+                    </a>
+                    <a href="{% url 'scheduling:holiday_list' %}" class="block px-4 py-2 hover:bg-gray-100">
+                        <i class="fas fa-calendar-times mr-2"></i>Manage Holidays
+                    </a>
+                    <a href="{% url 'scheduling:appointment_types' %}" class="block px-4 py-2 hover:bg-gray-100">
+                        <i class="fas fa-tags mr-2"></i>Appointment Types
+                    </a>
+                    <hr class="my-1 border-gray-200">
+                    <a href="{% url 'scheduling:settings' %}" class="block px-4 py-2 hover:bg-gray-100">
+                        <i class="fas fa-sliders-h mr-2"></i>System Settings
+                    </a>
+                    {% if user.is_superuser %}
+                    <hr class="my-1 border-gray-200">
+                    <a href="/admin/" target="_blank" class="block px-4 py-2 hover:bg-gray-100">
+                        <i class="fas fa-tools mr-2"></i>Django Admin
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="flex items-center">
+            {% if user.is_authenticated %}
+            <div class="relative" x-data="{ open: false }">
+                <button @click="open = !open" class="flex items-center space-x-2 focus:outline-none">
+                    <div class="avatar">
+                        {{ user.first_name|first }}{{ user.last_name|first }}
+                    </div>
+                    <span class="hidden md:inline-block">{{ user.get_full_name|default:user.username }}</span>
+                    {% if user.is_superuser %}
+                    <span class="hidden md:inline-block bg-red-600 text-white text-xs px-2 py-1 rounded">Admin</span>
+                    {% elif user.doctor %}
+                    <span class="hidden md:inline-block bg-blue-500 text-white text-xs px-2 py-1 rounded">Doctor</span>
+                    {% elif user.is_staff %}
+                    <span class="hidden md:inline-block bg-gray-500 text-white text-xs px-2 py-1 rounded">Staff</span>
+                    {% endif %}
+                </button>
+                <div x-show="open" @click.away="open = false" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10">
+                    <a href="/" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
+                        <i class="fas fa-home mr-2"></i>RxDoctor Home
+                    </a>
+                    <a href="#" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
+                        <i class="fas fa-user mr-2"></i>Profile
+                    </a>
+                    <a href="#" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
+                        <i class="fas fa-cog mr-2"></i>Settings
+                    </a>
+                    <hr class="my-1 border-gray-200">
+                    <a href="{% url 'scheduling:logout' %}" class="block px-4 py-2 text-red-600 hover:bg-gray-100">
+                        <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                    </a>
+                </div>
+            </div>
+            {% else %}
+            <a href="{% url 'scheduling:login' %}" class="px-3 py-2 border border-white rounded-md hover:bg-white hover:text-blue-600 transition-colors">Login</a>
+            {% endif %}
+            
+            <button class="md:hidden ml-4 text-white focus:outline-none" id="mobile-menu-button">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Mobile menu -->
+    <div class="md:hidden hidden" id="mobile-menu">
+        <div class="px-2 pt-2 pb-3 space-y-1">
+            <a href="{% url 'scheduling:dashboard' %}" class="block px-3 py-2 rounded-md hover:bg-blue-700 {% if request.resolver_match.view_name == 'scheduling:dashboard' %}bg-blue-700{% endif %}">
+                <i class="fas fa-tachometer-alt mr-1"></i> Dashboard
+            </a>
+            <a href="{% url 'scheduling:appointment_list' %}" class="block px-3 py-2 rounded-md hover:bg-blue-700 {% if request.resolver_match.view_name == 'scheduling:appointment_list' %}bg-blue-700{% endif %}">
+                <i class="fas fa-list mr-1"></i> Appointments
+            </a>
+            <a href="{% url 'scheduling:appointment_calendar' %}" class="block px-3 py-2 rounded-md hover:bg-blue-700 {% if request.resolver_match.view_name == 'scheduling:appointment_calendar' %}bg-blue-700{% endif %}">
+                <i class="fas fa-calendar mr-1"></i> Calendar
+            </a>
+            
+            {% if user.is_staff or user.is_superuser %}
+            <div class="border-t border-blue-700 my-2 pt-2">
+                <p class="px-3 text-sm text-blue-300 uppercase">Administration</p>
+                <a href="{% url 'scheduling:doctor_list' %}" class="block px-3 py-2 rounded-md hover:bg-blue-700">
+                    <i class="fas fa-user-md mr-1"></i> Manage Doctors
+                </a>
+                <a href="{% url 'scheduling:schedule_list' %}" class="block px-3 py-2 rounded-md hover:bg-blue-700">
+                    <i class="fas fa-calendar-plus mr-1"></i> Manage Schedules
+                </a>
+                <a href="{% url 'scheduling:holiday_list' %}" class="block px-3 py-2 rounded-md hover:bg-blue-700">
+                    <i class="fas fa-calendar-times mr-1"></i> Manage Holidays
+                </a>
+                <a href="{% url 'scheduling:settings' %}" class="block px-3 py-2 rounded-md hover:bg-blue-700">
+                    <i class="fas fa-cog mr-1"></i> Settings
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</nav>
+
+<div class="flex flex-col md:flex-row min-h-screen bg-gray-100">
+    {% if user.is_authenticated %}
+    <div class="sidebar bg-white shadow-sm hidden md:block" id="sidebar">
+        <div class="p-4">
+            <div class="flex justify-between items-center text-gray-500 mb-4">
+                <span class="text-sm font-medium">Quick Navigation</span>
+                <button id="toggle-sidebar" class="focus:outline-none hover:text-gray-700">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+            
+            <ul class="space-y-1">
+                <li>
+                    <a href="{% url 'scheduling:dashboard' %}" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600 {% if request.resolver_match.view_name == 'scheduling:dashboard' %}bg-blue-50 text-blue-600 border-l-4 border-blue-600 pl-2{% endif %}">
+                        <i class="fas fa-tachometer-alt w-5 text-center"></i>
+                        <span class="ml-2 nav-text">Dashboard</span>
+                    </a>
+                </li>
+                
+                <!-- Appointments Section -->
+                <li class="mt-4">
+                    <div class="px-3 py-1">
+                        <p class="text-xs text-gray-500 uppercase font-semibold">Appointments</p>
+                    </div>
+                </li>
+                <li>
+                    <a href="{% url 'scheduling:appointment_calendar' %}" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600 {% if request.resolver_match.view_name == 'scheduling:appointment_calendar' %}bg-blue-50 text-blue-600 border-l-4 border-blue-600 pl-2{% endif %}">
+                        <i class="fas fa-calendar-alt w-5 text-center"></i>
+                        <span class="ml-2 nav-text">Calendar</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url 'scheduling:appointment_create' %}" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600 {% if request.resolver_match.view_name == 'scheduling:appointment_create' %}bg-blue-50 text-blue-600 border-l-4 border-blue-600 pl-2{% endif %}">
+                        <i class="fas fa-plus-circle w-5 text-center"></i>
+                        <span class="ml-2 nav-text">New Appointment</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url 'scheduling:appointment_list' %}" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600 {% if request.resolver_match.view_name == 'scheduling:appointment_list' %}bg-blue-50 text-blue-600 border-l-4 border-blue-600 pl-2{% endif %}">
+                        <i class="fas fa-list w-5 text-center"></i>
+                        <span class="ml-2 nav-text">All Appointments</span>
+                    </a>
+                </li>
+                {% if user.is_staff or user.is_superuser %}
+                <li>
+                    <a href="{% url 'scheduling:appointment_list' %}?status=scheduled" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                        <i class="fas fa-calendar-check w-5 text-center"></i>
+                        <span class="ml-2 nav-text">Upcoming</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url 'scheduling:appointment_list' %}?status=completed" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                        <i class="fas fa-clipboard-check w-5 text-center"></i>
+                        <span class="ml-2 nav-text">Completed</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url 'scheduling:appointment_list' %}?status=cancelled" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                        <i class="fas fa-calendar-times w-5 text-center"></i>
+                        <span class="ml-2 nav-text">Cancelled</span>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+            
+            {% if user.doctor %}
+            <div class="mt-6">
+                <div class="px-3 py-1">
+                    <p class="text-xs text-gray-500 uppercase font-semibold">Doctor Schedule</p>
+                </div>
+                <ul class="mt-2 space-y-1">
+                    <li>
+                        <a href="#" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                            <i class="fas fa-user-md w-5 text-center"></i>
+                            <span class="ml-2 nav-text">My Schedule</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                            <i class="fas fa-clock w-5 text-center"></i>
+                            <span class="ml-2 nav-text">Working Hours</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                            <i class="fas fa-calendar-week w-5 text-center"></i>
+                            <span class="ml-2 nav-text">Weekly Schedule</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                            <i class="fas fa-stopwatch w-5 text-center"></i>
+                            <span class="ml-2 nav-text">Availability</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'scheduling:appointment_list' %}?today=true" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                            <i class="fas fa-calendar-day w-5 text-center"></i>
+                            <span class="ml-2 nav-text">Today's Appointments</span>
+                        </a>
+                    </li>
+                </ul>
+                
+                <div class="mt-6">
+                    <div class="px-3 py-1">
+                        <p class="text-xs text-gray-500 uppercase font-semibold">Patient Management</p>
+                    </div>
+                    <ul class="mt-2 space-y-1">
+                        <li>
+                            <a href="#" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                                <i class="fas fa-procedures w-5 text-center"></i>
+                                <span class="ml-2 nav-text">My Patients</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                                <i class="fas fa-user-plus w-5 text-center"></i>
+                                <span class="ml-2 nav-text">Add Patient</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                                <i class="fas fa-history w-5 text-center"></i>
+                                <span class="ml-2 nav-text">Visit History</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if user.is_staff or user.is_superuser %}
+            <div class="mt-6">
+                <div class="px-3 py-1">
+                    <p class="text-xs text-gray-500 uppercase font-semibold">Schedule Management</p>
+                </div>
+                <ul class="mt-2 space-y-1">
+                    <li>
+                        <a href="{% url 'scheduling:schedule_list' %}" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600 {% if request.resolver_match.view_name == 'scheduling:schedule_list' %}bg-blue-50 text-blue-600 border-l-4 border-blue-600 pl-2{% endif %}">
+                            <i class="fas fa-calendar-plus w-5 text-center"></i>
+                            <span class="ml-2 nav-text">Doctor Schedules</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'scheduling:schedule_create' %}" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600 {% if request.resolver_match.view_name == 'scheduling:schedule_create' %}bg-blue-50 text-blue-600 border-l-4 border-blue-600 pl-2{% endif %}">
+                            <i class="fas fa-plus w-5 text-center"></i>
+                            <span class="ml-2 nav-text">Add Schedule</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'scheduling:holiday_list' %}" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600 {% if request.resolver_match.view_name == 'scheduling:holiday_list' %}bg-blue-50 text-blue-600 border-l-4 border-blue-600 pl-2{% endif %}">
+                            <i class="fas fa-calendar-times w-5 text-center"></i>
+                            <span class="ml-2 nav-text">Holidays</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'scheduling:holiday_create' %}" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600 {% if request.resolver_match.view_name == 'scheduling:holiday_create' %}bg-blue-50 text-blue-600 border-l-4 border-blue-600 pl-2{% endif %}">
+                            <i class="fas fa-plus w-5 text-center"></i>
+                            <span class="ml-2 nav-text">Add Holiday</span>
+                        </a>
+                    </li>
+                </ul>
+                
+                <div class="mt-6">
+                    <div class="px-3 py-1">
+                        <p class="text-xs text-gray-500 uppercase font-semibold">Configuration</p>
+                    </div>
+                    <ul class="mt-2 space-y-1">
+                        <li>
+                            <a href="{% url 'scheduling:doctor_list' %}" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600 {% if request.resolver_match.view_name == 'scheduling:doctor_list' %}bg-blue-50 text-blue-600 border-l-4 border-blue-600 pl-2{% endif %}">
+                                <i class="fas fa-user-md w-5 text-center"></i>
+                                <span class="ml-2 nav-text">Doctors</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'scheduling:appointment_types' %}" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600 {% if request.resolver_match.view_name == 'scheduling:appointment_types' %}bg-blue-50 text-blue-600 border-l-4 border-blue-600 pl-2{% endif %}">
+                                <i class="fas fa-tags w-5 text-center"></i>
+                                <span class="ml-2 nav-text">Appointment Types</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'scheduling:appointment_type_create' %}" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600 {% if request.resolver_match.view_name == 'scheduling:appointment_type_create' %}bg-blue-50 text-blue-600 border-l-4 border-blue-600 pl-2{% endif %}">
+                                <i class="fas fa-plus w-5 text-center"></i>
+                                <span class="ml-2 nav-text">Add Type</span>
+                            </a>
+                        </li>
+                        
+                        {% if user.is_superuser %}
+                        <li>
+                            <a href="{% url 'scheduling:settings' %}" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600 {% if request.resolver_match.view_name == 'scheduling:settings' %}bg-blue-50 text-blue-600 border-l-4 border-blue-600 pl-2{% endif %}">
+                                <i class="fas fa-cog w-5 text-center"></i>
+                                <span class="ml-2 nav-text">Settings</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                                <i class="fas fa-sliders-h w-5 text-center"></i>
+                                <span class="ml-2 nav-text">System Configuration</span>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+                
+                {% if user.is_superuser %}
+                <div class="mt-6">
+                    <div class="px-3 py-1">
+                        <p class="text-xs text-gray-500 uppercase font-semibold">Admin Quick Links</p>
+                    </div>
+                    <ul class="mt-2 space-y-1">
+                        <li>
+                            <a href="/admin/" target="_blank" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                                <i class="fas fa-tools w-5 text-center"></i>
+                                <span class="ml-2 nav-text">Django Admin</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/admin/scheduling/appointmentschedule/" target="_blank" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                                <i class="fas fa-calendar-alt w-5 text-center"></i>
+                                <span class="ml-2 nav-text">Manage Schedules</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/admin/scheduling/scheduledappointment/" target="_blank" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                                <i class="fas fa-calendar-check w-5 text-center"></i>
+                                <span class="ml-2 nav-text">Manage Appointments</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/admin/scheduling/holiday/" target="_blank" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                                <i class="fas fa-calendar-times w-5 text-center"></i>
+                                <span class="ml-2 nav-text">Manage Holidays</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            <div class="mt-6">
+                <div class="px-3 py-1">
+                    <p class="text-xs text-gray-500 uppercase font-semibold">RxDoctor</p>
+                </div>
+                <ul class="mt-2 space-y-1">
+                    <li>
+                        <a href="/" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                            <i class="fas fa-home w-5 text-center"></i>
+                            <span class="ml-2 nav-text">Main Dashboard</span>
+                        </a>
+                    </li>
+                    {% if user.doctor %}
+                    <li>
+                        <a href="/patients/" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                            <i class="fas fa-users w-5 text-center"></i>
+                            <span class="ml-2 nav-text">Patients</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/health-records/" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600">
+                            <i class="fas fa-file-medical w-5 text-center"></i>
+                            <span class="ml-2 nav-text">Records</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="{% if user.is_authenticated %}content-wrapper{% endif %} flex-1" id="content">
+        {% if messages %}
+            <div class="mx-auto px-4 py-3">
+                {% for message in messages %}
+                    <div class="{% if message.tags == 'error' %}bg-red-100 border-l-4 border-red-500 text-red-700{% elif message.tags == 'success' %}bg-green-100 border-l-4 border-green-500 text-green-700{% elif message.tags == 'warning' %}bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700{% elif message.tags == 'info' %}bg-blue-100 border-l-4 border-blue-500 text-blue-700{% else %}bg-gray-100 border-l-4 border-gray-500 text-gray-700{% endif %} p-4 mb-4 relative" role="alert">
+                        <p>{{ message }}</p>
+                        <button type="button" class="absolute top-0 right-0 mt-4 mr-4 text-gray-400 hover:text-gray-800" onclick="this.parentElement.remove()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        
+        {% block content %}{% endblock %}
+    </div>
+</div>
+
+<footer class="bg-white shadow-md py-4 mt-auto">
+    <div class="container mx-auto px-4 text-center">
+        <p class="text-gray-600 text-sm">RxDoctor Scheduling &copy; {% now "Y" %}</p>
+    </div>
+</footer>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Toggle sidebar
+        const toggleBtn = document.getElementById('toggle-sidebar');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function() {
+                const sidebar = document.getElementById('sidebar');
+                const content = document.getElementById('content');
+                
+                sidebar.classList.toggle('sidebar-collapsed');
+                content.classList.toggle('content-wrapper-expanded');
+            });
+        }
+        
+        // Mobile menu toggle
+        const mobileMenuButton = document.getElementById('mobile-menu-button');
+        const mobileMenu = document.getElementById('mobile-menu');
+        
+        if (mobileMenuButton && mobileMenu) {
+            mobileMenuButton.addEventListener('click', function() {
+                mobileMenu.classList.toggle('hidden');
+            });
+        }
+    });
+</script>
+{% endblock %} 

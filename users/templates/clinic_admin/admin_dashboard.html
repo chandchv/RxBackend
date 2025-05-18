@@ -171,8 +171,8 @@
                         {% for test in recent_lab_tests %}
                         <tr>
                             <td class="px-6 py-4 whitespace-nowrap">{{ test.id }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap">{{ test.patient_name }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap">{{ test.test_name }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ test.patient }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ test.test }}</td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                                     {% if test.status == 'COMPLETED' %}bg-green-100 text-green-800

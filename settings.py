@@ -30,7 +30,13 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'users',
-    'labs'
+    'labs',
+    'billing',
+    'test_app',
+    'django.contrib.humanize',  # For formatting numbers in templates
+    'pharmacy',
+    'appointment',
+    'scheduling',
 ]
 
 MIDDLEWARE = [
@@ -50,7 +56,7 @@ ROOT_URLCONF = "RxBackend.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [os.path.join(BASE_DIR, 'templates')],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -58,6 +64,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "notifications.context_processors.notifications",
             ],
             'libraries': {
                 'custom_filters': 'users.templatetags.custom_filters',
@@ -72,13 +79,16 @@ WSGI_APPLICATION = "RxBackend.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-
 DATABASES = {
-     'default': {
-         'ENGINE': 'django.db.backends.sqlite3',
-         'NAME': BASE_DIR / 'db.sqlite3',
-     }
- }
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'rxdoctor',
+        'USER': 'postgres',
+        'PASSWORD': 'admin',
+        'HOST': 'localhost',
+        'PORT': '5432',
+    }
+}
 
 # Add the new PostgreSQL configuration
 #DATABASES = {
@@ -129,7 +139,18 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, "static"),
+]
+
+STATICFILES_FINDERS = [
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

@@ -47,3 +47,10 @@ def user_is_admin(view_func):
             
         return view_func(request, *args, **kwargs)
     return _wrapped_view 
+
+def user_is_patient(view_func):
+    def _wrapped_view(request, *args, **kwargs):
+        if hasattr(request.user, 'patient'):
+            return view_func(request, *args, **kwargs)
+        raise PermissionDenied
+    return _wrapped_view

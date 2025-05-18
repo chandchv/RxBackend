@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from django.conf import settings
 from django.contrib.auth import get_user_model
+import uuid
 
 from elasticsearch_dsl import Q
 
@@ -255,6 +256,7 @@ class Appointment(TimeStampedModel):
         ('missed', 'Missed'),
     ]
     
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     patient = models.ForeignKey(
         'Patient', 
         on_delete=models.CASCADE,
@@ -275,7 +277,12 @@ class Appointment(TimeStampedModel):
     )
     token_number = models.IntegerField(null=True, blank=True)
     is_walk_in = models.BooleanField(default=False)
-
+    
+    # Payment related fields
+    fee = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    prepaid_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payment_intent_id = models.CharField(max_length=100, null=True, blank=True)
+    
     class Meta:
         ordering = ['appointment_date', 'appointment_time']
         indexes = [
@@ -573,41 +580,6 @@ class DoctorAvailability(TimeStampedModel):
     def __str__(self):
         return f"{self.doctor.name} - {self.get_day_of_week_display()} ({self.shift})"
 
-class AppointmentSlot(TimeStampedModel):
-    doctor = models.ForeignKey(
-        'Doctor', 
-        on_delete=models.CASCADE,
-        related_name='appointment_slots'
-    )
-    date = models.DateField()
-    start_time = models.TimeField()
-    end_time = models.TimeField()
-    is_booked = models.BooleanField(default=False)
-    appointment = models.OneToOneField(
-        'Appointment', 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        related_name='slot'
-    )
-    created_at = models.DateTimeField(default=timezone.now, editable=False)
-
-    class Meta:
-        unique_together = ['doctor', 'date', 'start_time']
-        ordering = ['date', 'start_time']
-        indexes = [
-            models.Index(fields=['doctor', 'date', 'is_booked']),
-        ]
-
-    def __str__(self):
-        return f"{self.doctor} - {self.date} {self.start_time}"
-
-    def clean(self):
-        if self.start_time >= self.end_time:
-            raise ValidationError("End time must be after start time")
-        if self.date < timezone.now().date():
-            raise ValidationError("Cannot create slots for past dates")
-
 class ActivityLog(TimeStampedModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     action = models.CharField(max_length=255)
@@ -700,8 +672,15 @@ class Billing(TimeStampedModel):
         ).exists()
 
 class Staff(TimeStampedModel):
+    ROLE_CHOICES = [
+        ('nurse', 'Nurse'),
+        ('accountant', 'Accountant'),
+        ('receptionist', 'Receptionist'),
+        ('lab_technician', 'Lab Technician'),
+        ('other', 'Other')
+    ]
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='staff')
-    role = models.CharField(max_length=100)
+    role = models.CharField(max_length=100, choices=ROLE_CHOICES)
     clinic = models.ForeignKey(Clinic, on_delete=models.CASCADE, related_name='staff_members')
     is_active = models.BooleanField(default=True)
     joining_date = models.DateField(null=True, blank=True)
@@ -820,6 +799,41 @@ class Bill(models.Model):
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, null=True, blank=True)
     
     notes = models.TextField(blank=True)
+class AppointmentSlot(TimeStampedModel):
+    doctor = models.ForeignKey(
+        'Doctor', 
+        on_delete=models.CASCADE,
+        related_name='appointment_slots'
+    )
+    date = models.DateField()
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    is_booked = models.BooleanField(default=False)
+    appointment = models.OneToOneField(
+        'Appointment', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='slot'
+    )
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+
+    class Meta:
+        unique_together = ['doctor', 'date', 'start_time']
+        ordering = ['date', 'start_time']
+        indexes = [
+            models.Index(fields=['doctor', 'date', 'is_booked']),
+        ]
+
+    def __str__(self):
+        return f"{self.doctor} - {self.date} {self.start_time}"
+
+    def clean(self):
+        if self.start_time >= self.end_time:
+            raise ValidationError("End time must be after start time")
+        if self.date < timezone.now().date():
+            raise ValidationError("Cannot create slots for past dates")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -898,27 +912,47 @@ class LabTest(models.Model):
         ('SAMPLE_COLLECTED', 'Sample Collected'),
         ('PROCESSING', 'Processing'),
         ('COMPLETED', 'Completed'),
-        ('REVIEWED', 'Reviewed'),
+        ('REVIEWED', 'Reviewed')
     )
     
     COLLECTION_TYPE = (
         ('IN_CLINIC', 'In Clinic'),
-        ('HOME', 'Home Collection'),
+        ('HOME', 'Home Collection')
     )
-
-    prescription = models.ForeignKey(LabTestPrescription, on_delete=models.CASCADE, related_name='tests', null=True, blank=True)
-    test_definition = models.ForeignKey('labs.TestDefinition', on_delete=models.PROTECT, related_name='lab_tests', null=True, blank=True)
+    
+    prescription = models.ForeignKey(LabTestPrescription, on_delete=models.CASCADE, null=True, blank=True)
+    test_definition = models.ForeignKey('labs.TestDefinition', on_delete=models.PROTECT, null=True, blank=True)
     status = models.CharField(max_length=20, choices=TEST_STATUS, default='REQUESTED')
     collection_type = models.CharField(max_length=20, choices=COLLECTION_TYPE, default='IN_CLINIC')
-    collection_date = models.DateTimeField(null=True, blank=True)
-    result_file = models.FileField(upload_to='lab_results/', null=True, blank=True)
-    doctor_notes = models.TextField(null=True, blank=True)
-    doctor_analysis = models.TextField(null=True, blank=True, help_text="Doctor's analysis of the test results")
+    doctor_notes = models.TextField(blank=True, null=True)
+    result_file = models.FileField(upload_to='lab_results/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    
+    # New fields for status workflow
+    assigned_technician = models.CharField(max_length=100, blank=True, null=True)
+    expected_collection_date = models.DateField(blank=True, null=True)
+    collection_notes = models.TextField(blank=True, null=True)
+    collection_time = models.DateTimeField(blank=True, null=True)
+    processing_notes = models.TextField(blank=True, null=True)
+    expected_completion_date = models.DateField(blank=True, null=True)
+    test_results = models.TextField(blank=True, null=True)
+    
     def __str__(self):
-        return f"{self.test_definition.name if self.test_definition else 'Unknown Test'} - {self.get_status_display()}"
+        patient_name = self.prescription.patient.get_full_name() if self.prescription else "No Patient"
+        test_name = self.test_definition.name if self.test_definition else "No Test"
+        return f"{test_name} for {patient_name}"
+    
+    def get_status_display_class(self):
+        status_classes = {
+            'REQUESTED': 'bg-yellow-100 text-yellow-800',
+            'ASSIGNED': 'bg-blue-100 text-blue-800',
+            'SAMPLE_COLLECTED': 'bg-purple-100 text-purple-800',
+            'PROCESSING': 'bg-indigo-100 text-indigo-800',
+            'COMPLETED': 'bg-green-100 text-green-800',
+            'REVIEWED': 'bg-green-700 text-white'
+        }
+        return status_classes.get(self.status, 'bg-gray-100 text-gray-800')
 
 class LabTestBooking(models.Model):
     STATUS_CHOICES = [
@@ -1014,14 +1048,6 @@ class ClinicHoliday(models.Model):
     date = models.DateField()
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
-
-class Notification(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    title = models.CharField(max_length=100)
-    message = models.TextField()
-    notification_type = models.CharField(max_length=50)
-    is_read = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
 
 class LabRegistration(models.Model):
     STATUS_CHOICES = [

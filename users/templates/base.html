@@ -1,56 +1,264 @@
-{% load static %}
+{% load static i18n %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Doctor Portal{% endblock %}</title>
+    <title>{% block title %}RxDoctor{% endblock %}</title>
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="{% static 'admin/css/base.css' %}">
-    
-    {% block extra_head %}{% endblock %}
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <style>
+        /* Custom CSS for sidebar and responsive fixes */
+        @media (max-width: 768px) {
+            .md\:ml-64 {
+                margin-left: 0 !important;
+            }
+            
+            #sidebar {
+                width: 80%;
+                max-width: 300px;
+            }
+            
+            .menu-item .submenu {
+                padding-left: 0.5rem;
+            }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
 </head>
-<body class="bg-gray-100">
-    {% csrf_token %}
-    <nav class="bg-white shadow-lg">
-        <div class="max-w-6xl mx-auto px-4">
-            <div class="flex justify-between">
-                <div class="flex space-x-7">
-                    <div>
-                        <a href="{% url 'users:dashboard' %}" class="flex items-center py-4 px-2">
-                           {% if user.is_authenticated and user.is_doctor %}
-                            <img src="{{ doctor.clinic.logo.url }}" alt="Logo" class="w-10 h-10" style="width: 100px; height: 100px;">
-                           {% else %}
-                            <img src="https://klaxonit.in/wp-content/uploads/2024/12/Logo.png" alt="Logo" class="w-10 h-10" style="width: 100px; height: 100px;">
-                           {% endif %}
-                        </a>
+<body class="bg-gray-50">
+    <!-- Include the multilevel sidebar -->
+    {% include "multilevel_sidebar.html" %}
+
+    <!-- Main Content -->
+    <div class="md:ml-64 min-h-screen transition-all duration-300 p-4 md:p-8">
+        <!-- Top Navigation -->
+        <div class="flex justify-end items-center mb-6 space-x-2 sm:space-x-4">
+            <!-- Country Selector -->
+            <div>
+                <select id="country-select" name="country" class="text-xs sm:text-sm text-gray-600 hover:text-gray-800 bg-gray-100 rounded w-16 sm:w-auto px-1 sm:px-2 py-0.5 sm:py-1">
+                    <option value="US">USA</option>
+                    <option value="IN">India</option>
+                    <option value="UK">UK</option>
+                    <option value="CA">Canada</option>
+                    <option value="AU">Australia</option>
+                    <option value="NZ">New Zealand</option>
+                    <option value="SA">South Africa</option>
+                    <option value="SA">England</option>
+                    <option value="SA">Scotland</option>
+                    <option value="SA">Wales</option>
+                    <option value="SA">Ireland</option>
+                    <option value="SA">Australia</option>
+                    <option value="SA">New Zealand</option>
+                    <option value="SA">India</option>
+                    <option value="SA">Pakistan</option>
+                    <option value="SA">Bangladesh</option>
+                    <option value="SA">Sri Lanka</option>
+                    <option value="SA">Afghanistan</option>
+                    <option value="SA">Zimbabwe</option>
+                    <option value="SA">Mexico</option>
+                    <option value="SA">Brazil</option>
+                    <option value="SA">Argentina</option>
+                    <option value="SA">Chile</option>
+                    <option value="SA">Colombia</option>
+                    <option value="SA">Ecuador</option>
+                    <option value="SA">Peru </option>
+                    <option value="SA">China</option>
+                    <option value="SA">Japan</option>
+                    <option value="SA">South Korea</option>
+                    <option value="SA">Taiwan</option>
+                    <option value="SA">Hong Kong</option>
+                    <option value="SA">Macau</option>
+                    <option value="SA">Russia</option>
+                    <option value="SA">Turkey</option>
+                    <option value="SA">Egypt</option>
+                    <option value="SA">Nigeria</option>
+                    <option value="SA">Saudi Arabia</option>
+                    <option value="SA">UAE</option>
+                    <option value="SA">Oman</option>
+                    <option value="SA">Bahrain</option>
+                    <option value="SA">Kuwait</option>
+                    <option value="SA">Qatar</option>
+                    
+                    
+                    
+                </select>
+            </div>
+            <!-- Language Selector -->
+            <div>
+                <form action="{% url 'set_language' %}" method="post">
+                    {% csrf_token %}
+                    <select id="language-select" name="language" onchange="this.form.submit()" class="text-xs sm:text-sm text-gray-600 hover:text-gray-800 bg-gray-100 rounded w-16 sm:w-auto px-1 sm:px-2 py-0.5 sm:py-1">
+                        {% get_current_language as LANGUAGE_CODE %}
+                        {% get_available_languages as LANGUAGES %}
+                        {% for lang in LANGUAGES %}
+                            {% if lang.0 == 'en-us' %}
+                                <option value="en-us" {% if lang.0 == LANGUAGE_CODE %}selected{% endif %}>🇺🇸 English</option>
+                            {% elif lang.0 == 'hi' %}
+                                <option value="hi" {% if lang.0 == LANGUAGE_CODE %}selected{% endif %}>🇮🇳 हिन्दी</option>
+                            {% elif lang.0 == 'fr' %}
+                                <option value="fr" {% if lang.0 == LANGUAGE_CODE %}selected{% endif %}>🇫🇷 Français</option>
+                            {% else %}
+                                <option value="{{ lang.0 }}" {% if lang.0 == LANGUAGE_CODE %}selected{% endif %}>{{ lang.1 }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </form>
+            </div>
+            <!-- Profile Button -->
+            <div>
+                <a href="{% url 'users:profile' %}" class="text-gray-600 hover:text-gray-800">
+                    <i class="fas fa-user-circle fa-2x"></i>
+                </a>
+                <a href="{% url 'users:logout' %}" class="text-gray-600 hover:text-gray-800">
+                    <i class="fas fa-sign-out-alt fa-2x"></i>
+                </a>
+            </div>
+            <!-- Notifications -->
+            <div class="relative" x-data="{ open: false }">
+                <button type="button" 
+                        class="text-gray-600 hover:text-gray-800 relative p-2 rounded-full hover:bg-gray-100"
+                        @click="open = !open"
+                        @click.away="open = false">
+                    <i class="fas fa-bell text-xl"></i>
+                    {% if unread_notifications_count > 0 %}
+                    <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center notification-count">
+                        {{ unread_notifications_count }}
+                    </span>
+                    {% endif %}
+                </button>
+
+                <!-- Notification Dropdown -->
+                <div class="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg overflow-hidden z-50"
+                     x-show="open"
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="transform opacity-0 scale-95"
+                     x-transition:enter-end="transform opacity-100 scale-100"
+                     x-transition:leave="transition ease-in duration-75"
+                     x-transition:leave-start="transform opacity-100 scale-100"
+                     x-transition:leave-end="transform opacity-0 scale-95"
+                     @click.away="open = false"
+                     style="display: none;">
+                    <div class="p-4 border-b border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-semibold text-gray-900">Notifications</h3>
+                            {% if unread_notifications_count > 0 %}
+                            <button type="button"
+                                    class="text-sm text-blue-600 hover:text-blue-800"
+                                    hx-post="{% url 'notifications:mark_all_read' %}"
+                                    hx-trigger="click"
+                                    hx-swap="none"
+                                    hx-on::after-request="document.querySelectorAll('.unread-notification').forEach(el => el.classList.remove('bg-blue-50'));">
+                                Mark all as read
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="max-h-[calc(100vh-200px)] overflow-y-auto">
+                        {% if notifications %}
+                            <div class="divide-y divide-gray-100">
+                                {% for notification in notifications %}
+                                <div class="p-4 hover:bg-gray-50 {% if not notification.is_read %}bg-blue-50 unread-notification{% endif %}"
+                                     id="notification-{{ notification.id }}">
+                                    <div class="flex justify-between items-start gap-3">
+                                        <div class="flex-grow">
+                                            <p class="font-medium {% if not notification.is_read %}text-blue-900{% else %}text-gray-900{% endif %}">
+                                                {{ notification.message }}
+                                            </p>
+                                            <p class="text-sm text-gray-500 mt-1">{{ notification.timestamp|timesince }} ago</p>
+                                        </div>
+                                        {% if not notification.is_read %}
+                                        <button type="button"
+                                                class="text-blue-600 hover:text-blue-800 text-sm whitespace-nowrap"
+                                                hx-post="{% url 'notifications:mark_read' notification.id %}"
+                                                hx-trigger="click"
+                                                hx-swap="none"
+                                                hx-on::after-request="document.getElementById('notification-{{ notification.id }}').classList.remove('bg-blue-50');">
+                                            Mark as read
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-center py-8 text-gray-500">
+                                No notifications to display
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
-               
-                <div class="flex items-center space-x-3">
-                    {% if user.is_authenticated %}
-                        {% if user.doctor %}
-                            <a href="{% url 'users:doctor_profile' %}" class="py-2 px-4 bg-green-400 text-gray-500 hover:bg-green-500 hover:text-white rounded-md">Doctor profile</a>
-                        {% elif user.patient %}
-                            <a href="{% url 'users:patient_profile' %}" class="py-2 px-4 bg-green-400 text-gray-500 hover:bg-green-500 hover:text-white rounded-md">patient profile</a>
-                        {% elif user.clinic %}
-                            <a href="{% url 'users:clinic_profile' %}" class="py-2 px-4 bg-green-400 text-gray-500 hover:bg-green-500 hover:text-white rounded-md">Profile</a>
-                        {% endif %}
-                        <a href="{% url 'users:logout' %}" class="py-2 px-4 bg-red-500 text-white rounded hover:bg-red-600">Logout</a>
-                    {% else %}
-                        <a href="{% url 'users:login' %}" class="py-2 px-4 bg-blue-500 text-white rounded hover:bg-blue-600">Login</a>
-                    {% endif %}
-                </div>
-               
             </div>
         </div>
-    </nav>
 
-    <main class="container mx-auto px-4 py-8">
-        {% block content %}{% endblock %}
-    </main>
+        <!-- Page Content -->
+        <div class="bg-white rounded-lg shadow-sm p-4 md:p-6">
+            {% block content %}
+            <!-- Default content -->
+            <p>Welcome to RxDoctor!</p>
+            {% endblock %}
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-8 text-center text-gray-600 text-sm">
+            <p>&copy; {% now "Y" %} RxDoctor. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <!-- jQuery (if needed) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <!-- HTMX CSRF Token Setup -->
+    <script>
+        // Set up CSRF token for HTMX requests
+        document.addEventListener('htmx:configRequest', function(evt) {
+            evt.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+        });
+
+        // Set up CSRF token for regular AJAX requests
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add CSRF token to all AJAX requests
+            let csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            // Set up axios/fetch defaults if needed
+            if (window.axios) {
+                axios.defaults.headers.common['X-CSRFToken'] = csrftoken;
+            }
+        });
+    </script>
+
+    <!-- Notification Update Handler -->
+    <script>
+        document.addEventListener('htmx:afterRequest', function(evt) {
+            const path = evt.detail.pathInfo.requestPath;
+            if (path.includes('mark-read') || path.includes('mark-all-read')) {
+                const countElement = document.querySelector('.notification-count');
+                if (countElement) {
+                    const currentCount = parseInt(countElement.textContent);
+                    if (currentCount <= 1) {
+                        countElement.remove();
+                    } else {
+                        countElement.textContent = currentCount - 1;
+                    }
+                }
+            }
+        });
+    </script>
+
+    <!-- Custom JS -->
+    {% block extra_js %}{% endblock %}
+
+    <!-- Add before </body> -->
+    <script src="{% static 'js/main.js' %}"></script>
+    <script src="{% static 'js/notifications.js' %}"></script>
 </body>
 </html> 

@@ -1,0 +1,497 @@
+{% extends 'scheduling/base_scheduling.html' %}
+
+{% block title %}Scheduling Dashboard{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.css">
+<style>
+    /* Custom card hover effect */
+    .hover-translate {
+        transition: all 0.3s;
+    }
+    .hover-translate:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    /* Calendar event styling */
+    .fc-event {
+        cursor: pointer;
+    }
+    .stat-card {
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    .stat-icon {
+        font-size: 2rem;
+        opacity: 0.8;
+    }
+    .welcome-banner {
+        background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .role-icon {
+        font-size: 3rem;
+        margin-right: 1rem;
+        opacity: 0.8;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-4">
+    <!-- Role-specific welcome banner -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-400 text-white rounded-lg p-6 mb-6 shadow-sm">
+        <div class="flex items-center">
+            {% if user.doctor %}
+            <div class="text-5xl mr-4 opacity-80">
+                <i class="fas fa-user-md"></i>
+            </div>
+            <div>
+                <h2 class="text-2xl font-bold mb-1">Welcome, Dr. {{ user.get_full_name }}</h2>
+                <p class="mb-0">Manage your appointments and patient scheduling</p>
+            </div>
+            {% elif user.is_staff and not user.is_superuser %}
+            <div class="text-5xl mr-4 opacity-80">
+                <i class="fas fa-user-tie"></i>
+            </div>
+            <div>
+                <h2 class="text-2xl font-bold mb-1">Welcome, {{ user.get_full_name }}</h2>
+                <p class="mb-0">Staff dashboard for appointment management</p>
+            </div>
+            {% elif user.is_superuser %}
+            <div class="text-5xl mr-4 opacity-80">
+                <i class="fas fa-user-shield"></i>
+            </div>
+            <div>
+                <h2 class="text-2xl font-bold mb-1">Welcome, {{ user.get_full_name }}</h2>
+                <p class="mb-0">Administrator dashboard for scheduling system</p>
+            </div>
+            {% else %}
+            <div class="text-5xl mr-4 opacity-80">
+                <i class="fas fa-user"></i>
+            </div>
+            <div>
+                <h2 class="text-2xl font-bold mb-1">Welcome, {{ user.get_full_name }}</h2>
+                <p class="mb-0">Scheduling Dashboard</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="mb-6">
+        <div class="w-full md:w-5/6">
+            {% if user.doctor %}
+            <a href="{% url 'scheduling:appointment_create' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 mr-2 mb-2">
+                <i class="fas fa-plus mr-2"></i> New Appointment
+            </a>
+            <a href="#" class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 mr-2 mb-2">
+                <i class="fas fa-calendar-week mr-2"></i> My Schedule
+            </a>
+            <a href="#" class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 mr-2 mb-2">
+                <i class="fas fa-clock mr-2"></i> Office Hours
+            </a>
+            {% elif user.is_staff or user.is_superuser %}
+            <div class="flex flex-wrap">
+                <div class="mr-8 mb-4">
+                    <h6 class="text-xs text-gray-500 uppercase font-semibold mb-2">APPOINTMENTS</h6>
+                    <a href="{% url 'scheduling:appointment_create' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 mr-2 mb-2">
+                        <i class="fas fa-plus mr-2"></i> New Appointment
+                    </a>
+                    <a href="{% url 'scheduling:appointment_list' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 mr-2 mb-2">
+                        <i class="fas fa-list mr-2"></i> All Appointments
+                    </a>
+                </div>
+                <div class="mr-8 mb-4">
+                    <h6 class="text-xs text-gray-500 uppercase font-semibold mb-2">ADMINISTRATION</h6>
+                    <a href="{% url 'scheduling:doctor_list' %}" class="inline-flex items-center px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 mr-2 mb-2">
+                        <i class="fas fa-user-md mr-2"></i> Doctors
+                    </a>
+                    <a href="{% url 'scheduling:schedule_list' %}" class="inline-flex items-center px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 mr-2 mb-2">
+                        <i class="fas fa-calendar-plus mr-2"></i> Schedules
+                    </a>
+                    <a href="{% url 'scheduling:holiday_list' %}" class="inline-flex items-center px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 mr-2 mb-2">
+                        <i class="fas fa-calendar-times mr-2"></i> Holidays
+                    </a>
+                    <a href="{% url 'scheduling:appointment_types' %}" class="inline-flex items-center px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 mr-2 mb-2">
+                        <i class="fas fa-tags mr-2"></i> Types
+                    </a>
+                    {% if user.is_superuser %}
+                    <a href="{% url 'scheduling:settings' %}" class="inline-flex items-center px-4 py-2 border border-gray-800 text-gray-800 rounded-md hover:bg-gray-100 mr-2 mb-2">
+                        <i class="fas fa-cog mr-2"></i> Settings
+                    </a>
+                    <a href="/admin/" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-900 mr-2 mb-2">
+                        <i class="fas fa-tools mr-2"></i> Django Admin
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <a href="{% url 'scheduling:appointment_create' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 mr-2 mb-2">
+                <i class="fas fa-plus mr-2"></i> New Appointment
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Stats cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-blue-600 text-white rounded-xl shadow-md overflow-hidden hover-translate">
+            <div class="p-4 flex justify-between items-center">
+                <div>
+                    <h6 class="text-sm font-semibold">Today's Appointments</h6>
+                    <h2 class="text-3xl font-bold my-1">{{ today_count }}</h2>
+                    <p class="text-sm opacity-90">Upcoming: {{ upcoming_count }}</p>
+                </div>
+                <div class="text-4xl opacity-80">
+                    <i class="fas fa-calendar-day"></i>
+                </div>
+            </div>
+        </div>
+        <div class="bg-green-600 text-white rounded-xl shadow-md overflow-hidden hover-translate">
+            <div class="p-4 flex justify-between items-center">
+                <div>
+                    <h6 class="text-sm font-semibold">Confirmed</h6>
+                    <h2 class="text-3xl font-bold my-1">{{ confirmed_count }}</h2>
+                    <p class="text-sm opacity-90">This week</p>
+                </div>
+                <div class="text-4xl opacity-80">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+            </div>
+        </div>
+        <div class="bg-yellow-500 text-gray-900 rounded-xl shadow-md overflow-hidden hover-translate">
+            <div class="p-4 flex justify-between items-center">
+                <div>
+                    <h6 class="text-sm font-semibold">Pending</h6>
+                    <h2 class="text-3xl font-bold my-1">{{ pending_count }}</h2>
+                    <p class="text-sm opacity-90">Awaiting confirmation</p>
+                </div>
+                <div class="text-4xl opacity-80">
+                    <i class="fas fa-calendar-alt"></i>
+                </div>
+            </div>
+        </div>
+        <div class="bg-blue-400 text-white rounded-xl shadow-md overflow-hidden hover-translate">
+            <div class="p-4 flex justify-between items-center">
+                <div>
+                    <h6 class="text-sm font-semibold">No-Shows</h6>
+                    <h2 class="text-3xl font-bold my-1">{{ no_show_count }}</h2>
+                    <p class="text-sm opacity-90">Last 30 days</p>
+                </div>
+                <div class="text-4xl opacity-80">
+                    <i class="fas fa-user-times"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex flex-col lg:flex-row space-y-6 lg:space-y-0 lg:space-x-6">
+        <!-- Calendar Column -->
+        <div class="w-full lg:w-2/3">
+            <div class="bg-white rounded-lg shadow-sm mb-6 hover-translate">
+                <div class="bg-gray-50 px-4 py-3 rounded-t-lg flex justify-between items-center border-b border-gray-200">
+                    <h5 class="font-semibold text-gray-700">Appointment Calendar</h5>
+                    <a href="{% url 'scheduling:appointment_calendar' %}" class="text-sm px-3 py-1 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50">
+                        Full Calendar <i class="fas fa-external-link-alt ml-1"></i>
+                    </a>
+                </div>
+                <div class="p-4">
+                    <div id="calendar"></div>
+                </div>
+            </div>
+            
+            {% if user.is_staff or user.is_superuser %}
+            <!-- Staff/Admin Specific: Doctor Schedules -->
+            <div class="bg-white rounded-lg shadow-sm mb-6 hover-translate">
+                <div class="bg-gray-50 px-4 py-3 rounded-t-lg flex justify-between items-center border-b border-gray-200">
+                    <h5 class="font-semibold text-gray-700">Doctor Schedules</h5>
+                    <a href="{% url 'scheduling:doctor_list' %}" class="text-sm px-3 py-1 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50">
+                        Manage Doctors
+                    </a>
+                </div>
+                <div class="p-0">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doctor</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Today's Hours</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Appointments</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for doctor in doctors %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="w-8 h-8 flex-shrink-0 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-medium">
+                                                {{ doctor.name|slice:":1" }}
+                                            </div>
+                                            <span class="ml-2">{{ doctor.name }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        {% if doctor.todaySchedule %}
+                                            {{ doctor.todaySchedule.start_time|time:"h:i A" }} - {{ doctor.todaySchedule.end_time|time:"h:i A" }}
+                                        {% else %}
+                                            9:00 AM - 5:00 PM
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                            {{ doctor.scheduled_appointments.count }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap space-x-1">
+                                        <a href="{% url 'scheduling:doctor_detail' doctor.id %}" class="inline-flex items-center px-2 py-1 border border-blue-600 text-blue-600 rounded hover:bg-blue-50">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'scheduling:doctor_edit' doctor.id %}" class="inline-flex items-center px-2 py-1 border border-gray-300 text-gray-700 rounded hover:bg-gray-100">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="px-6 py-4 text-center text-gray-500">No doctors found</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if user.doctor %}
+            <!-- Doctor Specific: My Schedule -->
+            <div class="bg-white rounded-lg shadow-sm mb-6 hover-translate">
+                <div class="bg-gray-50 px-4 py-3 rounded-t-lg border-b border-gray-200">
+                    <h5 class="font-semibold text-gray-700">My Schedule</h5>
+                </div>
+                <div class="p-4">
+                    <!-- Weekly Schedule View -->
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full border border-gray-200 divide-y divide-gray-200">
+                            <thead>
+                                <tr class="bg-gray-50">
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Day</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Hours</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Appointments</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td class="px-4 py-2">Monday</td>
+                                    <td class="px-4 py-2">9:00 AM - 5:00 PM</td>
+                                    <td class="px-4 py-2">Main Clinic</td>
+                                    <td class="px-4 py-2">
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">8</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2">Tuesday</td>
+                                    <td class="px-4 py-2">10:00 AM - 6:00 PM</td>
+                                    <td class="px-4 py-2">Branch Office</td>
+                                    <td class="px-4 py-2">
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">6</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2">Wednesday</td>
+                                    <td class="px-4 py-2">9:00 AM - 5:00 PM</td>
+                                    <td class="px-4 py-2">Main Clinic</td>
+                                    <td class="px-4 py-2">
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">10</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2">Thursday</td>
+                                    <td class="px-4 py-2">9:00 AM - 5:00 PM</td>
+                                    <td class="px-4 py-2">Main Clinic</td>
+                                    <td class="px-4 py-2">
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">7</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2">Friday</td>
+                                    <td class="px-4 py-2">9:00 AM - 3:00 PM</td>
+                                    <td class="px-4 py-2">Main Clinic</td>
+                                    <td class="px-4 py-2">
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">5</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Sidebar Column -->
+        <div class="w-full lg:w-1/3">
+            <!-- Today's Appointments -->
+            <div class="bg-white rounded-lg shadow-sm mb-6 hover-translate">
+                <div class="bg-gray-50 px-4 py-3 rounded-t-lg flex justify-between items-center border-b border-gray-200">
+                    <h5 class="font-semibold text-gray-700">Today's Appointments</h5>
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">{{ today_appointments|length }}</span>
+                </div>
+                <div class="p-0">
+                    {% if today_appointments %}
+                        <div class="divide-y divide-gray-200">
+                            {% for appointment in today_appointments %}
+                                <a href="{% url 'scheduling:appointment_detail' appointment.id %}" class="block px-4 py-3 hover:bg-gray-50">
+                                    <div class="flex justify-between items-center">
+                                        <h6 class="text-sm font-medium">{{ appointment.appointment_time|time:"h:i A" }}</h6>
+                                        <div>
+                                            {% if appointment.status == 'scheduled' %}
+                                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Scheduled</span>
+                                            {% elif appointment.status == 'confirmed' %}
+                                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Confirmed</span>
+                                            {% elif appointment.status == 'completed' %}
+                                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">Completed</span>
+                                            {% elif appointment.status == 'cancelled' %}
+                                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Cancelled</span>
+                                            {% elif appointment.status == 'no_show' %}
+                                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">No Show</span>
+                                            {% elif appointment.status == 'rescheduled' %}
+                                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Rescheduled</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <p class="text-gray-700 mb-1">{{ appointment.patient }}</p>
+                                    <p class="text-xs text-gray-500">{% if not user.doctor or user.doctor != appointment.doctor %}Dr. {{ appointment.doctor }}{% else %}Your Patient{% endif %}</p>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="py-8 text-center">
+                            <i class="fas fa-calendar text-gray-300 mb-3 text-4xl"></i>
+                            <p class="text-gray-500">No appointments scheduled for today</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Upcoming Appointments -->
+            <div class="bg-white rounded-lg shadow-sm mb-6 hover-translate">
+                <div class="bg-gray-50 px-4 py-3 rounded-t-lg flex justify-between items-center border-b border-gray-200">
+                    <h5 class="font-semibold text-gray-700">Upcoming Appointments</h5>
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">{{ upcoming_appointments|length }}</span>
+                </div>
+                <div class="p-0">
+                    {% if upcoming_appointments %}
+                        <div class="divide-y divide-gray-200">
+                            {% for appointment in upcoming_appointments %}
+                                <a href="{% url 'scheduling:appointment_detail' appointment.id %}" class="block px-4 py-3 hover:bg-gray-50">
+                                    <div class="flex justify-between items-center">
+                                        <h6 class="text-sm font-medium">{{ appointment.appointment_date|date:"M d" }} at {{ appointment.appointment_time|time:"h:i A" }}</h6>
+                                        <div>
+                                            {% if appointment.is_emergency %}
+                                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Emergency</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <p class="text-gray-700 mb-1">{{ appointment.patient }}</p>
+                                    <p class="text-xs text-gray-500">{% if not user.doctor or user.doctor != appointment.doctor %}Dr. {{ appointment.doctor }}{% else %}Your Patient{% endif %}</p>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="py-8 text-center">
+                            <i class="fas fa-calendar-alt text-gray-300 mb-3 text-4xl"></i>
+                            <p class="text-gray-500">No upcoming appointments</p>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="bg-gray-50 px-4 py-3 rounded-b-lg border-t border-gray-200">
+                    <a href="{% url 'scheduling:appointment_list' %}" class="text-sm px-3 py-1 text-blue-600 rounded-md hover:bg-blue-50">
+                        View All Appointments
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="bg-white rounded-lg shadow-sm mb-6 hover-translate">
+                <div class="bg-gray-50 px-4 py-3 rounded-t-lg">
+                    <h5 class="font-semibold text-gray-700">Quick Actions</h5>
+                </div>
+                <div class="p-4">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'scheduling:appointment_create' %}" class="btn btn-primary">
+                            <i class="fas fa-plus-circle me-2"></i> New Appointment
+                        </a>
+                        {% if user.doctor %}
+                        <a href="#" class="btn btn-outline-secondary">
+                            <i class="fas fa-user-md me-2"></i> My Schedule
+                        </a>
+                        <a href="#" class="btn btn-outline-secondary">
+                            <i class="fas fa-clock me-2"></i> Set Availability
+                        </a>
+                        <a href="#" class="btn btn-outline-secondary">
+                            <i class="fas fa-envelope me-2"></i> Send Notifications
+                        </a>
+                        {% endif %}
+                        {% if user.is_staff or user.is_superuser %}
+                        <a href="{% url 'scheduling:schedule_create' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-calendar-plus me-2"></i> Create Schedule
+                        </a>
+                        <a href="{% url 'scheduling:holiday_create' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-calendar-times me-2"></i> Add Holiday
+                        </a>
+                        <a href="{% url 'scheduling:appointment_type_create' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-tags me-2"></i> Add Appointment Type
+                        </a>
+                        <a href="#" class="btn btn-outline-secondary">
+                            <i class="fas fa-envelope me-2"></i> Send Reminders
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            },
+            events: '{% url "scheduling:get_calendar_appointments" %}',
+            eventClick: function(info) {
+                window.location.href = info.event.url;
+            },
+            eventTimeFormat: {
+                hour: 'numeric',
+                minute: '2-digit',
+                meridiem: 'short'
+            },
+            businessHours: {
+                daysOfWeek: [1, 2, 3, 4, 5], // Monday - Friday
+                startTime: '08:00',
+                endTime: '18:00',
+            },
+            height: 450
+        });
+        
+        calendar.render();
+    });
+</script>
+{% endblock %} 

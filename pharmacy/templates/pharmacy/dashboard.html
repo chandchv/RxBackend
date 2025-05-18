@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Pharmacy Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h1 class="mb-4">Pharmacy Dashboard - {{ pharmacy.name }}</h1>
+    
+    {% if error %}
+    <div class="alert alert-danger">
+        {{ error }}
+    </div>
+    {% else %}
+    
+    <!-- KPI Cards Section -->
+    <div class="row mb-4">
+        <!-- New Prescriptions -->
+        <div class="col-md-4 col-lg-2 mb-3">
+            <div class="card h-100 border-left-primary shadow">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                New Prescriptions</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ new_prescriptions }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clipboard-list fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-primary text-white">
+                    <a href="#" class="text-white text-decoration-none">View Details</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Processing Prescriptions -->
+        <div class="col-md-4 col-lg-2 mb-3">
+            <div class="card h-100 border-left-warning shadow">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Processing</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ processing_prescriptions }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-spinner fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-warning text-white">
+                    <a href="#" class="text-white text-decoration-none">View Processing</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Low Stock Items -->
+        <div class="col-md-4 col-lg-2 mb-3">
+            <div class="card h-100 border-left-danger shadow">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                Low Stock</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ low_stock_items }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-danger text-white">
+                    <a href="#" class="text-white text-decoration-none">View Low Stock</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Expiring Soon Items -->
+        <div class="col-md-4 col-lg-2 mb-3">
+            <div class="card h-100 border-left-warning shadow">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Expiring Soon</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ expiring_soon_items }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar-times fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-warning text-white">
+                    <a href="#" class="text-white text-decoration-none">View Expiring</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Today's Sales -->
+        <div class="col-md-4 col-lg-2 mb-3">
+            <div class="card h-100 border-left-success shadow">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Today's Sales</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">${{ todays_sales|floatformat:2 }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-success text-white">
+                    <a href="#" class="text-white text-decoration-none">View Sales</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Pending Bills -->
+        <div class="col-md-4 col-lg-2 mb-3">
+            <div class="card h-100 border-left-info shadow">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Pending Bills</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ pending_bills }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-file-invoice-dollar fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-info text-white">
+                    <a href="#" class="text-white text-decoration-none">View Bills</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Alert Lists Section -->
+    <div class="row mb-4">
+        <!-- Low Stock Items -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Low Stock Medications</h6>
+                    <a href="#" class="btn btn-sm btn-primary">View All</a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Medicine</th>
+                                    <th>Batch #</th>
+                                    <th>Quantity</th>
+                                    <th>Min Level</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in low_stock_details %}
+                                <tr>
+                                    <td>{{ item.medicine.product_name }}</td>
+                                    <td>{{ item.batch_number|default:"N/A" }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>{{ item.min_stock_level }}</td>
+                                    <td>
+                                        {% if item.quantity == 0 %}
+                                        <span class="badge badge-danger">Out of Stock</span>
+                                        {% else %}
+                                        <span class="badge badge-warning">Low Stock</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center">No low stock items</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- OTC Low Stock -->
+                    {% if low_stock_otc %}
+                    <h6 class="mt-4 mb-2 font-weight-bold text-primary">Low Stock OTC Products</h6>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Batch #</th>
+                                    <th>Quantity</th>
+                                    <th>Min Level</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in low_stock_otc %}
+                                <tr>
+                                    <td>{{ item.product.name }}</td>
+                                    <td>{{ item.batch_number|default:"N/A" }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>{{ item.min_stock_level }}</td>
+                                    <td>
+                                        {% if item.quantity == 0 %}
+                                        <span class="badge badge-danger">Out of Stock</span>
+                                        {% else %}
+                                        <span class="badge badge-warning">Low Stock</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Expiring Soon Items -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Medications Expiring Soon</h6>
+                    <a href="#" class="btn btn-sm btn-primary">View All</a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Medicine</th>
+                                    <th>Batch #</th>
+                                    <th>Quantity</th>
+                                    <th>Expiry Date</th>
+                                    <th>Days Left</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in expiring_soon_details %}
+                                {% with days_left=item.expiry_date|timeuntil:today %}
+                                <tr>
+                                    <td>{{ item.medicine.product_name }}</td>
+                                    <td>{{ item.batch_number|default:"N/A" }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>{{ item.expiry_date|date:"M d, Y" }}</td>
+                                    <td>
+                                        {% if days_left <= 7 %}
+                                        <span class="badge badge-danger">{{ days_left }}</span>
+                                        {% else %}
+                                        <span class="badge badge-warning">{{ days_left }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endwith %}
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center">No items expiring soon</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- OTC Expiring Soon -->
+                    {% if expiring_soon_otc %}
+                    <h6 class="mt-4 mb-2 font-weight-bold text-primary">OTC Products Expiring Soon</h6>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Batch #</th>
+                                    <th>Quantity</th>
+                                    <th>Expiry Date</th>
+                                    <th>Days Left</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in expiring_soon_otc %}
+                                {% with days_left=item.expiry_date|timeuntil:today %}
+                                <tr>
+                                    <td>{{ item.product.name }}</td>
+                                    <td>{{ item.batch_number|default:"N/A" }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>{{ item.expiry_date|date:"M d, Y" }}</td>
+                                    <td>
+                                        {% if days_left <= 7 %}
+                                        <span class="badge badge-danger">{{ days_left }}</span>
+                                        {% else %}
+                                        <span class="badge badge-warning">{{ days_left }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endwith %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Links Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Quick Links</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-2 mb-3">
+                            <a href="#" class="btn btn-primary btn-block">
+                                <i class="fas fa-prescription mr-2"></i>New Prescriptions
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="#" class="btn btn-info btn-block">
+                                <i class="fas fa-pills mr-2"></i>Manage Inventory
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="#" class="btn btn-success btn-block">
+                                <i class="fas fa-file-invoice mr-2"></i>Create Bill
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="#" class="btn btn-warning btn-block">
+                                <i class="fas fa-truck mr-2"></i>Add Stock
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="#" class="btn btn-secondary btn-block">
+                                <i class="fas fa-chart-line mr-2"></i>Reports
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <a href="#" class="btn btn-dark btn-block">
+                                <i class="fas fa-cog mr-2"></i>Settings
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %} 

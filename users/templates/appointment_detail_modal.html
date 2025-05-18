@@ -72,4 +72,44 @@
 function closeModal() {
     document.getElementById('modal').style.display = 'none';
 }
+
+function updateAppointmentStatus(appointmentId, status) {
+    fetch(`/users/appointment/${appointmentId}/status/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ status: status })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            // Refresh the page to show updated status
+            window.location.reload();
+        } else {
+            alert('Error updating appointment status');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating appointment status');
+    });
+}
+
+// Function to get CSRF token from cookies
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
 </script>

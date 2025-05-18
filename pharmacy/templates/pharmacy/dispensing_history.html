@@ -1,0 +1,249 @@
+{% extends 'pharmacy/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Dispensing History{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">Dispensing History</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="{% url 'pharmacy:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'pharmacy:prescription_list' %}">Prescriptions</a></li>
+        <li class="breadcrumb-item active">Dispensing History</li>
+    </ol>
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-history me-1"></i>
+                        Dispensing Records
+                    </div>
+                    <div>
+                        <span class="badge bg-{{ prescription.status|yesno:'warning,success,danger' }}">
+                            {{ prescription.get_status_display }}
+                        </span>
+                        {% if prescription.is_fully_dispensed %}
+                            <span class="badge bg-success">Fully Dispensed</span>
+                        {% endif %}
+                        {% if prescription.is_expired %}
+                            <span class="badge bg-danger">Expired</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if not dispensing_records %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            No dispensing records found for this prescription.
+                        </div>
+                    {% else %}
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Dispensed By</th>
+                                        <th>Items</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for record in dispensing_records %}
+                                        <tr>
+                                            <td>{{ record.created_at|date:"d M Y h:i A" }}</td>
+                                            <td>{{ record.dispensed_by.get_full_name }}</td>
+                                            <td>{{ record.dispensing_items.count }} items</td>
+                                            <td>
+                                                <button class="btn btn-sm btn-primary view-details-btn" data-record-id="{{ record.id }}">
+                                                    <i class="fas fa-eye me-1"></i> View Details
+                                                </button>
+                                                {% if can_print_receipt %}
+                                                    <a href="{% url 'pharmacy:print_receipt' record.id %}" class="btn btn-sm btn-secondary" target="_blank">
+                                                        <i class="fas fa-print me-1"></i> Print Receipt
+                                                    </a>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr class="details-row d-none" id="details-{{ record.id }}">
+                                            <td colspan="4" class="p-0">
+                                                <div class="p-3 bg-light">
+                                                    <h6>Dispensed Items</h6>
+                                                    <div class="table-responsive">
+                                                        <table class="table table-sm">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Medication</th>
+                                                                    <th>Quantity</th>
+                                                                    <th>Batch</th>
+                                                                    <th>Expiry Date</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {% for item in record.dispensing_items.all %}
+                                                                    <tr>
+                                                                        <td>{{ item.prescription_drug.drug.product_name }}</td>
+                                                                        <td>{{ item.quantity_dispensed }}</td>
+                                                                        <td>{{ item.batch_number }}</td>
+                                                                        <td>{{ item.expiry_date|date:"d M Y" }}</td>
+                                                                    </tr>
+                                                                {% endfor %}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                    
+                                                    {% if record.notes %}
+                                                        <div class="mt-3">
+                                                            <h6>Notes</h6>
+                                                            <p class="mb-0">{{ record.notes }}</p>
+                                                        </div>
+                                                    {% endif %}
+                                                    
+                                                    {% if record.billing %}
+                                                        <div class="mt-3">
+                                                            <h6>Billing Information</h6>
+                                                            <p class="mb-0">
+                                                                <strong>Bill #:</strong> {{ record.billing.bill_number }}<br>
+                                                                <strong>Amount:</strong> ${{ record.billing.total_amount|floatformat:2 }}<br>
+                                                                <strong>Status:</strong> 
+                                                                <span class="badge bg-{{ record.billing.get_payment_status_display|lower }}">
+                                                                    {{ record.billing.get_payment_status_display }}
+                                                                </span>
+                                                            </p>
+                                                            <a href="{% url 'billing:bill_detail' record.billing.id %}" class="btn btn-sm btn-outline-primary mt-2">
+                                                                <i class="fas fa-file-invoice-dollar me-1"></i> View Bill
+                                                            </a>
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'pharmacy:prescription_list' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-1"></i> Back to List
+                        </a>
+                        
+                        {% if prescription.can_be_dispensed %}
+                            <a href="{% url 'pharmacy:dispense_prescription' prescription.id %}" class="btn btn-primary">
+                                <i class="fas fa-prescription-bottle-alt me-1"></i> Dispense More
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Prescription Information
+                </div>
+                <div class="card-body">
+                    <h6>Prescription #{{ prescription.prescription_number }}</h6>
+                    <p class="small text-muted">Created on {{ prescription.created_at|date:"d M Y" }}</p>
+                    
+                    <div class="mb-3">
+                        <h6 class="mb-2">Patient</h6>
+                        <p class="mb-1">{{ prescription.patient.user.get_full_name }}</p>
+                        <p class="mb-1 small">Age: {{ prescription.patient.age }} years</p>
+                        <p class="mb-1 small">Gender: {{ prescription.patient.gender }}</p>
+                        <p class="mb-1 small">Mobile: {{ prescription.patient.mobile_number }}</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="mb-2">Doctor</h6>
+                        <p class="mb-1">Dr. {{ prescription.doctor.user.get_full_name }}</p>
+                        <p class="mb-1 small">{{ prescription.doctor.specialization }}</p>
+                    </div>
+                    
+                    {% if prescription.diagnosis %}
+                    <div class="mb-3">
+                        <h6 class="mb-2">Diagnosis</h6>
+                        <p>{{ prescription.diagnosis }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    {% if prescription.notes %}
+                    <div class="mb-3">
+                        <h6 class="mb-2">Doctor's Notes</h6>
+                        <p>{{ prescription.notes }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="mb-3">
+                        <h6 class="mb-2">Dispensing Summary</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Medication</th>
+                                        <th>Prescribed</th>
+                                        <th>Dispensed</th>
+                                        <th>Remaining</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for drug in prescription_drugs %}
+                                        <tr>
+                                            <td>{{ drug.drug.product_name }}</td>
+                                            <td class="text-center">{{ drug.quantity }}</td>
+                                            <td class="text-center">{{ drug.total_dispensed|default:0 }}</td>
+                                            <td class="text-center">
+                                                {% if drug.remaining > 0 %}
+                                                    <span class="text-primary">{{ drug.remaining }}</span>
+                                                {% else %}
+                                                    <span class="badge bg-success">Complete</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Toggle dispensing details
+        const detailButtons = document.querySelectorAll('.view-details-btn');
+        detailButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const recordId = this.dataset.recordId;
+                const detailsRow = document.getElementById(`details-${recordId}`);
+                
+                // Toggle details row visibility
+                if (detailsRow.classList.contains('d-none')) {
+                    // Hide all other open detail rows
+                    document.querySelectorAll('.details-row:not(.d-none)').forEach(row => {
+                        row.classList.add('d-none');
+                    });
+                    
+                    // Show this detail row
+                    detailsRow.classList.remove('d-none');
+                    this.innerHTML = '<i class="fas fa-eye-slash me-1"></i> Hide Details';
+                } else {
+                    // Hide this detail row
+                    detailsRow.classList.add('d-none');
+                    this.innerHTML = '<i class="fas fa-eye me-1"></i> View Details';
+                }
+            });
+        });
+    });
+</script>
+{% endblock %} 

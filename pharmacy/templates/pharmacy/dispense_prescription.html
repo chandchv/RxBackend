@@ -1,0 +1,490 @@
+{% extends 'pharmacy/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Dispense Prescription{% endblock %}
+
+{% block extra_css %}
+<style>
+    .batch-selection {
+        display: none;
+    }
+    .batch-item {
+        border-left: 3px solid #3b7ddd;
+        margin-bottom: 8px;
+        padding: 10px 15px;
+        background-color: #f8f9fa;
+        border-radius: 0 4px 4px 0;
+    }
+    .batch-item.selected {
+        background-color: #e7f0ff;
+        border-left-color: #1a53ff;
+    }
+    .batch-item.expired {
+        border-left-color: #dc3545;
+        background-color: #f8d7da;
+    }
+    .item-header {
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 10px;
+        margin-bottom: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">Dispense Prescription</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="{% url 'pharmacy:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'pharmacy:prescription_list' %}">Prescriptions</a></li>
+        <li class="breadcrumb-item active">Dispense</li>
+    </ol>
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-prescription-bottle-alt me-1"></i>
+                        Dispense Medications
+                    </div>
+                    <div>
+                        <span class="badge bg-{{ prescription.status|yesno:'warning,success,danger' }}">
+                            {{ prescription.get_status_display }}
+                        </span>
+                        {% if prescription.is_expired %}
+                            <span class="badge bg-danger">Expired</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if error_message %}
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i> {{ error_message }}
+                        </div>
+                    {% endif %}
+                    
+                    {% if not prescription.can_be_dispensed %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i> 
+                            This prescription cannot be dispensed because it is 
+                            {% if prescription.is_fully_dispensed %}
+                                already fully dispensed.
+                            {% elif prescription.is_cancelled %}
+                                cancelled.
+                            {% elif prescription.is_expired %}
+                                expired.
+                            {% else %}
+                                not available for dispensing.
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <form method="post" id="dispensingForm">
+                            {% csrf_token %}
+                            
+                            <div class="table-responsive">
+                                <table class="table table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 40%">Medication</th>
+                                            <th style="width: 15%">Prescribed Qty</th>
+                                            <th style="width: 15%">Already Dispensed</th>
+                                            <th style="width: 15%">Dispense Now</th>
+                                            <th style="width: 15%">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for drug in prescription_drugs %}
+                                            <tr class="drug-row" data-drug-id="{{ drug.id }}" data-drug-name="{{ drug.drug.product_name }}" data-prescribed="{{ drug.quantity }}" data-dispensed="{{ drug.total_dispensed }}" data-remaining="{{ drug.remaining }}">
+                                                <td>
+                                                    <strong>{{ drug.drug.product_name }}</strong>
+                                                    <div class="small text-muted">{{ drug.instructions }}</div>
+                                                </td>
+                                                <td class="text-center">{{ drug.quantity }}</td>
+                                                <td class="text-center">{{ drug.total_dispensed|default:0 }}</td>
+                                                <td>
+                                                    {% if drug.remaining > 0 %}
+                                                        <input type="number" name="qty_{{ drug.id }}" min="0" max="{{ drug.remaining }}" value="0" class="form-control form-control-sm dispense-qty" data-drug-id="{{ drug.id }}">
+                                                        <input type="hidden" name="drug_id_{{ drug.id }}" value="{{ drug.id }}">
+                                                    {% else %}
+                                                        <span class="badge bg-success">Fully Dispensed</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if drug.remaining > 0 %}
+                                                        <button type="button" class="btn btn-sm btn-outline-primary select-batch-btn" data-drug-id="{{ drug.id }}" data-bs-toggle="modal" data-bs-target="#batchSelectionModal">
+                                                            <i class="fas fa-box me-1"></i> Select Batch
+                                                        </button>
+                                                        <div id="selected-batch-{{ drug.id }}" class="selected-batch small mt-1 text-muted"></div>
+                                                        <input type="hidden" name="batch_{{ drug.id }}" id="batch-input-{{ drug.id }}" value="">
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="form-group mb-3">
+                                <label for="notes" class="form-label">Dispensing Notes</label>
+                                <textarea name="notes" id="notes" class="form-control" rows="3" placeholder="Enter any notes regarding this dispensing..."></textarea>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between mt-4">
+                                <a href="{% url 'pharmacy:prescription_list' %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-1"></i> Back to List
+                                </a>
+                                <div>
+                                    <button type="button" class="btn btn-success me-2" id="dispenseSubmitBtn">
+                                        <i class="fas fa-pills me-1"></i> Dispense Medications
+                                    </button>
+                                    <button type="button" class="btn btn-primary" id="dispenseBillBtn">
+                                        <i class="fas fa-file-invoice-dollar me-1"></i> Dispense & Create Bill
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <input type="hidden" name="create_bill" id="create-bill-input" value="0">
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Prescription Information
+                </div>
+                <div class="card-body">
+                    <h6>Prescription #{{ prescription.prescription_number }}</h6>
+                    <p class="small text-muted">Created on {{ prescription.created_at|date:"d M Y" }}</p>
+                    
+                    <div class="mb-3">
+                        <h6 class="mb-2">Patient</h6>
+                        <p class="mb-1">{{ prescription.patient.user.get_full_name }}</p>
+                        <p class="mb-1 small">Age: {{ prescription.patient.age }} years</p>
+                        <p class="mb-1 small">Gender: {{ prescription.patient.gender }}</p>
+                        <p class="mb-1 small">Mobile: {{ prescription.patient.mobile_number }}</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="mb-2">Doctor</h6>
+                        <p class="mb-1">Dr. {{ prescription.doctor.user.get_full_name }}</p>
+                        <p class="mb-1 small">{{ prescription.doctor.specialization }}</p>
+                    </div>
+                    
+                    {% if prescription.diagnosis %}
+                    <div class="mb-3">
+                        <h6 class="mb-2">Diagnosis</h6>
+                        <p>{{ prescription.diagnosis }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    {% if prescription.notes %}
+                    <div class="mb-3">
+                        <h6 class="mb-2">Doctor's Notes</h6>
+                        <p>{{ prescription.notes }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="mb-3">
+                        <h6 class="mb-2">Dispensing History</h6>
+                        {% if dispensing_records %}
+                            <ul class="list-group">
+                                {% for record in dispensing_records %}
+                                <li class="list-group-item p-2">
+                                    <div class="d-flex justify-content-between">
+                                        <span>{{ record.created_at|date:"d M Y h:i A" }}</span>
+                                        <span class="badge bg-primary">{{ record.dispensing_items.count }} items</span>
+                                    </div>
+                                    <div class="small text-muted">
+                                        By: {{ record.dispensed_by.get_full_name }}
+                                    </div>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p class="text-muted">No dispensing records found</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Batch Selection Modal -->
+<div class="modal fade" id="batchSelectionModal" tabindex="-1" aria-labelledby="batchSelectionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="batchSelectionModalLabel">Select Batch</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <h6>Select batch for: <span id="drug-name-display"></span></h6>
+                    <p class="small text-muted">Quantity to dispense: <span id="qty-to-dispense">0</span></p>
+                </div>
+                
+                <div id="batch-loading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p>Loading available batches...</p>
+                </div>
+                
+                <div id="batch-list-container" class="d-none">
+                    <div class="alert alert-info mb-3">
+                        <i class="fas fa-info-circle me-2"></i> Please select a batch to dispense from. Batches are sorted by expiry date (earliest first).
+                    </div>
+                    
+                    <div id="batch-list">
+                        <!-- Batches will be loaded here -->
+                    </div>
+                    
+                    <div id="no-batches" class="alert alert-warning d-none">
+                        <i class="fas fa-exclamation-triangle me-2"></i> No batches available for this medication.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmBatchBtn">Confirm Selection</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmModalLabel">Confirm Dispensing</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to dispense these medications?</p>
+                <div id="confirm-details"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="finalConfirmBtn">Yes, Dispense Now</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const dispensingForm = document.getElementById('dispensingForm');
+        const dispenseSubmitBtn = document.getElementById('dispenseSubmitBtn');
+        const dispenseBillBtn = document.getElementById('dispenseBillBtn');
+        const createBillInput = document.getElementById('create-bill-input');
+        const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        const batchSelectionModal = document.getElementById('batchSelectionModal');
+        const confirmBatchBtn = document.getElementById('confirmBatchBtn');
+        
+        let currentDrugId = null;
+        
+        // Handle quantity changes
+        const qtyInputs = document.querySelectorAll('.dispense-qty');
+        qtyInputs.forEach(input => {
+            input.addEventListener('change', function() {
+                const drugId = this.dataset.drugId;
+                const row = document.querySelector(`.drug-row[data-drug-id="${drugId}"]`);
+                const remaining = parseInt(row.dataset.remaining);
+                
+                // Validate input
+                if (parseInt(this.value) > remaining) {
+                    this.value = remaining;
+                } else if (parseInt(this.value) < 0 || this.value === '') {
+                    this.value = 0;
+                }
+            });
+        });
+        
+        // Batch selection button
+        const batchBtns = document.querySelectorAll('.select-batch-btn');
+        batchBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const drugId = this.dataset.drugId;
+                const row = document.querySelector(`.drug-row[data-drug-id="${drugId}"]`);
+                const drugName = row.dataset.drugName;
+                const qtyInput = document.querySelector(`.dispense-qty[data-drug-id="${drugId}"]`);
+                const qtyToDispense = parseInt(qtyInput.value) || 0;
+                
+                // Set current drug id
+                currentDrugId = drugId;
+                
+                // Update modal content
+                document.getElementById('drug-name-display').textContent = drugName;
+                document.getElementById('qty-to-dispense').textContent = qtyToDispense;
+                
+                // Show loading
+                document.getElementById('batch-loading').classList.remove('d-none');
+                document.getElementById('batch-list-container').classList.add('d-none');
+                
+                // Fetch batches
+                fetch(`/pharmacy/api/batches/${drugId}/?qty=${qtyToDispense}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        // Hide loading
+                        document.getElementById('batch-loading').classList.add('d-none');
+                        document.getElementById('batch-list-container').classList.remove('d-none');
+                        
+                        const batchList = document.getElementById('batch-list');
+                        batchList.innerHTML = '';
+                        
+                        if (data.batches && data.batches.length > 0) {
+                            document.getElementById('no-batches').classList.add('d-none');
+                            
+                            data.batches.forEach(batch => {
+                                const isExpired = new Date(batch.expiry_date) < new Date();
+                                const batchItem = document.createElement('div');
+                                batchItem.className = `batch-item ${isExpired ? 'expired' : ''}`;
+                                batchItem.dataset.batchNumber = batch.batch_number;
+                                
+                                batchItem.innerHTML = `
+                                    <div class="form-check">
+                                        <input class="form-check-input batch-checkbox" type="radio" name="batch_selection" 
+                                               id="batch-${batch.batch_number}" value="${batch.batch_number}"
+                                               ${isExpired ? 'disabled' : ''}>
+                                        <label class="form-check-label w-100" for="batch-${batch.batch_number}">
+                                            <div class="item-header d-flex justify-content-between">
+                                                <strong>Batch: ${batch.batch_number}</strong>
+                                                <span class="badge ${isExpired ? 'bg-danger' : 'bg-success'}">
+                                                    ${isExpired ? 'EXPIRED' : 'AVAILABLE'}
+                                                </span>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <p class="mb-1 small"><strong>Expiry:</strong> ${new Date(batch.expiry_date).toLocaleDateString()}</p>
+                                                    <p class="mb-1 small"><strong>Received:</strong> ${new Date(batch.received_date).toLocaleDateString()}</p>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <p class="mb-1 small"><strong>Available:</strong> ${batch.quantity_available}</p>
+                                                    <p class="mb-1 small"><strong>Cost:</strong> $${batch.cost_per_unit.toFixed(2)}/unit</p>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                `;
+                                
+                                batchList.appendChild(batchItem);
+                                
+                                // Add event listener for selection
+                                const checkbox = batchItem.querySelector('.batch-checkbox');
+                                checkbox.addEventListener('change', function() {
+                                    document.querySelectorAll('.batch-item').forEach(item => {
+                                        item.classList.remove('selected');
+                                    });
+                                    
+                                    if (this.checked) {
+                                        batchItem.classList.add('selected');
+                                    }
+                                });
+                            });
+                        } else {
+                            document.getElementById('no-batches').classList.remove('d-none');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching batches:', error);
+                        document.getElementById('batch-loading').classList.add('d-none');
+                        document.getElementById('batch-list-container').classList.remove('d-none');
+                        document.getElementById('no-batches').classList.remove('d-none');
+                        document.getElementById('no-batches').textContent = 'Error loading batches. Please try again.';
+                    });
+            });
+        });
+        
+        // Confirm batch selection
+        confirmBatchBtn.addEventListener('click', function() {
+            const selectedBatch = document.querySelector('.batch-checkbox:checked');
+            
+            if (selectedBatch && currentDrugId) {
+                const batchNumber = selectedBatch.value;
+                const batchInput = document.getElementById(`batch-input-${currentDrugId}`);
+                const batchDisplay = document.getElementById(`selected-batch-${currentDrugId}`);
+                
+                batchInput.value = batchNumber;
+                batchDisplay.textContent = `Selected Batch: ${batchNumber}`;
+                batchDisplay.classList.add('text-success');
+                
+                // Close modal
+                bootstrap.Modal.getInstance(batchSelectionModal).hide();
+            } else {
+                alert('Please select a batch to continue.');
+            }
+        });
+        
+        // Handle submit buttons
+        dispenseSubmitBtn.addEventListener('click', function() {
+            createBillInput.value = '0';
+            validateAndConfirm();
+        });
+        
+        dispenseBillBtn.addEventListener('click', function() {
+            createBillInput.value = '1';
+            validateAndConfirm();
+        });
+        
+        // Validation and confirmation
+        function validateAndConfirm() {
+            let isValid = true;
+            let totalQty = 0;
+            let missingBatches = [];
+            let confirmHTML = '<ul class="mt-3">';
+            
+            // Validate each drug with quantity > 0 has a batch selected
+            qtyInputs.forEach(input => {
+                const drugId = input.dataset.drugId;
+                const qty = parseInt(input.value) || 0;
+                
+                if (qty > 0) {
+                    totalQty += qty;
+                    
+                    const row = document.querySelector(`.drug-row[data-drug-id="${drugId}"]`);
+                    const drugName = row.dataset.drugName;
+                    const batchInput = document.getElementById(`batch-input-${drugId}`);
+                    
+                    confirmHTML += `<li>${drugName} - ${qty} units</li>`;
+                    
+                    if (!batchInput.value) {
+                        missingBatches.push(drugName);
+                        isValid = false;
+                    }
+                }
+            });
+            
+            confirmHTML += '</ul>';
+            
+            if (totalQty === 0) {
+                alert('Please specify at least one medication to dispense.');
+                return;
+            }
+            
+            if (!isValid) {
+                alert('Please select a batch for the following medications: ' + missingBatches.join(', '));
+                return;
+            }
+            
+            // Show confirmation modal
+            document.getElementById('confirm-details').innerHTML = confirmHTML;
+            confirmModal.show();
+        }
+        
+        // Final submission
+        document.getElementById('finalConfirmBtn').addEventListener('click', function() {
+            dispensingForm.submit();
+        });
+    });
+</script>
+{% endblock %} 

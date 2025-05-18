@@ -1,0 +1,767 @@
+{% load static %}
+
+<!-- 
+    
+    - Uses Tailwind CSS for styling.
+    - Includes role-based visibility for menu items.
+    - Features multi-level dropdowns.
+    - Responsive design with mobile toggle and backdrop.
+    - Enhanced hover/active states and transitions.
+    - Basic ARIA attributes for accessibility.
+-->
+
+<style>
+/* Custom styles primarily for smooth submenu animation */
+.submenu {
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+                opacity 0.2s ease-in-out, 
+                visibility 0.3s ease-in-out;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    visibility: hidden; /* Add visibility for better accessibility and performance */
+}
+
+.submenu.open {
+    max-height: 1000px; /* Adjust if needed for very long submenus */
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Custom styles for responsive sidebar adjustments */
+@media (max-width: 767px) { /* Use md breakpoint value */
+    #sidebar-toggle {
+        position: fixed;
+        top: 1rem;
+        left: 1rem;
+        z-index: 100; /* Ensure button is above backdrop */
+    }
+    
+    #sidebar {
+        width: 90%;
+        max-width: 300px;
+        z-index: 90; /* Below toggle, above content */
+    }
+    
+    #sidebar-backdrop {
+        z-index: 80; /* Below sidebar */
+    }
+
+    /* Ensure sidebar comes from off-screen */
+    #sidebar:not(.translate-x-0) {
+        transform: translateX(-100%);
+    }
+}
+
+/* Optional: Slightly softer focus ring */
+*:focus-visible {
+    outline: 2px solid rgba(59, 130, 246, 0.4); /* Tailwind's blue-500 with opacity */
+    outline-offset: 2px;
+}
+
+</style>
+
+<!-- Mobile Toggle Button (visible only below md breakpoint) -->
+<button id="sidebar-toggle" aria-label="Toggle Menu" aria-controls="sidebar" aria-expanded="false"
+        class="md:hidden fixed top-4 left-4 z-[100] p-2 rounded-lg bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2">
+    <svg id="menu-open-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+    <svg id="menu-close-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+</button>
+
+<!-- Backdrop (Mobile Only) -->
+<div id="sidebar-backdrop" class="fixed inset-0 bg-gray-900 bg-opacity-60 z-[80] md:hidden hidden transition-opacity duration-300 ease-in-out"></div>
+
+<!-- Sidebar -->
+<aside id="sidebar" 
+       class="fixed inset-y-0 left-0 z-[90] w-72 bg-white border-r border-gray-200 
+              transform -translate-x-full md:translate-x-0 
+              transition-transform duration-300 ease-in-out 
+              flex flex-col shadow-md md:shadow-none">
+    
+    <!-- Logo & Header Section -->
+    <div class="p-4 border-b border-gray-200 flex-shrink-0">
+        <a href="{% url 'dashboard' %}" class="flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
+            <img src="{% static 'images/logo.png' %}" alt="RxDoctor Logo" class="h-8 w-auto">
+            <span class="text-xl font-semibold text-gray-800 tracking-tight">RxDoctor</span>
+        </a>
+    </div>
+
+    <!-- User Profile Summary -->
+    <div class="p-4 border-b border-gray-200 flex-shrink-0">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <img class="h-10 w-10 rounded-full object-cover" 
+                     src="{{ request.user.profile.avatar.url|default:'' }}{% if not request.user.profile.avatar.url %}{% static 'images/default-profile.png' %}{% endif %}" 
+                     alt="User profile picture">
+            </div>
+            <div class="ml-3 min-w-0">
+                <p class="text-sm font-semibold text-gray-900 truncate">{{ request.user.get_full_name|default:request.user.username }}</p>
+                <p class="text-xs font-medium text-gray-500 truncate">
+                    {% if request.user.is_superuser %}
+                        Administrator
+                    {% elif request.user.is_staff and not request.user.doctor and not request.user.patient and not request.user.lab and not request.user.pharmacy_staff %}
+                        Staff Member
+                    {% elif request.user.doctor  %}
+                        Doctor
+                    {% elif request.user.patient  %}
+                        Patient
+                    {% elif request.user.lab  %}
+                        Lab Technician
+                    {% elif request.user.pharmacy_staff %}
+                         Pharmacy Staff
+                    {% else %}
+                        User
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Links - Scrollable Area -->
+    <nav class="flex-grow px-3 py-4 overflow-y-auto">
+        <ul class="space-y-1.5">
+            <!-- Dashboard -->
+            <li>
+                <a href="{% url 'dashboard' %}" class="menu-link group">
+                    <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                    Dashboard
+                </a>
+            </li>
+
+            <!-- User Management (Admin & Staff) -->
+            {% if request.user.is_superuser or request.user.is_staff %}
+            <li class="menu-item">
+                <button class="dropdown-toggle group" aria-controls="submenu-users" aria-expanded="false">
+                    <span class="flex items-center">
+                        <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                        User Management
+                    </span>
+                    <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <div id="submenu-users" class="submenu">
+                    <ul class="submenu-list">
+                        <li><a href="{% url 'users:patients_list' %}" class="submenu-link">Patients</a></li>
+                        <li><a href="{% url 'users:doctors_list' %}" class="submenu-link">Doctors</a></li>
+                        <li><a href="{% url 'users:staff_list' %}" class="submenu-link">Staff</a></li>
+                        <li><a href="#" class="submenu-link">Add New User</a></li>
+                        <li><a href="#" class="submenu-link">User Roles</a></li>
+                    </ul>
+                </div>
+            </li>
+            {% endif %}
+
+            <!-- Appointments (Doctor) -->
+            {% if request.user.doctor %}
+            <li class="menu-item">
+                <button class="dropdown-toggle group" aria-controls="submenu-doc-appointments" aria-expanded="false">
+                    <span class="flex items-center">
+                        <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Appointments
+                    </span>
+                    <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <div id="submenu-doc-appointments" class="submenu">
+                     <ul class="submenu-list">
+                        <li><a href="{% url 'users:doctor_appointments_view' %}" class="submenu-link">All Appointments</a></li>
+                        <li><a href="#" class="submenu-link">Today's Schedule</a></li>
+                        <li><a href="#" class="submenu-link">Upcoming</a></li>
+                        <li><a href="#" class="submenu-link">Past</a></li>
+                        <li><a href="#" class="submenu-link">Canceled</a></li>
+                        <li><a href="#" class="submenu-link">Reschedule Requests</a></li>
+                        <li><a href="#" class="submenu-link">Calendar View</a></li>
+                        <li><a href="#" class="submenu-link">Set Availability</a></li>
+                    </ul>
+                </div>
+            </li>
+            <li class="menu-item">
+                <button class="dropdown-toggle group" aria-controls="submenu-doc-patients" aria-expanded="false">
+                    <span class="flex items-center">
+                        <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                             <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        Patients
+                    </span>
+                   <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                 <div id="submenu-doc-patients" class="submenu">
+                     <ul class="submenu-list">
+                        <li><a href="{% url 'users:patients_list' %}" class="submenu-link">All Patients</a></li>
+                        <li><a href="#" class="submenu-link">Today's Patients</a></li>
+                        <li><a href="#" class="submenu-link">Scheduled Patients</a></li>
+                        <li><a href="#" class="submenu-link">Add New Patient</a></li>
+                        <li><a href="#" class="submenu-link">Patient History</a></li>
+                    </ul>
+                </div>
+            </li>
+            {% endif %}
+
+            <!-- Appointments & Doctors (Patient) -->
+            {% if request.user.patient %}
+            <li class="menu-item">
+                <button class="dropdown-toggle group" aria-controls="submenu-pat-appointments" aria-expanded="false">
+                    <span class="flex items-center">
+                        <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                             <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Appointments
+                    </span>
+                    <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <div id="submenu-pat-appointments" class="submenu">
+                    <ul class="submenu-list">
+                        <li><a href="#" class="submenu-link">Book Appointment</a></li>
+                        <li><a href="#" class="submenu-link">Upcoming</a></li>
+                        <li><a href="#" class="submenu-link">Past</a></li>
+                        <li><a href="#" class="submenu-link">History</a></li>
+                        <li><a href="#" class="submenu-link">Cancelled</a></li>
+                        <li><a href="#" class="submenu-link">Reschedule</a></li>
+                    </ul>
+                </div>
+            </li>
+            <li class="menu-item">
+                <button class="dropdown-toggle group" aria-controls="submenu-pat-doctors" aria-expanded="false">
+                    <span class="flex items-center">
+                         <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                             <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        My Doctors
+                    </span>
+                    <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                 <div id="submenu-pat-doctors" class="submenu">
+                     <ul class="submenu-list">
+                        <li><a href="#" class="submenu-link">Primary Physician</a></li>
+                        <li><a href="#" class="submenu-link">All Doctors</a></li>
+                        <li><a href="#" class="submenu-link">Specialists</a></li>
+                        <li><a href="#" class="submenu-link">Find New Doctor</a></li>
+                    </ul>
+                </div>
+            </li>
+            {% endif %}
+
+            <!-- Prescriptions (Multiple Roles) -->
+            {% if request.user.doctor or request.user.patient or request.user.is_staff or request.user.is_superuser %}
+            <li class="menu-item">
+                <button class="dropdown-toggle group" aria-controls="submenu-prescriptions" aria-expanded="false">
+                    <span class="flex items-center">
+                        <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Prescriptions
+                    </span>
+                   <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <div id="submenu-prescriptions" class="submenu">
+                    <ul class="submenu-list">
+                        {% if request.user.patient %}
+                            <li><a href="{% url 'users:patient_prescriptions' %}" class="submenu-link">My Prescriptions</a></li>
+                            <li><a href="{% url 'users:patient_prescriptions' %}" class="submenu-link">Active</a></li>
+                            <li><a href="{% url 'users:patient_prescriptions' %}" class="submenu-link">History</a></li>
+                        {% endif %}
+                        {% if request.user.doctor %}
+                            <li><a href="#" class="submenu-link">Create Prescription</a></li>
+                            <li><a href="#" class="submenu-link">Patient Prescriptions</a></li>
+                        {% endif %}
+                         {% if request.user.is_staff or request.user.is_superuser %}
+                            <li><a href="{% url 'users:prescriptions' %}" class="submenu-link">All Prescriptions</a></li>
+                            <li><a href="#" class="submenu-link">Search</a></li>
+                            <li><a href="#" class="submenu-link">History</a></li>
+                         {% endif %}
+                    </ul>
+                </div>
+            </li>
+            {% endif %}
+            
+            <!-- Medical Records (Doctor & Patient) -->
+             {% if request.user.doctor or request.user.patient %}
+            <li class="menu-item">
+                <button class="dropdown-toggle group" aria-controls="submenu-records" aria-expanded="false">
+                    <span class="flex items-center">
+                        <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /> 
+                        </svg>
+                        Medical Records
+                    </span>
+                    <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                 <div id="submenu-records" class="submenu">
+                    <ul class="submenu-list">
+                        {% if request.user.patient %}
+                        <li><a href="{% url 'users:patient_health_records' %}" class="submenu-link">My Health Records</a></li>
+                        <li><a href="#" class="submenu-link">Medical History</a></li>
+                        <li><a href="#" class="submenu-link">Allergies & Conditions</a></li>
+                        <li><a href="#" class="submenu-link">Upload Document</a></li>
+                        {% endif %}
+                        {% if request.user.doctor %}
+                        <li><a href="#" class="submenu-link">Patient Records</a></li>
+                        <li><a href="#" class="submenu-link">Create Record</a></li>
+                        <li><a href="#" class="submenu-link">Update Record</a></li>
+                        <li><a href="#" class="submenu-link">Search Records</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </li>
+            {% endif %}
+
+            <!-- Lab Tests (Multiple Roles) -->
+            {% if request.user.is_superuser or request.user.lab or request.user.doctor or request.user.patient %}
+             <li class="menu-item">
+                <button class="dropdown-toggle group" aria-controls="submenu-labtests" aria-expanded="false">
+                    <span class="flex items-center">
+                        <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                        </svg>
+                        Lab Tests
+                    </span>
+                   <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <div id="submenu-labtests" class="submenu">
+                    <ul class="submenu-list">
+                        {% if request.user.doctor %}
+                            <li><a href="#" class="submenu-link">Order Test</a></li>
+                            <li><a href="#" class="submenu-link">View Results</a></li>
+                            <li><a href="#" class="submenu-link">Pending Orders</a></li>
+                            <li><a href="#" class="submenu-link">Completed Tests</a></li>
+                            <li><a href="{% url 'labs:manage_tests' %}" class="submenu-link">Available Tests</a></li>
+                        {% endif %}
+                        {% if request.user.patient %}
+                            <li><a href="{% url 'users:patient_test_results' %}" class="submenu-link">My Results</a></li>
+                            <li><a href="#" class="submenu-link">Scheduled Tests</a></li>
+                            <li><a href="#" class="submenu-link">History</a></li>
+                        {% endif %}
+                        {% if request.user.lab %}
+                            <li><a href="#" class="submenu-link">Pending Tests</a></li>
+                            <li><a href="#" class="submenu-link">Upload Results</a></li>
+                            <li><a href="#" class="submenu-link">Today's Schedule</a></li>
+                            <li><a href="{% url 'labs:manage_tests' %}" class="submenu-link">Manage Tests</a></li>
+                            <li><a href="#" class="submenu-link">Inventory</a></li>
+                            <li><a href="#" class="submenu-link">Equipment</a></li>
+                        {% endif %}
+                         {% if request.user.is_superuser %}
+                            <li><a href="{% url 'labs:manage_tests' %}" class="submenu-link">All Tests</a></li>
+                            <li><a href="#" class="submenu-link">Test Categories</a></li>
+                            <li><a href="#" class="submenu-link">Pricing</a></li>
+                            <li><a href="#" class="submenu-link">Lab Performance</a></li>
+                         {% endif %}
+                    </ul>
+                </div>
+            </li>
+            {% endif %}
+
+            <!-- Pharmacy (Pharmacy Staff) -->
+            {% if request.user.pharmacy_staff %}
+            <li class="menu-item">
+                <button class="dropdown-toggle group" aria-controls="submenu-pharmacy" aria-expanded="false">
+                     <span class="flex items-center">
+                        <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                           <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        Pharmacy
+                    </span>
+                   <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                 <div id="submenu-pharmacy" class="submenu">
+                    <ul class="submenu-list">
+                        <li><a href="{% url 'pharmacy:dashboard' %}" class="submenu-link">Dashboard</a></li>
+                        <li><a href="#" class="submenu-link">Inventory</a></li>
+                        <li><a href="#" class="submenu-link">Pending Orders</a></li>
+                        <li><a href="#" class="submenu-link">Dispensed</a></li>
+                        <li><a href="#" class="submenu-link">History</a></li>
+                    </ul>
+                </div>
+            </li>
+            {% endif %}
+
+            <!-- Billing (Multiple Roles) -->
+            {% if request.user.is_superuser or request.user.is_staff or request.user.doctor or request.user.patient %}
+            <li class="menu-item">
+                <button class="dropdown-toggle group" aria-controls="submenu-billing" aria-expanded="false">
+                     <span class="flex items-center">
+                        <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        Billing
+                    </span>
+                   <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                 <div id="submenu-billing" class="submenu">
+                     <ul class="submenu-list">
+                         {% if request.user.patient %}
+                            <li><a href="{% url 'billing:patient_billing_history' %}" class="submenu-link">Billing History</a></li>
+                            <li><a href="#" class="submenu-link">Make Payment</a></li>
+                            <li><a href="#" class="submenu-link">Outstanding Bills</a></li>
+                         {% else %} {# Staff, Admin, Doctor #}
+                            <li><a href="{% url 'billing:patient_billing_history' %}" class="submenu-link">Patient Billing</a></li>
+                            <li><a href="#" class="submenu-link">Generate Invoice</a></li>
+                            <li><a href="#" class="submenu-link">Pending Payments</a></li>
+                            <li><a href="#" class="submenu-link">Payment Records</a></li>
+                            <li><a href="#" class="submenu-link">Insurance Claims</a></li>
+                         {% endif %}
+                    </ul>
+                </div>
+            </li>
+            {% endif %}
+
+            <!-- Reports (Admin, Staff, Doctor) -->
+            {% if request.user.is_superuser or request.user.is_staff or request.user.doctor %}
+            <li class="menu-item">
+                 <button class="dropdown-toggle group" aria-controls="submenu-reports" aria-expanded="false">
+                     <span class="flex items-center">
+                        <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Reports
+                    </span>
+                   <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                 <div id="submenu-reports" class="submenu">
+                    <ul class="submenu-list">
+                        <li><a href="#" class="submenu-link">Patient Reports</a></li>
+                        <li><a href="#" class="submenu-link">Financial Reports</a></li>
+                        <li><a href="#" class="submenu-link">Appointments</a></li>
+                        <li><a href="#" class="submenu-link">Treatments</a></li>
+                         {% if request.user.is_superuser %}
+                            <li><a href="#" class="submenu-link">System Usage</a></li>
+                            <li><a href="#" class="submenu-link">Audit Logs</a></li>
+                         {% endif %}
+                    </ul>
+                </div>
+            </li>
+            {% endif %}
+           
+            <!-- Settings (Admin, Staff) -->
+            {% if request.user.is_superuser or request.user.is_staff %}
+            <li class="menu-item">
+                <button class="dropdown-toggle group" aria-controls="submenu-settings" aria-expanded="false">
+                    <span class="flex items-center">
+                        <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Settings
+                    </span>
+                   <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <div id="submenu-settings" class="submenu">
+                    <ul class="submenu-list">
+                        <li><a href="{% url 'users:clinic_admin_dashboard' %}" class="submenu-link">Clinic Settings</a></li>
+                        <li><a href="#" class="submenu-link">System Config</a></li>
+                        <li><a href="#" class="submenu-link">Permissions</a></li>
+                        <li><a href="#" class="submenu-link">Email Templates</a></li>
+                        <li><a href="#" class="submenu-link">Backup & Restore</a></li>
+                    </ul>
+                </div>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+
+    <!-- Bottom Actions -->
+    <div class="border-t border-gray-200 p-3 mt-auto flex-shrink-0">
+        <ul class="space-y-1">
+             <li>
+                <a href="{% url 'users:profile' %}" class="menu-link group">
+                    <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    Profile
+                </a>
+            </li>
+             <li>
+                <a href="{% url 'users:logout' %}" class="menu-link group hover:bg-red-50 hover:text-red-700">
+                    <svg class="menu-icon text-gray-500 group-hover:text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Logout
+                </a>
+            </li>
+        </ul>
+    </div>
+</aside>
+
+<!-- Javascript for Sidebar Functionality -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // --- Configuration ---
+    const activeLinkClasses = 'bg-blue-100 text-blue-700 font-semibold border-l-2 border-blue-600'.split(' ');
+    const activeSubLinkClasses = 'bg-blue-50 text-blue-700 font-semibold'.split(' '); // Slightly different for sublinks
+    const hoverBgClass = 'hover:bg-gray-100';
+    const hoverTextClass = 'hover:text-blue-600';
+    
+    // --- Elements ---
+    const sidebar = document.getElementById('sidebar');
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    const menuOpenIcon = document.getElementById('menu-open-icon');
+    const menuCloseIcon = document.getElementById('menu-close-icon');
+    const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
+    const allLinks = sidebar.querySelectorAll('nav a, .bottom-actions a'); // Include bottom links if needed
+    
+    // --- Helper Functions ---
+    const openSubmenu = (submenu, arrow) => {
+        submenu.classList.add('open');
+        arrow?.classList.add('rotate-180');
+        submenu.previousElementSibling?.setAttribute('aria-expanded', 'true');
+    };
+
+    const closeSubmenu = (submenu, arrow) => {
+        submenu.classList.remove('open');
+        arrow?.classList.remove('rotate-180');
+        submenu.previousElementSibling?.setAttribute('aria-expanded', 'false');
+    };
+
+    const closeAllSubmenus = (excludeSubmenu) => {
+        document.querySelectorAll('.submenu.open').forEach(openSubmenuEl => {
+            if (openSubmenuEl !== excludeSubmenu) {
+                const toggleBtn = openSubmenuEl.previousElementSibling;
+                const arrow = toggleBtn?.querySelector('.dropdown-arrow');
+                closeSubmenu(openSubmenuEl, arrow);
+            }
+        });
+    };
+
+    const openMobileSidebar = () => {
+        sidebar.classList.remove('-translate-x-full');
+        sidebar.classList.add('translate-x-0');
+        backdrop.classList.remove('hidden');
+        backdrop.classList.add('opacity-100'); // For transition if needed
+        menuOpenIcon.classList.add('hidden');
+        menuCloseIcon.classList.remove('hidden');
+        sidebarToggle.setAttribute('aria-expanded', 'true');
+        document.body.style.overflow = 'hidden'; // Prevent body scroll
+    };
+    
+    const closeMobileSidebar = () => {
+        sidebar.classList.add('-translate-x-full');
+        sidebar.classList.remove('translate-x-0');
+        backdrop.classList.add('hidden');
+        backdrop.classList.remove('opacity-100');
+        menuOpenIcon.classList.remove('hidden');
+        menuCloseIcon.classList.add('hidden');
+        sidebarToggle.setAttribute('aria-expanded', 'false');
+        document.body.style.overflow = ''; // Restore body scroll
+    };
+
+    // --- Event Listeners ---
+
+    // Dropdown Toggle Click
+    dropdownToggles.forEach(toggle => {
+        toggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            const submenu = this.nextElementSibling;
+            const arrow = this.querySelector('.dropdown-arrow');
+            
+            if (!submenu) return;
+
+            const isOpen = submenu.classList.contains('open');
+
+            // Close other submenus *before* opening the new one for smoother feel
+            if (!isOpen) {
+                 closeAllSubmenus(submenu);
+            }
+           
+            if (isOpen) {
+                closeSubmenu(submenu, arrow);
+            } else {
+                openSubmenu(submenu, arrow);
+            }
+        });
+    });
+
+    // Mobile Sidebar Toggle Click
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent triggering the document click listener
+            const isExpanded = this.getAttribute('aria-expanded') === 'true';
+            if (isExpanded) {
+                closeMobileSidebar();
+            } else {
+                openMobileSidebar();
+            }
+        });
+    }
+
+    // Backdrop Click (Close Mobile Sidebar)
+    if (backdrop) {
+        backdrop.addEventListener('click', closeMobileSidebar);
+    }
+    
+    // Close mobile sidebar if clicked outside (and not on the toggle button)
+    document.addEventListener('click', function(e) {
+        if (sidebar && !sidebar.contains(e.target) && sidebarToggle && !sidebarToggle.contains(e.target)) {
+             // Check if the sidebar is actually open in mobile view
+             const isMobileOpen = window.innerWidth < 768 && sidebar.classList.contains('translate-x-0');
+             if (isMobileOpen) {
+                closeMobileSidebar();
+             }
+        }
+    });
+
+    // Keyboard accessibility (Escape key to close mobile sidebar)
+     document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            const isMobileOpen = window.innerWidth < 768 && sidebar.classList.contains('translate-x-0');
+            if (isMobileOpen) {
+                closeMobileSidebar();
+            }
+        }
+    });
+
+    // --- Active Link Handling ---
+    const currentPath = window.location.pathname;
+    const currentFullPath = window.location.href; // Use full path for exact match
+
+    let activeLinkFound = false;
+
+    allLinks.forEach(link => {
+        const linkHref = link.getAttribute('href');
+        
+        // Exact match first
+        if (linkHref === currentPath || link.href === currentFullPath) {
+            
+            link.classList.add(...activeLinkClasses); // Use defined active classes
+            link.setAttribute('aria-current', 'page');
+            activeLinkFound = true;
+            
+            // If the active link is inside a submenu, open the submenu
+            const parentSubmenu = link.closest('.submenu');
+            if (parentSubmenu) {
+                 parentSubmenu.classList.add('open'); // Add 'open' directly
+                 const toggleBtn = parentSubmenu.previousElementSibling;
+                 const arrow = toggleBtn?.querySelector('.dropdown-arrow');
+                 arrow?.classList.add('rotate-180');
+                 toggleBtn?.setAttribute('aria-expanded', 'true');
+                 
+                 // Also highlight the parent toggle button (optional, less intense style)
+                 if (toggleBtn) {
+                     toggleBtn.classList.add('text-blue-600'); // Or a different subtle style
+                 }
+            }
+        } else {
+            // Ensure clean state for non-active links
+            link.classList.remove(...activeLinkClasses, ...activeSubLinkClasses);
+            link.removeAttribute('aria-current');
+            
+            // Add base hover classes (consider moving to CSS if purely visual)
+            // link.classList.add(hoverBgClass, hoverTextClass); 
+            // Better: Define base styles in CSS and only toggle active state here
+        }
+    });
+
+    // Fallback: If no exact match, try partial match for parent sections (e.g., /users/ should highlight /users/patients_list/)
+    // This part can be complex and depends on URL structure. 
+    // Example: Highlight parent if path starts with parent's base URL.
+    if (!activeLinkFound) {
+        let bestMatch = null;
+        let maxMatchLength = 0;
+
+        dropdownToggles.forEach(toggle => {
+            const submenu = toggle.nextElementSibling;
+            if (!submenu) return;
+            
+            // Check if any link within this submenu is a parent of the current path
+            submenu.querySelectorAll('a').forEach(subLink => {
+                 const subLinkHref = subLink.getAttribute('href');
+                 if (subLinkHref && currentPath.startsWith(subLinkHref) && subLinkHref.length > maxMatchLength) {
+                     // Check if this is a *better* match than the previous best
+                     if (subLinkHref !== '/' || currentPath === '/') { // Avoid matching root '/' for everything
+                        maxMatchLength = subLinkHref.length;
+                        bestMatch = subLink; // Store the link itself
+                     }
+                 }
+            });
+        });
+        
+        // Apply active style to the best matching link and open its submenu
+        if (bestMatch) {
+            bestMatch.classList.add(...activeSubLinkClasses); // Use submenu active style
+            bestMatch.setAttribute('aria-current', 'page');
+
+            const parentSubmenu = bestMatch.closest('.submenu');
+            if (parentSubmenu) {
+                 parentSubmenu.classList.add('open');
+                 const toggleBtn = parentSubmenu.previousElementSibling;
+                 const arrow = toggleBtn?.querySelector('.dropdown-arrow');
+                 arrow?.classList.add('rotate-180');
+                 toggleBtn?.setAttribute('aria-expanded', 'true');
+                 toggleBtn?.classList.add('text-blue-600'); 
+            }
+        }
+    }
+
+    // Add base styling classes using Tailwind (moved from inline style block where possible)
+    // Can be done via @apply in CSS too
+    document.querySelectorAll('.menu-link, .dropdown-toggle').forEach(el => {
+        el.classList.add(
+            'flex', 'items-center', 'justify-between', 'w-full', 
+            'px-3', 'py-2.5', // Slightly more padding
+            'text-sm', 'font-medium', 'rounded-md', 
+            'text-gray-700', 
+            'hover:bg-gray-100', 'hover:text-blue-600', // Consistent hover
+            'transition-colors', 'duration-150', 'ease-in-out'
+        );
+    });
+    
+    document.querySelectorAll('.submenu-link').forEach(el => {
+         el.classList.add(
+            'block', 'w-full',
+            'px-3', 'py-2', // Slightly less padding for subitems
+            'text-sm', 'font-medium', 'rounded-md', 
+            'text-gray-600', // Slightly lighter text for subitems
+            'hover:bg-gray-100', 'hover:text-blue-600',
+             'transition-colors', 'duration-150', 'ease-in-out'
+        );
+    });
+
+    document.querySelectorAll('.menu-icon').forEach(icon => {
+        icon.classList.add('h-5', 'w-5', 'mr-3', 'text-gray-400', 'group-hover:text-blue-500', 'transition-colors', 'duration-150');
+    });
+    
+    document.querySelectorAll('.dropdown-arrow').forEach(arrow => {
+        arrow.classList.add('h-5', 'w-5', 'transform', 'transition-transform', 'duration-200', 'text-gray-400', 'group-hover:text-blue-500');
+    });
+
+     document.querySelectorAll('.submenu-list').forEach(list => {
+        list.classList.add('pl-5', 'mt-1', 'space-y-1', 'border-l', 'border-gray-200', 'ml-3'); // Indent with line
+    });
+
+
+});
+</script>
+
+<!-- Removed the old <script> tag referencing multilevel-sidebar.js -->

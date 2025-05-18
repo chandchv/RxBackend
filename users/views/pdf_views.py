@@ -110,16 +110,19 @@ def generate_prescription_pdf(request, pk, format_type='digital'):
             patient=prescription.patient
         ).order_by('-created_at').first()
 
-        # Get lab tests
+        # First get lab prescriptions for this patient on the same date
         lab_prescriptions = LabTestPrescription.objects.filter(
             patient=prescription.patient,
-            doctor=prescription.doctor.user,
-            prescription_date__date=prescription.created_at.date()
+            doctor__id=prescription.doctor.user.id,  # Use the doctor's user ID
+            prescription_date__date=prescription.date  # Match on the prescription date
         )
         
+        # Then gather all lab tests from these prescriptions
         lab_tests = []
         for lab_prescription in lab_prescriptions:
-            lab_tests.extend(LabTest.objects.filter(prescription=lab_prescription))
+            # This correctly uses the ForeignKey relationship from LabTest to LabTestPrescription
+            tests = LabTest.objects.filter(prescription=lab_prescription)
+            lab_tests.extend(tests)
 
         # Calculate patient age
         patient_age = calculate_age(prescription.patient.date_of_birth)
@@ -167,4 +170,5 @@ def generate_prescription_pdf(request, pk, format_type='digital'):
 
     except Exception as e:
         print(f"Error generating prescription PDF: {str(e)}")
-        return HttpResponse('Error generating PDF', status=500)
+        messages.error(request, f'Error generating PDF: {str(e)}')
+        return redirect('users:prescription_detail', pk=pk)

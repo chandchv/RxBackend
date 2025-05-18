@@ -5,10 +5,13 @@
 {% block content %}
 {% load custom_filters %}
 
-<div class="max-w-7xl mx-auto px-4 py-8">
-    <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
-        <div class="flex justify-between items-center mb-6">
-            <div>
+<div class="bg-gray-100">
+    <!-- Main Content -->
+    <div class="transition-all duration-300 ease-in-out">
+            <div class="max-w-7xl mx-auto px-4 py-8">
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <div class="flex justify-between items-center mb-6">
+                <div>
                 <h1 class="text-2xl font-bold text-gray-900">Patients List</h1>
                 {% if is_staff %}
                     <p class="text-sm text-gray-600">Viewing all patients (Staff Access)</p>

@@ -4,9 +4,10 @@ from django.contrib import messages
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.utils import timezone
-from ..models import Bill, BillItem, Payment, BillingItem, Doctor, Patient, Clinic
+from ..models import Bill, BillItem, Payment, BillingItem, Doctor, Patient, Clinic, Appointment
 from ..forms import BillForm, BillItemForm, PaymentForm
 import json
+from django.db.models import Sum
 
 # Patient Views
 @login_required
@@ -103,6 +104,50 @@ def create_bill(request, appointment_id):
     except Doctor.DoesNotExist:
         messages.error(request, 'Doctor profile not found')
         return redirect('users:dashboard')
+
+@login_required
+def doctor_billing_overview(request):
+    """View for showing doctor's billing overview"""
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        
+        # Get all bills for this doctor
+        bills = Bill.objects.filter(
+            appointment__doctor=doctor
+        ).select_related(
+            'appointment',
+            'appointment__patient'
+        ).order_by('-created_at')
+        
+        # Calculate total earnings
+        total_earnings = bills.filter(status='paid').aggregate(
+            total=Sum('amount')
+        )['total'] or 0
+        
+        # Calculate pending payments
+        pending_amount = bills.filter(status='pending').aggregate(
+            total=Sum('amount')
+        )['total'] or 0
+        
+        context = {
+            'doctor': doctor,
+            'bills': bills,
+            'total_earnings': total_earnings,
+            'pending_amount': pending_amount,
+            'total_bills': bills.count(),
+            'paid_bills': bills.filter(status='paid').count(),
+            'pending_bills': bills.filter(status='pending').count(),
+        }
+        
+        return render(request, 'doctor/billing_overview.html', context)
+        
+    except Doctor.DoesNotExist:
+        messages.error(request, 'Doctor profile not found')
+        return redirect('users:dashboard')
+    except Exception as e:
+        print(f"Error in doctor_billing_overview: {str(e)}")
+        messages.error(request, 'Error accessing billing overview')
+        return redirect('users:doctor_dashboard')
 
 # Admin Views
 @login_required

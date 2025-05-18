@@ -2,8 +2,9 @@ from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
-from .models import LabProfile, LabTestOffering, TestDefinition, ExternalLabTestOffering, LabResult
+from .models import LabOrder, LabProfile, LabTestOffering, TestDefinition, ExternalLabTestOffering, LabResult
 from django.apps import apps
+from users.models import Patient
 
 User = get_user_model()
 
@@ -173,3 +174,45 @@ class LabResultForm(forms.ModelForm):
             'result_file': 'Upload the test result file (PDF, image, or document)',
             'lab_metadata': 'Add any additional notes or metadata about the test result (e.g., Lab Name, Technician, Test Method)'
         } 
+
+class LabOrderForm(forms.ModelForm):
+    # Fields for walk-in patient information
+    patient_name = forms.CharField(max_length=100, required=True)
+    patient_phone = forms.CharField(max_length=15, required=True)
+    patient_email = forms.EmailField(required=False)
+    patient_age = forms.IntegerField(required=True)
+    patient_gender = forms.ChoiceField(choices=[('M', 'Male'), ('F', 'Female'), ('O', 'Other')], required=True)
+    
+    # Multiple test selection
+    tests = forms.ModelMultipleChoiceField(
+        queryset=TestDefinition.objects.all(),
+        widget=forms.CheckboxSelectMultiple,
+        required=True
+    )
+
+    class Meta:
+        model = LabOrder
+        fields = ['patient_name', 'patient_phone', 'patient_email', 'patient_age', 'patient_gender', 'tests']
+
+    def save(self, commit=True):
+        # First create or get the patient
+        patient, created = Patient.objects.get_or_create(
+            phone_number=self.cleaned_data['patient_phone'],
+            defaults={
+                'first_name': self.cleaned_data['patient_name'].split()[0],
+                'last_name': ' '.join(self.cleaned_data['patient_name'].split()[1:]) if len(self.cleaned_data['patient_name'].split()) > 1 else '',
+                'email': self.cleaned_data['patient_email'],
+                'age': self.cleaned_data['patient_age'],
+                'gender': self.cleaned_data['patient_gender']
+            }
+        )
+        
+        # Create the lab order
+        instance = super().save(commit=False)
+        instance.patient = patient
+        
+        if commit:
+            instance.save()
+        
+        return instance
+

@@ -20,7 +20,6 @@
             <div class="p-6">
                 <form method="post" class="space-y-6" id="add-offering-form">
                     {% csrf_token %}
-                    <input type="hidden" id="is_custom_test" name="is_custom_test" value="false">
                     
                     {% if form.non_field_errors %}
                         <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
@@ -92,8 +91,8 @@
                                 <label for="custom_test_name" class="sr-only">Custom Test Name</label>
                                 <input type="text" name="custom_test_name" id="custom_test_name"
                                        class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                       placeholder="Enter custom test name"
-                                       disabled>
+                                       placeholder="Enter custom test name">
+                                <input type="hidden" name="is_custom_test" id="is_custom_test" value="false">
                                 <p class="mt-1 text-xs text-gray-500">Enter a custom test name that's not in the dropdown</p>
                             </div>
                         </div>
@@ -195,22 +194,71 @@
         const customInput = document.getElementById("custom_test_name");
         const isCustomTest = document.getElementById("is_custom_test");
 
+        // Initialize UI (dropdown view is default)
+        dropdownBtn.classList.add("bg-gray-100");
+        
         dropdownBtn.addEventListener("click", function () {
-            dropdownContainer.style.display = "block";
-            customContainer.style.display = "none";
-            customInput.disabled = true;
-            isCustomTest.value = "false";
-            dropdownBtn.classList.add("bg-blue-200");
-            customBtn.classList.remove("bg-blue-200");
+            showDropdown();
         });
 
         customBtn.addEventListener("click", function () {
+            showCustom();
+        });
+        
+        function showDropdown() {
+            dropdownContainer.style.display = "block";
+            customContainer.style.display = "none";
+            if (isCustomTest) {
+                isCustomTest.value = "false";
+                console.log("Set is_custom_test to:", isCustomTest.value);
+            }
+            dropdownBtn.classList.add("bg-gray-100");
+            customBtn.classList.remove("bg-gray-100");
+        }
+        
+        function showCustom() {
             dropdownContainer.style.display = "none";
             customContainer.style.display = "block";
-            customInput.disabled = false;
-            isCustomTest.value = "true";
-            customBtn.classList.add("bg-blue-200");
-            dropdownBtn.classList.remove("bg-blue-200");
+            if (isCustomTest) {
+                isCustomTest.value = "true";
+                console.log("Set is_custom_test to:", isCustomTest.value);
+            }
+            customBtn.classList.add("bg-gray-100");
+            dropdownBtn.classList.remove("bg-gray-100");
+        }
+        
+        // Form validation with improved checks
+        const form = document.querySelector("form");
+        form.addEventListener("submit", function(event) {
+            console.log("Form submission - current display:", customContainer.style.display);
+            console.log("Current isCustomTest value:", isCustomTest.value);
+            
+            // Check if custom test container is visible and update the flag accordingly
+            if (customContainer.style.display !== "none") {
+                // Ensure the flag is set correctly
+                isCustomTest.value = "true";
+                console.log("Updated is_custom_test to: true");
+                
+                if (!customInput.value.trim()) {
+                    event.preventDefault();
+                    alert("Please enter a custom test name");
+                    return false;
+                }
+            } else {
+                // Make sure the flag is set to false for dropdown selection
+                isCustomTest.value = "false";
+                console.log("Updated is_custom_test to: false");
+            }
+            
+            // Add a final check to ensure is_custom_test is included as a form field
+            if (!form.querySelector('input[name="is_custom_test"]')) {
+                const hiddenField = document.createElement("input");
+                hiddenField.type = "hidden";
+                hiddenField.name = "is_custom_test";
+                hiddenField.value = isCustomTest.value;
+                form.appendChild(hiddenField);
+                console.log("Added hidden is_custom_test field with value:", hiddenField.value);
+            }
         });
     });
 </script>

@@ -6,6 +6,315 @@
 {% block extra_head %}
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/styles.css' %}">
+<style>
+    /* Calendar Container */
+    .calendar-container {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        background-color: white;
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+    }
+    
+    /* Make calendar responsive */
+    @media (max-width: 767px) {
+        .calendar-container {
+            border-radius: 6px;
+            margin-left: -0.5rem;
+            margin-right: -0.5rem;
+            width: calc(100% + 1rem);
+        }
+        
+        .fc .fc-toolbar {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .fc .fc-toolbar-title {
+            font-size: 1.1rem !important;
+        }
+        
+        .fc-header-toolbar {
+            padding: 0.75rem !important;
+        }
+    }
+    
+    /* FullCalendar Custom Styling */
+    .fc {
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .fc-theme-standard td, .fc-theme-standard th {
+        border: 1px solid #e2e8f0;
+    }
+    
+    .fc-theme-standard .fc-scrollgrid {
+        border: 1px solid #e2e8f0;
+    }
+    
+    /* Calendar Header */
+    .fc-header-toolbar {
+        background-color: white;
+        padding: 16px;
+        margin-bottom: 0 !important;
+    }
+
+    .fc-toolbar-title {
+        font-size: 1.3em !important;
+        font-weight: 600;
+        color: #333;
+        text-transform: capitalize;
+    }
+
+    /* Calendar Buttons */
+    .fc-button-primary {
+        background-color: #f0f4f8 !important;
+        border-color: #e2e8f0 !important;
+        color: #4a5568 !important;
+        font-weight: 500;
+        text-transform: capitalize;
+        box-shadow: none !important;
+    }
+
+    .fc-button-primary:hover {
+        background-color: #e2e8f0 !important;
+        border-color: #cbd5e0 !important;
+    }
+
+    .fc-button-active {
+        background-color: #3b82f6 !important;
+        border-color: #3b82f6 !important;
+        color: white !important;
+    }
+    
+    .fc .fc-daygrid-day.fc-day-today {
+        background-color: #ebf8ff !important;
+    }
+    
+    .fc-daygrid-day-number {
+        font-weight: 500;
+    }
+    
+    .fc-col-header-cell {
+        background-color: #f7fafc;
+        font-weight: 600;
+    }
+    
+    .fc-theme-standard .fc-scrollgrid-section-header > th {
+        border-bottom-width: 2px;
+    }
+    
+    /* Day Cells */
+    .fc-daygrid-day {
+        min-height: 120px;
+    }
+
+    .fc-daygrid-day-frame {
+        padding: 2px 4px;
+    }
+
+    .fc-day-today {
+        background-color: #ebf5ff !important;
+    }
+
+    .fc-daygrid-day-number {
+        text-decoration: none;
+        font-weight: 600;
+        padding: 4px 6px !important;
+        color: #2d3748;
+    }
+
+    /* Week Day Headers */
+    .fc-col-header-cell {
+        background-color: #f9fafb;
+        padding: 8px 0;
+    }
+
+    .fc-col-header-cell-cushion {
+        text-decoration: none !important;
+        color: #4a5568;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.8em;
+    }
+
+    /* Appointments in Calendar */
+    .fc-event {
+        border: none !important;
+        border-radius: 4px !important;
+        padding: 4px 6px !important;
+        margin-bottom: 4px !important;
+        cursor: pointer;
+        transition: opacity 0.2s;
+    }
+    
+    .fc-event:hover {
+        opacity: 0.9;
+    }
+
+    .fc-event-title {
+        font-size: 0.85em;
+        white-space: normal;
+    }
+    
+    .fc-event-time {
+        font-weight: 600;
+        font-size: 0.8em;
+    }
+    
+    /* Control panel styling */
+    .calendar-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        border-bottom: 1px solid #e2e8f0;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        background-color: white;
+    }
+    
+    @media (max-width: 640px) {
+        .calendar-controls {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .doctor-filter, .view-control {
+            width: 100%;
+        }
+    }
+    
+    /* Loading indicator styling */
+    #calendar-loading {
+        border-radius: 8px;
+        background-color: rgba(255, 255, 255, 0.8);
+    }
+
+    .appointment-event {
+        border-left: 3px solid !important;
+    }
+
+    /* Filter Controls */
+    .calendar-controls {
+        background-color: white;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .filter-label {
+        font-size: 0.9em;
+        font-weight: 500;
+        color: #4a5568;
+        margin-right: 8px;
+    }
+
+    .view-control {
+        display: flex;
+        align-items: center;
+        background-color: white;
+        border-radius: 20px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+    }
+
+    .view-control button {
+        padding: 4px 12px;
+        font-size: 0.85em;
+        background: none;
+        border: none;
+        color: #4a5568;
+        cursor: pointer;
+    }
+
+    .view-control button.active {
+        background-color: #3b82f6;
+        color: white;
+    }
+
+    /* Doctor Filter */
+    .doctor-filter {
+        display: flex;
+        align-items: center;
+    }
+
+    .doctor-filter select {
+        border-radius: 4px;
+        border: 1px solid #e2e8f0;
+        padding: 6px 12px;
+        font-size: 0.9em;
+        background-color: white;
+        color: #4a5568;
+        min-width: 180px;
+    }
+    
+    /* Appointment Details Tooltip */
+    .appointment-tooltip {
+        position: absolute;
+        background: white;
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+        padding: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        z-index: 1000;
+        display: none;
+        width: 220px;
+        pointer-events: none;
+        font-size: 0.9em;
+    }
+
+    .tooltip-heading {
+        font-weight: 600;
+        font-size: 1em;
+        margin-bottom: 8px;
+        color: #2d3748;
+    }
+
+    .tooltip-detail {
+        display: flex;
+        margin-bottom: 6px;
+        align-items: center;
+    }
+
+    .tooltip-detail i {
+        color: #718096;
+        width: 16px;
+        margin-right: 8px;
+    }
+
+    .tooltip-footer {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #e2e8f0;
+        font-size: 0.85em;
+        color: #4299e1;
+    }
+
+    /* Today's Appointments List Section */
+    .today-appointments {
+        margin-top: 24px;
+    }
+
+    .today-heading {
+        font-size: 1.2em;
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+    }
+
+    .today-heading i {
+        margin-right: 8px;
+        color: #3b82f6;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -46,48 +355,115 @@
 
     <!-- Main Content -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Today's Appointments -->
-        <div class="bg-white shadow-lg rounded-lg p-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold text-gray-900">Today's Appointments</h2>
-                <a href="{% url 'users:staff_appointments' %}" class="text-blue-500 hover:text-blue-600">
-                    View All
-                </a>
+        <!-- Appointments Calendar -->
+        <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+            <div class="flex justify-between items-center p-4 border-b border-gray-200">
+                <h2 class="text-xl font-bold text-gray-800">Appointments Calendar</h2>
+                <div class="flex items-center space-x-2">
+                    <a href="{% url 'users:staff_create_appointment' %}" 
+                       class="bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-md inline-flex items-center transition-colors duration-200">
+                        <i class="fas fa-plus mr-2"></i>New Appointment
+                    </a>
+                    <a href="{% url 'users:staff_appointments' %}" 
+                       class="text-blue-500 hover:text-blue-600 text-sm font-medium">
+                        View All
+                    </a>
+                </div>
             </div>
             
-            <!-- Calendar View -->
-            <div class="mb-6">
-                <!-- Doctor Filter -->
-                <div class="mb-4">
-                    <label for="doctor_filter" class="block text-sm font-medium text-gray-700">Filter by Doctor</label>
-                    <select id="doctor_filter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+            <!-- Calendar Controls -->
+            <div class="calendar-controls">
+                <div class="doctor-filter">
+                    <label for="doctor_filter" class="filter-label">Filter by Doctor</label>
+                    <select id="doctor_filter" class="focus:ring-blue-500 focus:border-blue-500">
                         <option value="">All Doctors</option>
                         {% for doctor in doctors %}
-                        <option value="{{ doctor.id }}">{{ doctor.get_full_name }}</option>
+                        <option value="{{ doctor.id }}">Dr. {{ doctor.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                <div id="calendar" class="w-full"></div>
+                <div class="view-control" id="calendar-view-control">
+                    <button data-view="dayGridMonth" class="active">Month</button>
+                    <button data-view="timeGridWeek">Week</button>
+                    <button data-view="timeGridDay">Day</button>
+                </div>
             </div>
+            
+            <!-- Calendar View -->
+            <div class="calendar-container">
+                <div id="calendar-loading" class="hidden flex justify-center items-center py-10">
+                    <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="text-gray-600 text-lg">Loading appointments...</span>
+                </div>
+                <div id="calendar" class="w-full" 
+                     data-calendar-events-url="{% url 'users:staff_calendar_events' %}"
+                     data-appointment-base-url="{% url 'users:staff_appointments' %}"></div>
+                <div id="appointment-tooltip" class="appointment-tooltip"></div>
+            </div>
+        </div>
 
-            <!-- Appointments List -->
-            <div class="space-y-4">
+        <!-- Today's Appointments List -->
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800">Today's Appointments</h2>
+                <div class="text-sm text-gray-500">{{ today|date:"l, F j, Y" }}</div>
+            </div>
+            
+            {% if appointments %}
+            <div class="space-y-3">
                 {% for appointment in appointments %}
-                <div class="border-b border-gray-200 pb-4">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <p class="font-semibold">{{ appointment.patient.get_full_name }}</p>
-                            <p class="text-gray-600">{{ appointment.time|time:"g:i A" }}</p>
+                <div class="flex items-center p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors duration-200">
+                    <div class="flex-shrink-0 w-16 text-center">
+                        <div class="text-sm font-semibold text-gray-800">{{ appointment.appointment_time|time:"g:i A" }}</div>
+                        <div class="text-xs text-gray-500">
+                            {% if appointment.token_number %}
+                            #{{ appointment.token_number }}
+                            {% endif %}
                         </div>
-                        <span class="px-2 py-1 rounded-full text-sm {% if appointment.status == 'scheduled' %}bg-blue-100 text-blue-800{% elif appointment.status == 'completed' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
-                            {{ appointment.get_status_display }}
+                    </div>
+                    <div class="flex-grow mx-4">
+                        <p class="text-sm font-medium text-gray-900">{{ appointment.patient.get_full_name }}</p>
+                        <p class="text-xs text-gray-600">Dr. {{ appointment.doctor.name }}</p>
+                        <p class="text-xs text-gray-500 mt-1">{{ appointment.reason|truncatechars:30 }}</p>
+                    </div>
+                    <div class="flex flex-col items-end">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full mb-2
+                            {% if appointment.status == 'SCHEDULED' %}bg-blue-100 text-blue-800
+                            {% elif appointment.status == 'COMPLETED' %}bg-green-100 text-green-800
+                            {% elif appointment.status == 'CANCELLED' %}bg-red-100 text-red-800
+                            {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                            {{ appointment.status }}
                         </span>
+                        <div class="flex space-x-2">
+                            <a href="{% url 'users:staff_appointment_detail' appointment.id %}" 
+                               class="text-blue-600 hover:text-blue-800 p-1" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="{% url 'users:staff_update_appointment' appointment.id %}" 
+                               class="text-green-600 hover:text-green-800 p-1" title="Edit Appointment">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                        </div>
                     </div>
                 </div>
-                {% empty %}
-                <p class="text-gray-600">No appointments scheduled for today</p>
                 {% endfor %}
             </div>
+            {% else %}
+            <div class="flex flex-col items-center py-10 text-center">
+                <svg class="w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <h3 class="text-lg font-medium text-gray-900 mb-1">No appointments today</h3>
+                <p class="text-gray-500 mb-4">There are no appointments scheduled for today</p>
+                <a href="{% url 'users:staff_create_appointment' %}" 
+                   class="bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-md inline-flex items-center transition-colors duration-200">
+                    <i class="fas fa-plus mr-2"></i>Schedule New Appointment
+                </a>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Recent Patients -->
@@ -200,111 +576,34 @@
                class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded text-center">
                 <i class="fas fa-calendar-times mr-2"></i>Manage Leaves
             </a>
+            <a href="{% url 'users:doctor_calendar' %}" 
+               class="bg-blue-300 hover:bg-blue-600 text-white rounded-lg p-4 text-center">
+                <i class="fas fa-calendar-alt mb-2"></i>
+                <span class="block">Calendar View</span>
+            </a>
         </div>
     </div>
 </div>
-
-<style>
-.dashboard-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid #eee;
-}
-
-.header-actions {
-    display: flex;
-    gap: 1rem;
-}
-
-.btn-primary {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background: #3498db;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    text-decoration: none;
-    transition: background 0.3s;
-}
-
-.btn-primary:hover {
-    background: #2980b9;
-    color: white;
-}
-
-.btn-primary i {
-    font-size: 1.1rem;
-}
-</style>
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    var calendarEl = document.getElementById('calendar');
-    var calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
-        headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay'
-        },
-        height: 'auto',
-        events: function(info, successCallback, failureCallback) {
-            var doctorId = $('#doctor_filter').val();
-            var url = '{% url "users:staff_calendar_events" %}';
-            if (doctorId) {
-                url += '?doctor_id=' + doctorId;
-            }
-            $.ajax({
-                url: url,
-                type: 'GET',
-                success: function(response) {
-                    var events = response.map(function(event) {
-                        return {
-                            id: event.id,
-                            title: event.title,
-                            start: event.start,
-                            end: event.end,
-                            backgroundColor: event.status === 'scheduled' ? '#3b82f6' : 
-                                          event.status === 'completed' ? '#10b981' : '#ef4444',
-                            borderColor: event.status === 'scheduled' ? '#3b82f6' : 
-                                       event.status === 'completed' ? '#10b981' : '#ef4444'
-                        };
-                    });
-                    successCallback(events);
-                },
-                error: function() {
-                    failureCallback();
-                }
-            });
-        },
-        eventClick: function(info) {
-            window.location.href = '/staff/appointments/' + info.event.id + '/';
-        },
-        eventDidMount: function(info) {
-            // Add tooltip
-            $(info.el).tooltip({
-                title: info.event.title,
-                placement: 'top',
-                trigger: 'hover',
-                container: 'body'
-            });
+    // Make the URL template directly available to JavaScript
+    window.APPOINTMENT_BASE_URL = "{% url 'users:staff_appointments' %}";
+    
+    // Function to get appointment detail URL by ID
+    window.getAppointmentDetailUrl = function(appointmentId) {
+        // Replace last part of URL (staff_appointments) with the specific appointment ID
+        // This assumes the URL format is /path/to/staff/appointments/
+        var baseUrl = window.APPOINTMENT_BASE_URL;
+        // Make sure base URL ends with slash
+        if (!baseUrl.endsWith('/')) {
+            baseUrl += '/';
         }
-    });
-    calendar.render();
-
-    // Handle doctor filter change
-    $('#doctor_filter').change(function() {
-        calendar.refetchEvents();
-    });
-});
+        return baseUrl + appointmentId + '/';
+    };
 </script>
-{% endblock %} 
+<script src="{% static 'users/staff_dashboard.js' %}"></script>
+{% endblock %}

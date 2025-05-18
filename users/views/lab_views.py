@@ -4,13 +4,78 @@ from rest_framework.response import Response
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
-from ..models import LabTest, LabTechnician, Lab
+from ..models import LabTest, LabTechnician, Lab, LabTestPrescription
 from labs.models import TestDefinition, LabProfile
 from ..serializers import LabTestSerializer, LabTechnicianSerializer
 from django.http import JsonResponse
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 from django.contrib import messages
 from django.shortcuts import redirect
+from django.db.models import Q
+from django.core.paginator import Paginator
+from notifications.models import Notification
+from django.core.files.storage import default_storage
+import os
+from notifications.utils import create_notification
+import logging
+
+logger = logging.getLogger(__name__)
+
+@login_required
+def doctor_lab_tests(request):
+    """View for doctors to see all lab tests they've prescribed"""
+    try:
+        # Check if user has doctor profile
+        if not hasattr(request.user, 'doctor'):
+            messages.error(request, 'Access denied. Doctor privileges required.')
+            return redirect('users:dashboard')
+
+        doctor = request.user.doctor
+        
+        # Get search parameters
+        search_query = request.GET.get('search', '')
+        status_filter = request.GET.get('status', '')
+        
+        # Base query - get all lab tests prescribed by this doctor
+        lab_tests = LabTest.objects.filter(
+            prescription__doctor=request.user
+        ).select_related(
+            'prescription__patient',
+            'test_definition'
+        ).order_by('-created_at')
+        
+        # Apply filters
+        if search_query:
+            lab_tests = lab_tests.filter(
+                Q(prescription__patient__first_name__icontains=search_query) |
+                Q(prescription__patient__last_name__icontains=search_query) |
+                Q(test_definition__name__icontains=search_query)
+            )
+            
+        if status_filter:
+            lab_tests = lab_tests.filter(status=status_filter)
+            
+        # Paginate results
+        paginator = Paginator(lab_tests, 10)  # Show 10 tests per page
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        
+        context = {
+            'lab_tests': page_obj,
+            'search_query': search_query,
+            'status_filter': status_filter,
+            'status_choices': LabTest.TEST_STATUS,
+            'is_paginated': page_obj.has_other_pages(),
+            'page_obj': page_obj,
+            'paginator': paginator,
+        }
+        
+        return render(request, 'doctor/lab_tests.html', context)
+        
+    except Exception as e:
+        print(f"Error in doctor lab tests: {str(e)}")
+        messages.error(request, f'Error accessing lab tests: {str(e)}')
+        return redirect('users:doctor_dashboard')
 
 @login_required
 def lab_dashboard(request):
@@ -235,90 +300,147 @@ def update_lab_test_status(request, test_id):
         
         if request.method == 'POST':
             new_status = request.POST.get('status')
-            if new_status in dict(LabTest.TEST_STATUS):
-                old_status = test.status
-                test.status = new_status
+            
+            # Validate status transition
+            valid_transitions = {
+                'REQUESTED': ['ASSIGNED'],
+                'ASSIGNED': ['SAMPLE_COLLECTED'],
+                'SAMPLE_COLLECTED': ['PROCESSING'],
+                'PROCESSING': ['COMPLETED'],
+                'COMPLETED': ['REVIEWED']  # Only doctors can mark as reviewed
+            }
+            
+            if new_status not in valid_transitions.get(test.status, []):
+                messages.error(request, f'Invalid status transition from {test.status} to {new_status}')
+                return redirect('users:lab_test_detail', pk=test.id)
+            
+            # Update test status and related fields
+            test.status = new_status
+            
+            # Handle status-specific updates
+            if new_status == 'ASSIGNED':
+                test.assigned_technician = request.POST.get('assigned_technician')
+                test.expected_collection_date = request.POST.get('collection_date')
                 
-                # Handle file uploads for completed tests
-                if new_status == 'COMPLETED' and request.FILES.get('result_file'):
-                    test.result_file = request.FILES.get('result_file')
+                # Notify patient
+                patient_message = f"Your lab test has been assigned. Expected collection date: {test.expected_collection_date}"
+                patient_link = f"/patient/lab-test/{test.id}"
                 
-                # Save the test with its new status
-                test.save()
-                
-                # Update prescription status if all tests are completed
-                if new_status == 'COMPLETED':
-                    prescription = test.prescription
-                    all_tests = LabTest.objects.filter(prescription=prescription)
-                    if all(t.status == 'COMPLETED' for t in all_tests):
-                        prescription.status = 'COMPLETED'
-                        prescription.save()
-                
-                messages.success(request, f'Test status updated from {old_status} to {new_status}')
-                
-                # Create notification for patient
+                # Create notifications
                 try:
-                    from notifications.utils import create_notification
-                    patient_user = test.prescription.patient.user
-                    
-                    # Get the doctor user
-                    doctor_user = test.prescription.doctor
-                    
-                    # Create message with more details for COMPLETED status
-                    if new_status == 'COMPLETED':
-                        test_name = test.test_definition.name if test.test_definition else 'Unknown Test'
-                        base_message = f"Lab test '{test_name}' has been completed and results are available."
-                        
-                        # Include direct links to the dashboards, not specific test pages
-                        # This ensures users see the notification on their main dashboard
-                        patient_link = "/users/patient/dashboard/"
-                        doctor_link = "/users/doctor/dashboard/"
-                    else:
-                        base_message = f"Your lab test for {test.test_definition.name if test.test_definition else 'Unknown Test'} has been updated to {new_status}"
-                        patient_link = None
-                        doctor_link = None
-                    
                     # Notify patient
-                    if patient_user:
-                        patient_message = f"Your {base_message} Please check your dashboard to review."
-                        create_notification(
-                            recipient=patient_user,
-                            message=patient_message,
-                            sender=request.user,
-                            notification_type='lab_test_update',
-                            related_object=test,
-                            action_url=patient_link
-                        )
+                    create_notification(
+                        recipient=test.prescription.patient.user,
+                        message=patient_message,
+                        sender=request.user,
+                        notification_type='lab_test_status_update',
+                        related_object=test,
+                        action_url=patient_link
+                    )
                     
-                    # Notify doctor for completed tests - always send for COMPLETED status
-                    if new_status == 'COMPLETED' and doctor_user:
-                        doctor_message = f"Lab test '{test_name}' for patient {test.prescription.patient.get_full_name()} has been completed and requires your review. Check your dashboard."
+                    # Notify doctor
+                    doctor_user = test.prescription.doctor.user
+                    if doctor_user:
+                        create_notification(
+                            recipient=doctor_user,
+                            message=f"Lab test status updated: {patient_message}",
+                            sender=request.user,
+                            notification_type='lab_test_status_update',
+                            related_object=test,
+                            action_url=f"/doctor/lab-test/{test.id}/detail/"
+                        )
+                except Exception as e:
+                    logger.error(f"Error creating notifications for test {test.id}: {e}", exc_info=True)
+                    messages.warning(request, "Test status updated, but failed to send notifications.")
+            
+            elif new_status == 'SAMPLE_COLLECTED':
+                test.collection_notes = request.POST.get('collection_notes')
+                test.collection_time = request.POST.get('collection_time')
+                
+                # Notify patient
+                patient_message = "Your lab test sample has been collected and is being processed."
+                Notification.objects.create(
+                    recipient=test.prescription.patient.user,
+                    message=patient_message,
+                    notification_type='sample_collected',
+                    related_object=test
+                )
+            
+            elif new_status == 'PROCESSING':
+                test.processing_notes = request.POST.get('processing_notes')
+                test.expected_completion_date = request.POST.get('expected_completion_date')
+                
+                # Notify patient
+                patient_message = f"Your lab test is being processed. Expected completion date: {test.expected_completion_date}"
+                Notification.objects.create(
+                    recipient=test.prescription.patient.user,
+                    message=patient_message,
+                    notification_type='test_processing',
+                    related_object=test
+                )
+            
+            elif new_status == 'COMPLETED':
+                test.test_results = request.POST.get('test_results')
+                
+                # Handle result file upload
+                if 'result_file' in request.FILES:
+                    result_file = request.FILES['result_file']
+                    file_name = f"lab_results/test_{test.id}/{result_file.name}"
+                    
+                    # Save the file
+                    if test.result_file:
+                        # Delete old file if it exists
+                        default_storage.delete(test.result_file.name)
+                    
+                    test.result_file.save(file_name, result_file)
+                
+                # Notify both patient and doctor
+                patient_message = "Your lab test results are ready. Please check your dashboard."
+                doctor_message = f"Lab test results for patient {test.prescription.patient.get_full_name()} are ready for review."
+                
+                patient_link = f"/patient/lab-test/{test.id}"
+                doctor_link = f"/doctor/lab-test/{test.id}"
+                
+                # Create notifications
+                try:
+                    # Notify patient
+                    create_notification(
+                        recipient=test.prescription.patient.user,
+                        message=patient_message,
+                        sender=request.user,
+                        notification_type='lab_test_status_update',
+                        related_object=test,
+                        action_url=patient_link
+                    )
+                    
+                    # Notify doctor
+                    doctor_user = test.prescription.doctor.user
+                    if doctor_user:
                         create_notification(
                             recipient=doctor_user,
                             message=doctor_message,
                             sender=request.user,
-                            notification_type='lab_test_completed',
+                            notification_type='lab_test_status_update',
                             related_object=test,
                             action_url=doctor_link
                         )
                 except Exception as e:
-                    # Log but don't fail if notification creation fails
-                    print(f"Error sending notification: {e}")
-                
-            else:
-                messages.error(request, f'Invalid status: {new_status}')
+                    logger.error(f"Error creating notifications for test {test.id}: {e}", exc_info=True)
+                    messages.warning(request, "Test status updated, but failed to send notifications.")
             
-            # Return to the lab test detail page
+            # Save all changes
+            test.save()
+            
+            messages.success(request, f'Test status updated to {new_status}')
             return redirect('users:lab_test_detail', pk=test.id)
         
         # If GET request, show the form
         context = {
             'test': test,
-            'status_choices': LabTest.TEST_STATUS,
             'current_status': test.status,
         }
         
-        return render(request, 'lab/update_lab_test_status.html', context)
+        return render(request, 'labs/update_lab_test_status.html', context)
     
     except Exception as e:
         print(f"Error updating lab test status: {str(e)}")
@@ -438,27 +560,47 @@ def patient_lab_test_detail(request, pk):
         if not hasattr(request.user, 'patient'):
             messages.error(request, 'Access denied. Patient privileges required.')
             return redirect('users:dashboard')
+        
+        patient = request.user.patient
             
-        # Get the lab test and verify patient's access
-        test = get_object_or_404(
-            LabTest.objects.select_related(
+        # Try to get the lab test - handle both direct and through prescription patient relationship
+        try:
+            test = LabTest.objects.select_related(
                 'prescription',
                 'prescription__patient',
                 'prescription__doctor',
                 'test_definition'
-            ),
-            id=pk
-        )
-        
-        # Verify the requesting patient is associated with the test
-        if test.prescription.patient.user != request.user:
-            messages.error(request, 'You do not have permission to view this test.')
-            return redirect('users:patient_dashboard')
+            ).get(id=pk)
+            
+            # Verify the requesting patient is associated with the test
+            if test.prescription and test.prescription.patient != patient:
+                messages.error(request, 'You do not have permission to view this test.')
+                return redirect('users:patient_dashboard')
+                
+        except LabTest.DoesNotExist:
+            # If test doesn't exist with direct relationship, look for it in lab test prescriptions
+            lab_prescriptions = LabTestPrescription.objects.filter(patient=patient)
+            test = None
+            
+            for prescription in lab_prescriptions:
+                try:
+                    test = LabTest.objects.get(
+                        prescription=prescription,
+                        id=pk
+                    )
+                    if test:
+                        break
+                except LabTest.DoesNotExist:
+                    continue
+            
+            if not test:
+                messages.error(request, 'Lab test not found.')
+                return redirect('users:patient_test_results')
             
         context = {
             'test': test,
             'prescription': test.prescription,
-            'doctor': test.prescription.doctor
+            'doctor': test.prescription.doctor if test.prescription else None
         }
         
         return render(request, 'patient/lab_test_detail.html', context)

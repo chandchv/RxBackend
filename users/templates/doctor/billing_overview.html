@@ -1,13 +1,85 @@
 {% extends 'base.html' %}
 
-{% block title %}Doctor Billing Overview{% endblock %}
+{% block title %}Billing Overview{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-6">Billing Overview</h1>
-    <div class="bg-white rounded-lg shadow p-6">
-        <p><strong>Total Appointments:</strong> {{ total_appointments }}</p>
-        <p><strong>Total Billing:</strong> ${{ total_billing }}</p>
+<div class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Billing Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- Total Earnings -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Total Earnings</h3>
+                <p class="text-3xl font-bold text-green-600">₹{{ total_earnings|floatformat:2 }}</p>
+                <p class="text-sm text-gray-500 mt-2">From {{ paid_bills }} paid bills</p>
+            </div>
+            
+            <!-- Pending Payments -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Pending Payments</h3>
+                <p class="text-3xl font-bold text-yellow-600">₹{{ pending_amount|floatformat:2 }}</p>
+                <p class="text-sm text-gray-500 mt-2">From {{ pending_bills }} pending bills</p>
+            </div>
+            
+            <!-- Total Bills -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Total Bills</h3>
+                <p class="text-3xl font-bold text-blue-600">{{ total_bills }}</p>
+                <p class="text-sm text-gray-500 mt-2">All time total</p>
+            </div>
+        </div>
+
+        <!-- Recent Bills -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-xl font-medium text-gray-900">Recent Bills</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bill Date</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for bill in bills %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {{ bill.created_at|date:"M d, Y" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {{ bill.appointment.patient.get_full_name }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                ₹{{ bill.amount|floatformat:2 }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                    {% if bill.status == 'paid' %}bg-green-100 text-green-800
+                                    {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                    {{ bill.get_status_display }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <a href="{% url 'users:billing_detail' bill.id %}" 
+                                   class="text-blue-600 hover:text-blue-900">View Details</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                                No bills found
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %} 

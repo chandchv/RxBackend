@@ -5,8 +5,9 @@ from django.contrib import messages
 from django.urls import reverse
 from django.utils import timezone
 from datetime import datetime, timedelta
-from ..forms import StaffAppointmentForm
-from ..models import Appointment, Patient, Prescription, LabTest, Billing, Doctor, PatientVitals, StaffLeave, Notification
+from ..forms import StaffAppointmentForm, BillForm, BillItemForm
+from ..models import Appointment, Patient, Prescription, LabTest, Billing, Doctor, PatientVitals, StaffLeave, DoctorAvailability
+from notifications.models import Notification
 from ..serializers import AppointmentSerializer, PatientSerializer, PrescriptionSerializer, LabTestSerializer, BillingSerializer
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -19,6 +20,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 import logging
 from notifications.utils import create_notification
+from django.http import JsonResponse
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -54,7 +56,6 @@ def staff_create_appointment(request):
                 appointment_date = request.POST.get('appointment_date')
                 appointment_time = request.POST.get('appointment_time')
                 reason = request.POST.get('reason')
-                notes = request.POST.get('notes')
                 
                 # Validate required fields
                 if not all([patient_id, doctor_id, appointment_date, appointment_time, reason]):
@@ -72,30 +73,46 @@ def staff_create_appointment(request):
                     appointment_date=appointment_date,
                     appointment_time=appointment_time,
                     reason=reason,
-                    notes=notes,
                     status='scheduled'
                 )
                 
                 # --- Add Notifications --- 
+                notification_success = True
                 try:
-                    # Notify Doctor
-                    create_notification(
-                        recipient=appointment.doctor.user,
-                        message=f"New appointment scheduled by staff for {appointment.patient.get_full_name()} on {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')}.",
-                        sender=request.user, 
-                        notification_type='appointment_new',
-                        related_object=appointment
-                    )
-                    # Notify Patient
-                    create_notification(
-                        recipient=appointment.patient.user,
-                        message=f"Your appointment with Dr. {appointment.doctor.name} is scheduled for {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')} (booked by clinic staff).",
-                        sender=request.user,
-                        notification_type='appointment_new',
-                        related_object=appointment
-                    )
+                    # Check if doctor has a user account
+                    if hasattr(doctor, 'user') and doctor.user:
+                        # Notify Doctor
+                        doctor_notification = create_notification(
+                            recipient=doctor.user,
+                            message=f"New appointment scheduled by staff for {patient.get_full_name()} on {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')}.",
+                            sender=request.user, 
+                            notification_type='appointment_new',
+                            related_object=appointment
+                        )
+                        if not doctor_notification:
+                            notification_success = False
+                            logger.warning(f"Failed to create notification for doctor: {doctor.name}")
+                    
+                    # Check if patient has a user account
+                    if hasattr(patient, 'user') and patient.user:
+                        # Notify Patient
+                        patient_notification = create_notification(
+                            recipient=patient.user,
+                            message=f"Your appointment with Dr. {doctor.name} is scheduled for {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')} (booked by clinic staff).",
+                            sender=request.user,
+                            notification_type='appointment_new',
+                            related_object=appointment
+                        )
+                        if not patient_notification:
+                            notification_success = False
+                            logger.warning(f"Failed to create notification for patient: {patient.get_full_name()}")
+                    
+                    # If either notification failed but didn't raise an exception
+                    if not notification_success:
+                        messages.warning(request, "Appointment created, but some notifications may not have been sent.")
+                        
                 except Exception as e:
-                    logger.error(f"Error creating notification in staff_create_appointment: {e}")
+                    logger.error(f"Error creating notification in staff_create_appointment: {e}", exc_info=True)
                     messages.warning(request, "Appointment created, but failed to send notifications.")
                 # --- End Notifications ---
 
@@ -124,18 +141,21 @@ def staff_dashboard(request):
         # Check if user has staff profile
         if not hasattr(request.user, 'staff'):
             messages.error(request, "You don't have staff access")
-            return redirect('users:dashboard')
+            return redirect('users:login')
             
         staff = request.user.staff
         if not staff.clinic:
             messages.error(request, "No clinic assigned to your account")
-            return redirect('users:dashboard')
+            return redirect('users:login')
             
         # Get today's date
         today = timezone.now().date()
         
         # Get clinic's doctors
         doctors = Doctor.objects.filter(clinic=staff.clinic, is_active=True)
+        if not doctors:
+            messages.error(request, "No doctors found for your clinic")
+            return redirect('users:staff_dashboard')
         
         # Get today's appointments
         todays_appointments = Appointment.objects.filter(
@@ -154,9 +174,9 @@ def staff_dashboard(request):
             clinic=staff.clinic
         ).order_by('-created_at')[:5]
         
-        # Get recent lab tests
+        # Get recent lab tests - using prescription relationship
         recent_tests = LabTest.objects.filter(
-            doctor__in=doctors
+            prescription__doctor__in=[doctor.user for doctor in doctors]
         ).order_by('-created_at')[:5]
         
         context = {
@@ -173,109 +193,80 @@ def staff_dashboard(request):
         
     except Exception as e:
         messages.error(request, f'Error accessing dashboard: {str(e)}')
-        return redirect('users:dashboard')
+        return redirect('users:login')
 
 @login_required
+@user_is_staff
+def staff_appointment_detail(request, appointment_id):
+    """View appointment details for staff"""
+    try:
+        appointment = get_object_or_404(Appointment, id=appointment_id)
+        staff = request.user.staff
+        
+        # Check if staff has access to this appointment
+        if appointment.doctor.clinic != staff.clinic:
+            messages.error(request, "You don't have permission to view this appointment")
+            return redirect('users:staff_dashboard')
+
+        context = {
+            'appointment': appointment,
+            'patient': appointment.patient,
+            'doctor': appointment.doctor,
+            'staff': staff
+        }
+        
+        return render(request, 'staff/appointment_detail.html', context)
+
+    except Exception as e:
+        messages.error(request, f'Error viewing appointment: {str(e)}')
+        return redirect('users:staff_dashboard')
+
+@login_required
+@user_is_staff
 def staff_update_appointment(request, appointment_id):
-    """Update an existing appointment"""
-    if not hasattr(request.user, 'staff'):
-        messages.error(request, "You don't have permission to update appointments.")
-        return redirect('users:dashboard')
-    
-    staff = request.user.staff
-    clinic = staff.clinic
-    appointment = get_object_or_404(Appointment, id=appointment_id, doctor__clinic=clinic)
-    original_details = f"Dr. {appointment.doctor.name} on {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')}" # Store original details for comparison/notification message
-
-    if request.method == 'POST':
-        form = StaffAppointmentForm(request.POST, instance=appointment, clinic=clinic)
-        if form.is_valid():
-            try:
-                updated_appointment = form.save()
-                # --- Add Notifications ---
-                try:
-                    updated_details = f"Dr. {updated_appointment.doctor.name} on {updated_appointment.appointment_date.strftime('%d-%b-%Y')} at {updated_appointment.appointment_time.strftime('%I:%M %p')}"
-                    change_message = f"Appointment updated by staff. Details changed from {original_details} to {updated_details}."
-                    
-                    # Notify Doctor
-                    create_notification(
-                        recipient=updated_appointment.doctor.user,
-                        message=f"Your appointment with {updated_appointment.patient.get_full_name()} was updated by staff. {change_message}",
-                        sender=request.user,
-                        notification_type='appointment_updated',
-                        related_object=updated_appointment
-                    )
-                    # Notify Patient
-                    create_notification(
-                        recipient=updated_appointment.patient.user,
-                        message=f"Your appointment details were updated by clinic staff. {change_message}",
-                        sender=request.user,
-                        notification_type='appointment_updated',
-                        related_object=updated_appointment
-                    )
-                except Exception as e:
-                    logger.error(f"Error creating notification in staff_update_appointment: {e}")
-                    messages.warning(request, "Appointment updated, but failed to send notifications.")
-                # --- End Notifications ---
-
-                messages.success(request, 'Appointment updated successfully!')
-                return redirect('users:staff_appointment_detail', appointment_id=updated_appointment.id) # Redirect to detail view
-            except Exception as e:
-                messages.error(request, f'Error updating appointment: {str(e)}')
-        else: # Corrected indentation for else block
-            messages.error(request, 'Please correct the errors below.')
-       
-    # Moved form instantiation outside the else block to handle GET requests correctly
-    form = StaffAppointmentForm(instance=appointment, clinic=clinic) 
-    
-    return render(request, 'staff/update_appointment.html', {
-        'form': form,
-        'appointment': appointment,
-        'clinic': clinic
-    })
+    """Update appointment details"""
+    try:
+        appointment = get_object_or_404(Appointment, id=appointment_id)
+        staff = request.user.staff
+        
+        # Check if staff has access to this appointment
+        if appointment.doctor.clinic != staff.clinic:
+            return JsonResponse({"error": "Permission denied"}, status=403)
+        
+        if request.method == 'POST':
+            form = StaffAppointmentForm(request.POST, instance=appointment, clinic=staff.clinic)
+            if form.is_valid():
+                form.save()
+                return JsonResponse({"status": "success"})
+            return JsonResponse({"error": form.errors}, status=400)
+        
+        form = StaffAppointmentForm(instance=appointment, clinic=staff.clinic)
+        return render(request, 'staff/appointment_edit.html', {'form': form, 'appointment': appointment})
+        
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 @login_required
+@user_is_staff
 def staff_cancel_appointment(request, appointment_id):
     """Cancel an appointment"""
-    if not hasattr(request.user, 'staff'):
-        messages.error(request, "You don't have permission to cancel appointments.")
-        return redirect('users:dashboard')
-    
-    staff = request.user.staff
-    clinic = staff.clinic
-    appointment = get_object_or_404(Appointment, id=appointment_id, doctor__clinic=clinic)
-    
-    if request.method == 'POST':
-        try:
+    try:
+        appointment = get_object_or_404(Appointment, id=appointment_id)
+        staff = request.user.staff
+        
+        # Check if staff has access to this appointment
+        if appointment.doctor.clinic != staff.clinic:
+            return JsonResponse({"error": "Permission denied"}, status=403)
+        
+        if request.method == 'POST':
             appointment.status = 'cancelled'
             appointment.save()
-             # --- Add Notifications --- 
-            try:
-                # Notify Doctor
-                create_notification(
-                    recipient=appointment.doctor.user,
-                    message=f"Appointment with {appointment.patient.get_full_name()} on {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')} was cancelled by staff.",
-                    sender=request.user, 
-                    notification_type='appointment_cancelled',
-                    related_object=appointment
-                )
-                # Notify Patient
-                create_notification(
-                    recipient=appointment.patient.user,
-                    message=f"Your appointment with Dr. {appointment.doctor.name} on {appointment.appointment_date.strftime('%d-%b-%Y')} at {appointment.appointment_time.strftime('%I:%M %p')} was cancelled by clinic staff.",
-                    sender=request.user,
-                    notification_type='appointment_cancelled',
-                    related_object=appointment
-                )
-            except Exception as e:
-                logger.error(f"Error creating notification in staff_cancel_appointment: {e}")
-                messages.warning(request, "Appointment cancelled, but failed to send notifications.")
-            # --- End Notifications ---
-            messages.success(request, 'Appointment cancelled successfully!')
-        except Exception as e:
-            messages.error(request, f'Error cancelling appointment: {str(e)}')
-    
-    return redirect('users:staff_dashboard')
+            return JsonResponse({"status": "success"})
+        
+        return JsonResponse({"error": "Invalid request"}, status=400)
+        
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 @api_view(['GET'])
 @permission_classes([IsStaff])
@@ -359,16 +350,31 @@ def staff_prescriptions(request):
 @api_view(['GET'])
 @permission_classes([IsStaff])
 def staff_lab_tests(request):
-    """Get lab tests for staff dashboard"""
+    """List all lab tests for staff"""
     try:
         staff = request.user.staff
         clinic = staff.clinic
         
-        lab_tests = LabTest.objects.filter(clinic=clinic)
-        serializer = LabTestSerializer(lab_tests, many=True)
-        return Response(serializer.data)
+        # Get clinic's doctors
+        doctors = Doctor.objects.filter(clinic=clinic)
+        
+        # Get lab tests through prescription relationship
+        lab_tests = LabTest.objects.filter(
+            prescription__doctor__in=[doctor.user for doctor in doctors]
+        ).select_related(
+            'prescription__doctor',
+            'prescription__patient',
+            'test_definition'
+        ).order_by('-created_at')
+        
+        context = {
+            'lab_tests': lab_tests
+        }
+        
+        return render(request, 'staff/Lab-tests.html', context)
     except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        messages.error(request, f'Error listing lab tests: {str(e)}')
+        return redirect('users:staff_dashboard')
 
 @api_view(['GET'])
 @permission_classes([IsStaff])
@@ -378,7 +384,17 @@ def staff_billing(request):
         staff = request.user.staff
         clinic = staff.clinic
         
-        billing = Billing.objects.filter(clinic=clinic)
+        # Get clinic's doctors
+        doctors = Doctor.objects.filter(clinic=clinic)
+        
+        # Get billing records through appointment relationship
+        billing = Billing.objects.filter(
+            appointment__doctor__in=doctors
+        ).select_related(
+            'appointment__doctor',
+            'appointment__patient'
+        ).order_by('-created_at')
+        
         serializer = BillingSerializer(billing, many=True)
         return Response(serializer.data)
     except Exception as e:
@@ -518,32 +534,6 @@ def staff_delete_billing(request, billing_id):
 
 @login_required
 @user_is_staff
-def staff_appointment_detail(request, appointment_id):
-    """View appointment details for staff"""
-    try:
-        appointment = get_object_or_404(Appointment, id=appointment_id)
-        staff = request.user.staff
-        
-        # Check if staff has access to this appointment
-        if appointment.doctor.clinic != staff.clinic:
-            messages.error(request, "You don't have permission to view this appointment")
-            return redirect('users:staff_dashboard')
-
-        context = {
-            'appointment': appointment,
-            'patient': appointment.patient,
-            'doctor': appointment.doctor,
-            'staff': staff
-        }
-        
-        return render(request, 'staff/appointment_detail.html', context)
-
-    except Exception as e:
-        messages.error(request, f'Error viewing appointment: {str(e)}')
-        return redirect('users:staff_dashboard')
-
-@login_required
-@user_is_staff
 def staff_patient_detail(request, patient_id):
     """View patient details for staff"""
     try:
@@ -669,39 +659,167 @@ def staff_delete_lab_test(request, test_id):
         messages.error(request, f'Error deleting lab test: {str(e)}')
         return redirect('users:staff_lab_tests')
 
-@api_view(['GET'])
-@permission_classes([IsStaff])
+@login_required
+@user_is_staff
 def staff_calendar_events(request):
-    """Get appointments for calendar view"""
+    """Get appointments and doctor availability for calendar view"""
     try:
         staff = request.user.staff
         clinic = staff.clinic
-        
+
         # Get doctor filter if provided
         doctor_id = request.GET.get('doctor_id')
+
+        # Get date range if provided, otherwise default to current month
+        start_date_str = request.GET.get('start')
+        end_date_str = request.GET.get('end')
         
-        # Base queryset
-        appointments = Appointment.objects.filter(doctor__clinic=clinic)
-        
+        try:
+            if start_date_str:
+                # Convert ISO format string to datetime
+                start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00'))
+                # Extract just the date part for appointment filtering
+                start_date_for_query = start_date.date()
+            else:
+                # Default to start of current month
+                today = timezone.now().date()
+                start_date = datetime(today.year, today.month, 1)
+                start_date_for_query = start_date.date()
+                
+            if end_date_str:
+                # Convert ISO format string to datetime
+                end_date = datetime.fromisoformat(end_date_str.replace('Z', '+00:00'))
+                # Extract just the date part for appointment filtering
+                end_date_for_query = end_date.date()
+            else:
+                # Default to end of current month
+                next_month = start_date.replace(day=28) + timedelta(days=4)
+                end_date = next_month.replace(day=1) - timedelta(days=1)
+                end_date_for_query = end_date.date()
+        except ValueError:
+            # Handle invalid date format
+            start_date = timezone.now()
+            start_date_for_query = start_date.date()
+            end_date_for_query = (start_date + timedelta(days=30)).date()
+
+        # Base queryset for appointments
+        appointments = Appointment.objects.filter(
+            doctor__clinic=clinic,
+            appointment_date__gte=start_date_for_query,
+            appointment_date__lte=end_date_for_query
+        ).select_related('doctor', 'patient')
+
         # Apply doctor filter if provided
         if doctor_id:
             appointments = appointments.filter(doctor_id=doctor_id)
-        
+
+        # Get doctors for the clinic
+        doctors = Doctor.objects.filter(clinic=clinic, is_active=True)
+
+        # Get doctor availability for the date range
+        doctor_availability = {}
+        for doctor in doctors:
+            availability = DoctorAvailability.objects.filter(
+                doctor=doctor
+            )
+
+            slots = []
+            for a in availability:
+                # Generate slots for each day in the range
+                # Make sure we're working with date objects consistently
+                current_date = start_date_for_query
+                while current_date <= end_date_for_query:
+                    if current_date.weekday() == a.day_of_week:
+                        slots.extend(a.generate_slots(current_date))
+                    current_date += timedelta(days=1)
+
+            doctor_availability[doctor.id] = slots
+
         # Convert appointments to calendar events
         events = []
         for appointment in appointments:
-            event = {
-                'id': appointment.id,
-                'title': f"{appointment.patient.get_full_name()} - {appointment.doctor.get_full_name()}",
-                'start': appointment.appointment_date.strftime('%Y-%m-%d') + 'T' + appointment.appointment_time.strftime('%H:%M:%S'),
-                'end': appointment.appointment_date.strftime('%Y-%m-%d') + 'T' + (appointment.appointment_time + timedelta(minutes=30)).strftime('%H:%M:%S'),
-                'status': appointment.status
-            }
-            events.append(event)
-        
-        return Response(events)
+            try:
+                patient_name = appointment.patient.get_full_name() if appointment.patient else "No Patient"
+                doctor_name = appointment.doctor.name if appointment.doctor else "No Doctor"
+
+                # Combine date and time into datetime objects
+                start_datetime = datetime.combine(appointment.appointment_date, appointment.appointment_time)
+                end_datetime = start_datetime + timedelta(minutes=30)
+
+                event = {
+                    'id': appointment.id,
+                    'title': f"{patient_name} - Dr. {doctor_name}",
+                    'start': start_datetime.strftime('%Y-%m-%dT%H:%M:%S'),
+                    'end': end_datetime.strftime('%Y-%m-%dT%H:%M:%S'),
+                    'status': appointment.status,
+                    'patient': patient_name,
+                    'doctor': doctor_name,
+                    'reason': appointment.reason,
+                    'token_number': appointment.token_number
+                }
+                events.append(event)
+            except (AttributeError, TypeError) as e:
+                logger.error(f"Error processing appointment {appointment.id}: {str(e)}")
+                continue
+
+        # Prepare available slots for the template
+        available_slots = []
+        for doctor_id, slots in doctor_availability.items():
+            doctor_obj = next((d for d in doctors if d.id == doctor_id), None)
+            if not doctor_obj:
+                continue
+                
+            for slot in slots:
+                # Check if there is an appointment at this time
+                # Extract date and time from the datetime slot object
+                slot_date = slot.date()
+                slot_time = slot.time()
+                
+                appointment_exists = appointments.filter(
+                    appointment_date=slot_date,
+                    appointment_time=slot_time,
+                    doctor_id=doctor_id
+                ).exists()
+
+                if not appointment_exists:
+                    available_slots.append({
+                        'id': f"available_{doctor_id}_{slot.strftime('%Y%m%d%H%M')}",
+                        'title': f"Available - Dr. {doctor_obj.name}",
+                        'start': slot.strftime('%Y-%m-%dT%H:%M:%S'),
+                        'end': (slot + timedelta(minutes=30)).strftime('%Y-%m-%dT%H:%M:%S'),
+                        'status': 'AVAILABLE',
+                        'doctor': doctor_obj.name,
+                        'doctor_id': doctor_id,
+                        'rendering': 'background',
+                        'backgroundColor': '#e8f5e9'
+                    })
+
+        return JsonResponse({
+            'events': events,
+            'available_slots': available_slots
+        })
     except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        logger.error(f"Error in staff_calendar_events: {str(e)}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=400)
+
+@login_required
+@user_is_staff
+def staff_calendar(request):
+    """View staff calendar"""
+    try:
+        staff = request.user.staff
+        clinic = staff.clinic
+        doctors = Doctor.objects.filter(clinic=clinic, is_active=True)
+
+        context = {
+            'clinic': clinic,
+            'doctors': doctors
+        }
+        return render(request, 'staff/calendar.html', context)
+    except Exception as e:
+        messages.error(request, f'Error accessing calendar: {str(e)}')
+        return redirect('users:staff_dashboard')
+
 
 @login_required
 @user_is_staff
@@ -905,13 +1023,16 @@ def staff_manage_leaves(request):
                 )
                 
                 for admin in admin_users:
-                    Notification.objects.create(
-                        user=admin,
-                        title='New Leave Request',
-                        message=f'{staff.user.get_full_name()} has requested leave from {start_date} to {end_date}',
-                        notification_type='leave_request',
-                        related_id=leave.id
-                    )
+                    try:
+                        create_notification(
+                            recipient=admin,
+                            message=f'{staff.user.get_full_name()} has requested leave from {start_date} to {end_date}',
+                            notification_type='leave_request',
+                            related_id=leave.id
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to send notification to admin {admin}: {e}")
+                        messages.warning(request, "Leave request submitted but failed to send notification to clinic admin.")
                 
                 messages.success(request, 'Leave request submitted successfully')
                 return redirect('users:staff_manage_leaves')
@@ -934,4 +1055,4 @@ def staff_manage_leaves(request):
 
     except Exception as e:
         messages.error(request, f'Error accessing leave management: {str(e)}')
-        return redirect('users:staff_dashboard') 
+        return redirect('users:staff_dashboard')

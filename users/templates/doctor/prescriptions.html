@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Prescriptions{% endblock %}
+
+{% block content %}
+<div class="bg-gray-100">
+    <!-- Main Content -->
+    <div class="transition-all duration-300 ease-in-out">       <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-800">Prescriptions</h1>
+            <div>
+                <a href="{% url 'users:doctor_dashboard' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <svg class="-ml-1 mr-2 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L7.414 9H15a1 1 0 110 2H7.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                    </svg>
+                    Back to Dashboard
+                </a>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <div class="flex items-center justify-between">
+                <div class="flex-1 min-w-0">
+                    <h2 class="text-lg font-medium leading-6 text-gray-900">
+                        All Prescriptions
+                    </h2>
+                </div>
+                <div>
+                    <input type="text" id="prescription-search" placeholder="Search Prescriptions" 
+                        class="border border-gray-300 rounded-md px-4 py-2 w-full shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Prescription List -->
+        {% if prescriptions %}
+            <div class="bg-white shadow overflow-hidden sm:rounded-md">
+                <ul class="divide-y divide-gray-200">
+                    {% for prescription in prescriptions %}
+                    <li class="prescription-item">
+                        <a href="{% url 'users:prescription_detail' prescription.id %}" class="block hover:bg-gray-50">
+                            <div class="px-4 py-4 sm:px-6">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex flex-col md:flex-row md:items-center">
+                                        <p class="text-sm font-medium text-blue-600 truncate">
+                                            {{ prescription.patient.get_full_name }}
+                                        </p>
+                                        <p class="text-sm text-gray-500 md:ml-4">
+                                            {{ prescription.date|date:"F j, Y" }}
+                                        </p>
+                                    </div>
+                                    <div class="ml-2 flex-shrink-0 flex">
+                                        <a href="{% url 'users:prescription_pdf' prescription.id %}" 
+                                           class="px-2 py-1 text-xs rounded-md bg-blue-100 text-blue-800 hover:bg-blue-200 inline-flex items-center">
+                                            <svg class="mr-1 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd" />
+                                            </svg>
+                                            PDF
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="mt-2 sm:flex sm:justify-between">
+                                    <div class="sm:flex">
+                                        <p class="flex items-center text-sm text-gray-500">
+                                            <svg class="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                                            </svg>
+                                            {% if prescription.diagnosis %}{{ prescription.diagnosis|truncatechars:50 }}{% else %}No diagnosis recorded{% endif %}
+                                        </p>
+                                    </div>
+                                    <div class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
+                                        <svg class="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
+                                        </svg>
+                                        <span>
+                                            {{ prescription.doctor.clinic.name }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-4">
+                <div class="flex-1 flex justify-between sm:hidden">
+                    {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        Previous
+                    </a>
+                    {% endif %}
+                    {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        Next
+                    </a>
+                    {% endif %}
+                </div>
+                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-sm text-gray-700">
+                            Showing
+                            <span class="font-medium">{{ page_obj.start_index }}</span>
+                            to
+                            <span class="font-medium">{{ page_obj.end_index }}</span>
+                            of
+                            <span class="font-medium">{{ page_obj.paginator.count }}</span>
+                            results
+                        </p>
+                    </div>
+                    <div>
+                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            {% if page_obj.has_previous %}
+                            <a href="?page={{ page_obj.previous_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">Previous</span>
+                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                </svg>
+                            </a>
+                            {% endif %}
+                            
+                            {% for i in paginator.page_range %}
+                                {% if page_obj.number == i %}
+                                <span class="relative inline-flex items-center px-4 py-2 border border-blue-300 bg-blue-50 text-sm font-medium text-blue-700">
+                                    {{ i }}
+                                </span>
+                                {% else %}
+                                <a href="?page={{ i }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                    {{ i }}
+                                </a>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if page_obj.has_next %}
+                            <a href="?page={{ page_obj.next_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">Next</span>
+                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                </svg>
+                            </a>
+                            {% endif %}
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        {% else %}
+            <div class="bg-white p-6 rounded-lg shadow text-center">
+                <p class="text-gray-500 mb-4">No prescriptions found.</p>
+                <a href="{% url 'users:patients_list' %}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Create New Prescription
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('prescription-search');
+        const prescriptionItems = document.querySelectorAll('.prescription-item');
+        
+        if (searchInput) {
+            searchInput.addEventListener('keyup', function() {
+                const searchText = this.value.toLowerCase();
+                
+                prescriptionItems.forEach(item => {
+                    const text = item.textContent.toLowerCase();
+                    if(text.includes(searchText)) {
+                        item.style.display = 'block';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        }
+    });
+</script>
+{% endblock %} 

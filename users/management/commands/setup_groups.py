@@ -6,7 +6,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         # Create groups if they don't exist
-        groups = ['Admin', 'Doctor', 'Patient', 'Staff']
+        groups = ['Admin', 'Doctor', 'Patient', 'Staff', 'Lab_user', 'Pharmacy_user']
         
         for group_name in groups:
             group, created = Group.objects.get_or_create(name=group_name)

@@ -3,9 +3,12 @@
 {% block title %}Manage Availability{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto px-4 py-8">
-    <div class="bg-white shadow-lg rounded-lg p-6">
-        <div class="flex justify-between items-center mb-6">
+<div class="bg-gray-100">
+    <!-- Main Content -->
+    <div class="transition-all duration-300 ease-in-out">
+        <!-- Patient Info -->       
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold">Manage Availability Schedule</h2>
             <a href="{% url 'users:manage_leaves' %}" 
                class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded">

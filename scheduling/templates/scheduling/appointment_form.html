@@ -1,0 +1,216 @@
+{% extends 'scheduling/base_scheduling.html' %}
+{% load static %}
+
+{% block title %}
+    {% if form.instance.id %}Edit Appointment{% else %}Create Appointment{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-4">
+    <div class="bg-white rounded-lg shadow-sm">
+        <div class="bg-gray-50 px-4 py-3 rounded-t-lg border-b border-gray-200">
+            <h3 class="text-xl font-semibold text-gray-800">{% if form.instance.id %}Edit Appointment{% else %}Create New Appointment{% endif %}</h3>
+        </div>
+        <div class="p-6">
+            <form method="post" id="appointment-form">
+                {% csrf_token %}
+                
+                {% if form.errors %}
+                    <div class="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-md">
+                        <strong class="font-medium">There were errors in your form submission:</strong>
+                        <ul class="mt-2 ml-4 list-disc">
+                            {% for field, errors in form.errors.items %}
+                                {% for error in errors %}
+                                    <li>{{ field|title }}: {{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <h5 class="text-lg font-medium text-gray-700 mb-4">Patient & Doctor</h5>
+                        
+                        <div class="mb-4">
+                            <label for="{{ form.patient.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Patient *</label>
+                            {{ form.patient.as_widget|safe }}
+                            {% if form.patient.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.patient.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="{{ form.doctor.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Doctor *</label>
+                            {{ form.doctor.as_widget|safe }}
+                            {% if form.doctor.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.doctor.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="{{ form.clinic.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Clinic *</label>
+                            {{ form.clinic.as_widget|safe }}
+                            {% if form.clinic.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.clinic.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h5 class="text-lg font-medium text-gray-700 mb-4">Date & Time</h5>
+                        
+                        <div class="mb-4">
+                            <label for="{{ form.appointment_date.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+                            {{ form.appointment_date.as_widget|safe }}
+                            {% if form.appointment_date.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.appointment_date.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="{{ form.appointment_time.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Time *</label>
+                            {% if form.instance.id %}
+                                <!-- For edit view, show the current time -->
+                                {{ form.appointment_time.as_widget|safe }}
+                            {% else %}
+                                <!-- For create view, we'll populate available slots via AJAX -->
+                                <select name="appointment_time" id="id_appointment_time" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50" required>
+                                    <option value="">Select a date and doctor first</option>
+                                </select>
+                            {% endif %}
+                            {% if form.appointment_time.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.appointment_time.errors }}</div>
+                            {% endif %}
+                            <div id="time-slot-message" class="text-sm text-gray-500 mt-1"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <h5 class="text-lg font-medium text-gray-700 mb-4">Appointment Type</h5>
+                        
+                        <div class="mb-3">
+                            <div class="flex items-center">
+                                {{ form.is_emergency.as_widget|safe }}
+                                <label class="text-sm text-gray-700 ml-2" for="{{ form.is_emergency.id_for_label }}">
+                                    Emergency Appointment
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="flex items-center">
+                                {{ form.is_telemedicine.as_widget|safe }}
+                                <label class="text-sm text-gray-700 ml-2" for="{{ form.is_telemedicine.id_for_label }}">
+                                    Telemedicine Appointment
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="flex items-center">
+                                {{ form.is_walk_in.as_widget|safe }}
+                                <label class="text-sm text-gray-700 ml-2" for="{{ form.is_walk_in.id_for_label }}">
+                                    Walk-in Appointment
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h5 class="text-lg font-medium text-gray-700 mb-4">Details</h5>
+                        
+                        <div class="mb-4">
+                            <label for="{{ form.reason.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Reason for Visit</label>
+                            {{ form.reason.as_widget|safe }}
+                            {% if form.reason.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.reason.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="{{ form.notes.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
+                            {{ form.notes.as_widget|safe }}
+                            {% if form.notes.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.notes.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-between items-center mt-6 pt-4 border-t border-gray-200">
+                    <a href="{% url 'scheduling:appointment_list' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
+                        <i class="fas fa-arrow-left mr-2"></i> Back
+                    </a>
+                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-save mr-2"></i> {% if form.instance.id %}Update{% else %}Create{% endif %} Appointment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Only run this for new appointments, not when editing
+        {% if not form.instance.id %}
+            function updateAvailableTimeSlots() {
+                const doctorId = document.getElementById('id_doctor').value;
+                const appointmentDate = document.getElementById('id_appointment_date').value;
+                const timeSelect = document.getElementById('id_appointment_time');
+                const timeSlotMessage = document.getElementById('time-slot-message');
+                
+                if (!doctorId || !appointmentDate) {
+                    timeSelect.innerHTML = '<option value="">Select a date and doctor first</option>';
+                    return;
+                }
+                
+                timeSelect.innerHTML = '<option value="">Loading available slots...</option>';
+                timeSlotMessage.textContent = '';
+                
+                const params = new URLSearchParams();
+                params.append('doctor', doctorId);
+                params.append('date', appointmentDate);
+                
+                fetch('{% url 'scheduling:get_available_slots' %}?' + params.toString())
+                .then(response => response.json())
+                .then(data => {
+                    timeSelect.innerHTML = '';
+                    
+                    if (data.slots && data.slots.length > 0) {
+                        data.slots.forEach(slot => {
+                            const option = document.createElement('option');
+                            option.value = slot.time;
+                            option.textContent = slot.formatted_time;
+                            timeSelect.appendChild(option);
+                        });
+                    } else {
+                        timeSelect.innerHTML = '<option value="">No available slots</option>';
+                        if (data.message) {
+                            timeSlotMessage.textContent = data.message;
+                        }
+                    }
+                })
+                .catch(error => {
+                    timeSelect.innerHTML = '<option value="">Error loading slots</option>';
+                    timeSlotMessage.textContent = 'There was an error loading available time slots.';
+                });
+            }
+            
+            // Update slots when doctor or date changes
+            document.getElementById('id_doctor').addEventListener('change', updateAvailableTimeSlots);
+            document.getElementById('id_appointment_date').addEventListener('change', updateAvailableTimeSlots);
+            
+            // If both doctor and date are already selected on page load, update slots
+            if (document.getElementById('id_doctor').value && document.getElementById('id_appointment_date').value) {
+                updateAvailableTimeSlots();
+            }
+        {% endif %}
+    });
+</script>
+{% endblock %} 

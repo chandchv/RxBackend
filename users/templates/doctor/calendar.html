@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Doctor Calendar{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/styles.css' %}">
+<style>
+    /* Calendar Container Styling */
+    .calendar-container {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        background-color: white;
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+    }
+    
+    /* Make calendar responsive */
+    @media (max-width: 767px) {
+        .calendar-container {
+            border-radius: 6px;
+            margin-left: -1rem;
+            margin-right: -1rem;
+            width: calc(100% + 2rem);
+        }
+        
+        .fc .fc-toolbar {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .fc .fc-toolbar-title {
+            font-size: 1.1rem !important;
+        }
+        
+        .fc-header-toolbar {
+            padding: 0.75rem !important;
+        }
+    }
+    
+    /* FullCalendar Custom Styling */
+    .fc {
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .fc-theme-standard td, .fc-theme-standard th {
+        border: 1px solid #e2e8f0;
+    }
+    
+    .fc-theme-standard .fc-scrollgrid {
+        border: 1px solid #e2e8f0;
+    }
+    
+    .fc .fc-daygrid-day.fc-day-today {
+        background-color: #ebf8ff !important;
+    }
+    
+    .fc-daygrid-day-number {
+        font-weight: 500;
+    }
+    
+    .fc-col-header-cell {
+        background-color: #f7fafc;
+        font-weight: 600;
+    }
+    
+    .fc-theme-standard .fc-scrollgrid-section-header > th {
+        border-bottom-width: 2px;
+    }
+    
+    /* Control panel styling */
+    .calendar-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        border-bottom: 1px solid #e2e8f0;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    @media (max-width: 640px) {
+        .calendar-controls {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .view-control {
+            width: 100%;
+        }
+    }
+    
+    /* Loading indicator styling */
+    #calendar-loading {
+        border-radius: 8px;
+        background-color: rgba(255, 255, 255, 0.8);
+    }
+    
+    /* Event Styling */
+    .appointment-event {
+        border: none !important;
+        border-radius: 4px;
+        padding: 3px 5px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        cursor: pointer;
+    }
+    
+    .availability-summary-event {
+        border: none !important;
+        background-color: rgba(232, 245, 233, 0.5) !important;
+        cursor: pointer;
+    }
+    
+    /* Tooltip Styling */
+    .appointment-tooltip {
+        position: absolute;
+        z-index: 1000;
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        padding: 12px;
+        max-width: 250px;
+        display: none;
+        border: 1px solid #e2e8f0;
+        pointer-events: none;
+    }
+    
+    .tooltip-heading {
+        font-weight: 600;
+        font-size: 1.1em;
+        margin-bottom: 8px;
+        color: #1e40af;
+        border-bottom: 1px solid #e5e7eb;
+        padding-bottom: 4px;
+    }
+    
+    .tooltip-detail {
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        font-size: 0.9em;
+    }
+    
+    .tooltip-detail i {
+        width: 16px;
+        margin-right: 8px;
+        color: #4b5563;
+    }
+    
+    .tooltip-footer {
+        margin-top: 8px;
+        font-size: 0.8em;
+        color: #2563eb;
+        font-style: italic;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8">
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div class="flex justify-between items-center p-4 border-b border-gray-200">
+            <h2 class="text-xl font-bold text-gray-800">My Appointments Calendar</h2>
+            <div class="flex items-center space-x-2">
+                <a href="{% url 'users:doctor_create_appointment' %}" 
+                   class="bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-md inline-flex items-center transition-colors duration-200">
+                    <i class="fas fa-plus mr-2"></i>New Appointment
+                </a>
+                <a href="{% url 'users:doctor_appointments_view' %}" 
+                   class="text-blue-500 hover:text-blue-600 text-sm font-medium">
+                    View All
+                </a>
+            </div>
+        </div>
+        
+        <!-- Calendar Controls -->
+        <div class="calendar-controls">
+            <div class="view-control" id="calendar-view-control">
+                <button data-view="dayGridMonth" class="active">Month</button>
+                <button data-view="timeGridWeek">Week</button>
+                <button data-view="timeGridDay">Day</button>
+            </div>
+            <div class="text-sm text-gray-600">
+                <i class="fas fa-info-circle mr-1"></i> 
+                Click on a date with available slots to see the detailed day view
+            </div>
+        </div>
+        
+        <!-- Calendar View -->
+        <div class="calendar-container">
+            <div id="calendar-loading" class="hidden flex justify-center items-center py-10">
+                <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="text-gray-600 text-lg">Loading appointments...</span>
+            </div>
+            <div id="calendar" class="w-full" 
+                 data-calendar-events-url="{% url 'users:doctor_calendar_events' %}"
+                 data-appointment-base-url="{% url 'users:doctor_appointments_view' %}"></div>
+            <div id="appointment-tooltip" class="appointment-tooltip"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    // Make the URL template directly available to JavaScript
+    window.APPOINTMENT_BASE_URL = "{% url 'users:doctor_appointments_view' %}";
+    
+    // Function to get appointment detail URL by ID
+    window.getAppointmentDetailUrl = function(appointmentId) {
+        // Replace last part of URL with the specific appointment ID
+        var baseUrl = window.APPOINTMENT_BASE_URL;
+        // Make sure base URL ends with slash
+        if (!baseUrl.endsWith('/')) {
+            baseUrl += '/';
+        }
+        return baseUrl + appointmentId + '/';
+    };
+</script>
+
+{% if selected_date %}
+<script>
+    // Initialize with selected date
+    window.SELECTED_DATE = "{{ selected_date }}";
+</script>
+{% else %}
+<script>
+    // No selected date
+    window.SELECTED_DATE = null;
+</script>
+{% endif %}
+
+<script src="{% static 'users/doctor_dashboard.js' %}"></script>
+{% endblock %} 

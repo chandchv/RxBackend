@@ -23,6 +23,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.http import JsonResponse
+from django.conf.urls.i18n import i18n_patterns
 
 def redirect_to_dashboard(request):
     return redirect('users:dashboard' if request.user.is_authenticated else 'users:login')
@@ -43,6 +44,11 @@ urlpatterns = [
     path('api/notifications/', include('notifications.urls', namespace='notifications_api')),
     path('api/get-csrf-token/', get_csrf_token),
     path('social/', include(('social_django.urls', 'social'), namespace='social')),
+    #path('pharmacy/', include('pharmacy.urls', namespace='pharmacy')),
+    path('billing/', include('billing.urls', namespace='billing')),
+    path('i18n/', include('django.conf.urls.i18n')),
+    path('appointment/', include('appointment.urls', namespace='appointment')),
+    path('scheduling/', include('scheduling.urls', namespace='scheduling')),
 ]
 
 # Add static and media URL patterns

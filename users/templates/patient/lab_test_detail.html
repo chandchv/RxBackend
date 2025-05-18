@@ -3,117 +3,127 @@
 {% block title %}Lab Test Results{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto px-4 py-8">
-    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
-        <!-- Header -->
-        <div class="border-b p-6">
-            <div class="flex justify-between items-center">
-                <div>
-                    <h1 class="text-2xl font-bold">{{ test.test_definition.name }}</h1>
-                    <p class="text-gray-600">Test ID: {{ test.id }}</p>
-                </div>
-                <div class="text-right">
-                    <span class="px-3 py-1 rounded-full text-sm font-semibold
-                        {% if test.status == 'COMPLETED' %}bg-yellow-100 text-yellow-800
-                        {% elif test.status == 'REVIEWED' %}bg-green-100 text-green-800
-                        {% else %}bg-blue-100 text-blue-800{% endif %}">
-                        {{ test.get_status_display }}
-                    </span>
-                </div>
-            </div>
+<div class="flex h-screen bg-gray-100">
+    
+    <div class="flex-1 overflow-y-auto transition-all duration-300 ease-in-out">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-800">Lab Test Details</h1>
+            <a href="{% url 'users:patient_test_results' %}" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm">
+                Back to Test Results
+            </a>
         </div>
-
-        <!-- Test Details -->
-        <div class="p-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <h2 class="text-lg font-semibold mb-4">Test Information</h2>
-                    <div class="space-y-2">
-                        <p><strong>Test Name:</strong> {{ test.test_definition.name }}</p>
-                        <p><strong>Collection Type:</strong> {{ test.get_collection_type_display }}</p>
-                        <p><strong>Prescribed by:</strong> Dr. {{ test.prescription.doctor.get_full_name }}</p>
-                        <p><strong>Prescribed Date:</strong> {{ test.prescription.prescription_date|date:"F j, Y" }}</p>
-                        <p><strong>Status:</strong> {{ test.get_status_display }}</p>
+        
+        <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+            <!-- Header -->
+            <div class="border-b p-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-2xl font-bold">{{ test.test_definition.name }}</h1>
+                        <p class="text-gray-600">Test ID: {{ test.id }}</p>
                     </div>
-                </div>
-                <div>
-                    <h2 class="text-lg font-semibold mb-4">Additional Information</h2>
-                    <div class="space-y-2">
-                        {% if test.doctor_notes %}
-                        <p><strong>Doctor's Notes:</strong> {{ test.doctor_notes }}</p>
-                        {% endif %}
-                        <p><strong>Last Updated:</strong> {{ test.updated_at|date:"F j, Y H:i" }}</p>
+                    <div class="text-right">
+                        <span class="px-3 py-1 rounded-full text-sm font-semibold
+                            {% if test.status == 'COMPLETED' %}bg-yellow-100 text-yellow-800
+                            {% elif test.status == 'REVIEWED' %}bg-green-100 text-green-800
+                            {% else %}bg-blue-100 text-blue-800{% endif %}">
+                            {{ test.get_status_display }}
+                        </span>
                     </div>
                 </div>
             </div>
 
-            <!-- Test Results -->
-            {% if test.status == 'COMPLETED' or test.status == 'REVIEWED' %}
-            <div class="mt-8">
-                <h2 class="text-lg font-semibold mb-4">Test Results</h2>
-                
-                {% if test.result_file %}
-                <div class="bg-gray-50 p-4 rounded-lg mb-4">
-                    <div class="mb-2">
-                        <strong>Result Document:</strong>
+            <!-- Test Details -->
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h2 class="text-lg font-semibold mb-4">Test Information</h2>
+                        <div class="space-y-2">
+                            <p><strong>Test Name:</strong> {{ test.test_definition.name }}</p>
+                            <p><strong>Collection Type:</strong> {{ test.get_collection_type_display }}</p>
+                            <p><strong>Prescribed by:</strong> Dr. {{ test.prescription.doctor.get_full_name }}</p>
+                            <p><strong>Prescribed Date:</strong> {{ test.prescription.prescription_date|date:"F j, Y" }}</p>
+                            <p><strong>Status:</strong> {{ test.get_status_display }}</p>
+                        </div>
                     </div>
-                    <iframe src="{{ test.result_file.url }}" class="w-full h-96 border rounded"></iframe>
-                    <div class="mt-4">
-                        <a href="{{ test.result_file.url }}" target="_blank" class="text-blue-600 hover:text-blue-800 font-medium">
-                            <i class="fas fa-external-link-alt mr-1"></i> Open in New Tab
-                        </a>
-                        <a href="{{ test.result_file.url }}" download class="text-blue-600 hover:text-blue-800 font-medium ml-4">
-                            <i class="fas fa-download mr-1"></i> Download
-                        </a>
+                    <div>
+                        <h2 class="text-lg font-semibold mb-4">Additional Information</h2>
+                        <div class="space-y-2">
+                            {% if test.doctor_notes %}
+                            <p><strong>Doctor's Notes:</strong> {{ test.doctor_notes }}</p>
+                            {% endif %}
+                            <p><strong>Last Updated:</strong> {{ test.updated_at|date:"F j, Y H:i" }}</p>
+                        </div>
                     </div>
+                </div>
+
+                <!-- Test Results -->
+                {% if test.status == 'COMPLETED' or test.status == 'REVIEWED' %}
+                <div class="mt-8">
+                    <h2 class="text-lg font-semibold mb-4">Test Results</h2>
+                    
+                    {% if test.result_file %}
+                    <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                        <div class="mb-2">
+                            <strong>Result Document:</strong>
+                        </div>
+                        <iframe src="{{ test.result_file.url }}" class="w-full h-96 border rounded"></iframe>
+                        <div class="mt-4">
+                            <a href="{{ test.result_file.url }}" target="_blank" class="text-blue-600 hover:text-blue-800 font-medium">
+                                <i class="fas fa-external-link-alt mr-1"></i> Open in New Tab
+                            </a>
+                            <a href="{{ test.result_file.url }}" download class="text-blue-600 hover:text-blue-800 font-medium ml-4">
+                                <i class="fas fa-download mr-1"></i> Download
+                            </a>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                        <p class="text-yellow-700">Results have been processed but no result file is available. Please contact your doctor for more information.</p>
+                    </div>
+                    {% endif %}
                 </div>
                 {% else %}
-                <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                    <p class="text-yellow-700">Results have been processed but no result file is available. Please contact your doctor for more information.</p>
+                <div class="mt-8 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <p class="text-blue-700">Your test is still being processed. Results will be available once the lab completes the analysis.</p>
+                    <p class="text-blue-700 mt-2">Current status: <strong>{{ test.get_status_display }}</strong></p>
                 </div>
                 {% endif %}
-            </div>
-            {% else %}
-            <div class="mt-8 bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <p class="text-blue-700">Your test is still being processed. Results will be available once the lab completes the analysis.</p>
-                <p class="text-blue-700 mt-2">Current status: <strong>{{ test.get_status_display }}</strong></p>
-            </div>
-            {% endif %}
 
-            <!-- Doctor's Analysis Section -->
-            {% if test.status == 'REVIEWED' and test.doctor_analysis %}
-            <div class="mt-8">
-                <h2 class="text-lg font-semibold mb-4">Doctor's Analysis</h2>
-                <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <p class="italic text-gray-500 mb-2">Analysis by Dr. {{ test.prescription.doctor.get_full_name }}:</p>
-                    <p class="text-gray-800">{{ test.doctor_analysis|linebreaks }}</p>
+                <!-- Doctor's Analysis Section -->
+                {% if test.status == 'REVIEWED' and test.doctor_analysis %}
+                <div class="mt-8">
+                    <h2 class="text-lg font-semibold mb-4">Doctor's Analysis</h2>
+                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <p class="italic text-gray-500 mb-2">Analysis by Dr. {{ test.prescription.doctor.get_full_name }}:</p>
+                        <p class="text-gray-800">{{ test.doctor_analysis|linebreaks }}</p>
+                    </div>
                 </div>
-            </div>
-            {% endif %}
+                {% endif %}
 
-            <!-- Call to Action -->
-            {% if test.status == 'REVIEWED' %}
-            <div class="mt-8 bg-green-50 p-4 rounded-lg border border-green-200">
-                <p class="text-green-700 font-medium">Your doctor has reviewed these results. If you have any questions, please schedule a follow-up appointment.</p>
-                <div class="mt-4">
-                    <a href="{% url 'users:patient_create_appointment' %}" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                        <i class="fas fa-calendar-plus mr-2"></i> Schedule Follow-up
+                <!-- Call to Action -->
+                {% if test.status == 'REVIEWED' %}
+                <div class="mt-8 bg-green-50 p-4 rounded-lg border border-green-200">
+                    <p class="text-green-700 font-medium">Your doctor has reviewed these results. If you have any questions, please schedule a follow-up appointment.</p>
+                    <div class="mt-4">
+                        <a href="{% url 'users:patient_create_appointment' %}" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                            <i class="fas fa-calendar-plus mr-2"></i> Schedule Follow-up
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Actions -->
+                <div class="mt-8 border-t pt-6 flex justify-between">
+                    <a href="{% url 'users:patient_test_results' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        <i class="fas fa-arrow-left mr-2"></i> Back to Test Results
                     </a>
+                    
+                    {% if test.prescription %}
+                    <a href="{% url 'users:lab_prescription_detail' test.prescription.id %}" class="inline-flex items-center px-4 py-2 border border-blue-700 shadow-sm text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50">
+                        <i class="fas fa-file-medical mr-2"></i> View Full Prescription
+                    </a>
+                    {% endif %}
                 </div>
-            </div>
-            {% endif %}
-
-            <!-- Actions -->
-            <div class="mt-8 border-t pt-6 flex justify-between">
-                <a href="{% url 'users:patient_dashboard' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                    <i class="fas fa-arrow-left mr-2"></i> Back to Dashboard
-                </a>
-                
-                {% if test.prescription %}
-                <a href="{% url 'users:lab_prescription_detail' test.prescription.id %}" class="inline-flex items-center px-4 py-2 border border-blue-700 shadow-sm text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50">
-                    <i class="fas fa-file-medical mr-2"></i> View Full Prescription
-                </a>
-                {% endif %}
             </div>
         </div>
     </div>

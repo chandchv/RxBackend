@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from ..models import Doctor, Appointment, Patient, DoctorAvailability, AppointmentSlot, DoctorLeave, Billing, Bill, Prescription, PatientVitals, PrescriptionItem, Drug, PatientDoctor, ClinicHoliday, Notification
+from ..models import Doctor, Appointment, Patient, PatientVitals, DoctorAvailability, AppointmentSlot, DoctorLeave, Billing, Bill, Prescription, PrescriptionItem, Drug, PatientDoctor, ClinicHoliday
 from ..serializers import DoctorSerializer
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -24,6 +24,53 @@ from django.urls import reverse
 from rest_framework.decorators import api_view, permission_classes
 from django.db.models import Case, When
 from django.contrib.auth.models import User
+from django.utils.crypto import get_random_string
+from notifications.models import Notification
+from notifications.utils import create_notification
+
+def send_appointment_create_notification(appointment):
+    try:
+        subject = 'New Appointment Scheduled'
+        message = f"""
+        Dear {appointment.patient.get_full_name()},
+
+        Your appointment has been scheduled with Dr. {appointment.doctor.name}.
+
+        Appointment Details:
+        Date: {appointment.appointment_date}
+        Time: {appointment.appointment_time}
+        
+        Please arrive 15 minutes before your scheduled time.
+        If you need to reschedule or cancel, please contact the clinic.
+
+        Best regards,
+        {appointment.doctor.clinic.name}
+        """
+        
+        # Send email notification if patient has email
+        if appointment.patient.email:
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [appointment.patient.email],
+                fail_silently=False,
+            )
+        
+        # Create in-app notification
+        create_notification(
+            recipient=appointment.patient.user,
+            message=f"New appointment scheduled with Dr. {appointment.doctor.name} for {appointment.appointment_date} at {appointment.appointment_time}",
+            sender=appointment.doctor.user,
+            notification_type='appointment_created',
+            action_url=f'/appointments/{appointment.id}/'
+        )
+        
+        print(f"Appointment creation notification sent to {appointment.patient.email}")
+        return True
+    except Exception as e:
+        print(f"Error in appointment creation notification: {str(e)}")
+        return False
 
 def send_appointment_update_notification(appointment):
     try:
@@ -72,6 +119,7 @@ def send_status_update_notification(appointment):
     except Exception as e:
         print(f"Error in status notification: {str(e)}")
         return False
+
 
 class DoctorCreateView(APIView):
     permission_classes = [IsAuthenticated]
@@ -257,23 +305,48 @@ def doctor_dashboard_view(request):
     return render(request, 'dashboard.html', context)
 
 @login_required
-def doctor_appointments_view(request):
-    try:
-        # Get the doctor's appointments
-        doctor = Doctor.objects.get(user=request.user)
-        appointments = Appointment.objects.filter(doctor=doctor).order_by('appointment_date')
-        
-        return render(request, 'doctor/appointments.html', {
-            'appointments': appointments
-        })
-    except Doctor.DoesNotExist:
-        messages.error(request, 'Doctor profile not found')
-        return redirect('users:doctor_dashboard')
-    except Exception as e:
-        print(f"Error fetching appointments: {str(e)}")
-        messages.error(request, 'Error accessing appointments')
-        return redirect('users:doctor_dashboard')
-
+@user_is_doctor
+def doctor_appointments(request):
+    """View for doctor to see their appointments"""
+    if not hasattr(request.user, 'doctor'):
+        messages.error(request, 'Access denied. Doctor privileges required.')
+        return redirect('users:dashboard')
+    
+    # Start with all appointments for this doctor
+    appointments = Appointment.objects.filter(doctor=request.user.doctor)
+    
+    # Apply filters
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    status = request.GET.get('status')
+    patient_search = request.GET.get('patient_search')
+    
+    if date_from:
+        appointments = appointments.filter(appointment_date__gte=date_from)
+    
+    if date_to:
+        appointments = appointments.filter(appointment_date__lte=date_to)
+    
+    if status:
+        appointments = appointments.filter(status=status)
+    
+    if patient_search:
+        appointments = appointments.filter(
+            Q(patient__first_name__icontains=patient_search) |
+            Q(patient__last_name__icontains=patient_search) |
+            Q(patient__user__first_name__icontains=patient_search) |
+            Q(patient__user__last_name__icontains=patient_search)
+        )
+    
+    # Order by date and time
+    appointments = appointments.order_by('appointment_date', 'appointment_time')
+    
+    context = {
+        'appointments': appointments,
+        'today': timezone.now().date(),
+    }
+    
+    return render(request, 'doctor/appointments.html', context)
 
 @login_required
 def create_appointment(request): 
@@ -434,7 +507,7 @@ def appointment_detail_doctor(request, appointment_id):
             'appointment': appointment,
             'patient': appointment.patient,
             'min_date': timezone.now().date(),
-            'bill': bill  # Add bill to context
+            'bill': bill
         }
         
         if request.headers.get('HX-Request'):
@@ -471,8 +544,23 @@ def create_patient_doctor(request):
             # Get data from form submission
             data = request.POST
             
+            # Create user account for patient
+            username = data.get('email') if data.get('email') else data.get('phone_number')
+            # Generate a random password (12 characters with letters and digits)
+            temp_password = get_random_string(12)
+            
+            # Create user account
+            user = User.objects.create_user(
+                username=username,
+                email=data.get('email'),
+                password=temp_password,
+                first_name=data.get('first_name'),
+                last_name=data.get('last_name')
+            )
+            
             # Create patient
             patient = Patient.objects.create(
+                user=user,  # Link the user account
                 first_name=data.get('first_name'),
                 last_name=data.get('last_name'),
                 email=data.get('email'),
@@ -506,6 +594,20 @@ def create_patient_doctor(request):
                 doctor=request.user.doctor,
                 is_primary=True
             )
+            
+            # Send notification to patient with their login credentials
+            if patient.email:
+                try:
+                    create_notification(
+                        recipient=user,
+                        message=f"Your patient account has been created. Username: {username}, Temporary password: {temp_password}. Please change your password after logging in.",
+                        sender=request.user,
+                        notification_type='account_created',
+                        action_url='/users/change_password/'
+                    )
+                except Exception as e:
+                    print(f"Error sending notification: {str(e)}")
+                    messages.warning(request, 'Patient created but failed to send login credentials notification.')
             
             messages.success(request, 'Patient created successfully')
             return redirect('users:patients_list')
@@ -1021,6 +1123,7 @@ def doctor_profile(request):
 def doctor_create_appointment(request):
     try:
         doctor = Doctor.objects.get(user=request.user)
+        
         print(f"Doctor ID: {doctor.id}")  # Debug print
         
         if request.method == 'POST':
@@ -1039,11 +1142,15 @@ def doctor_create_appointment(request):
                     print(f"Appointment saved with doctor: {appointment.doctor.id}")  # Debug print
                     messages.success(request, 'Appointment scheduled successfully!')
                     return redirect('users:doctor_dashboard')
-                    print("POST Data:", request.POST)
-                    print("Appointment Date:", appointment_date_str)
-                    print("Parsed Date:", appointment_date)
-                    print("Stored Datetime:", stored_datetime, type(stored_datetime))
-                    print("Comparison Result:", stored_datetime.date() == appointment_date)
+                   
+                    # Send appointment  create notification
+                    try:
+                        send_appointment_create_notification(appointment)
+                    except Exception as e:
+                        print(f"Error sending create notification: {str(e)}")
+                    
+                    messages.success(request, 'Appointment created successfully')
+                    return redirect('users:doctor_appointments')
                 else:
                     messages.error(request, 'Please select an appointment time.')
             else:
@@ -1377,7 +1484,8 @@ def get_patient_details(request, patient_id):
     try:
         doctor = Doctor.objects.get(user=request.user)
         patient = get_object_or_404(Patient, id=patient_id)
-        
+        patient_vitals = PatientVitals.objects.filter(patient=patient).order_by('-created_at').first()
+
         # Calculate age from date_of_birth
         today = timezone.now().date()
         age = today.year - patient.date_of_birth.year - (
@@ -1394,8 +1502,24 @@ def get_patient_details(request, patient_id):
                 'date_of_birth': patient.date_of_birth.isoformat(),
                 'age': age,
                 'gender': patient.gender
-            }
+            },
+            'patient_vitals': {}  # Initialize as an empty dictionary
         }
+
+        # Only add patient_vitals data if patient_vitals is not None
+        if patient_vitals:
+            data['patient_vitals'] = {
+                'weight': patient_vitals.weight,
+                'height': patient_vitals.height,
+                'blood_pressure': patient_vitals.blood_pressure,
+                'temperature': patient_vitals.temperature,
+                'heart_rate': patient_vitals.heart_rate,
+                'oxygen_saturation': patient_vitals.oxygen_saturation,
+                'bmi': patient_vitals.bmi,
+                'recorded_at': patient_vitals.created_at.strftime('%Y-%m-%d %H:%M') if patient_vitals.created_at else None,
+                'recorded_by': patient_vitals.recorded_by.get_full_name() if patient_vitals.recorded_by else 'Unknown'
+            }
+
         return Response(data)
         
     except Doctor.DoesNotExist:
@@ -1414,7 +1538,7 @@ def api_appointment_detail(request, appointment_id):
         appointment = get_object_or_404(Appointment, id=appointment_id, doctor=doctor)
         
         data = {
-            'id': appointment.id,
+            'id': str(appointment.id),  # Convert UUID to string
             'appointment_date': appointment.appointment_date,
             'appointment_time': appointment.appointment_time.strftime('%H:%M'),
             'status': appointment.status,
@@ -1616,11 +1740,26 @@ def create_patient_api(request):
         doctor = Doctor.objects.get(user=request.user)
         clinic = doctor.clinic
         
+        # Create user account for patient
+        username = request.data.get('email') if request.data.get('email') else request.data.get('phone_number')
+        # Generate a random password (12 characters with letters and digits)
+        temp_password = get_random_string(12)
+        
+        # Create user account
+        user = User.objects.create_user(
+            username=username,
+            email=request.data.get('email'),
+            password=temp_password,
+            first_name=request.data.get('first_name'),
+            last_name=request.data.get('last_name')
+        )
+        
         # Create patient with the data from request
         patient = Patient.objects.create(
+            user=user,  # Link the user account
             first_name=request.data.get('first_name'),
             last_name=request.data.get('last_name'),
-            date_of_birth=request.data.get('date_of_birth'),  # You might want to convert age to date_of_birth
+            date_of_birth=request.data.get('date_of_birth'),
             gender=request.data.get('gender'),
             phone_number=request.data.get('phone_number'),
             email=request.data.get('email', ''),
@@ -1632,9 +1771,24 @@ def create_patient_api(request):
             doctor=doctor
         )
         
+        # Send notification to patient with their login credentials
+        if patient.email:
+            try:
+                create_notification(
+                    recipient=user,
+                    message=f"Your patient account has been created. Username: {username}, Temporary password: {temp_password}. Please change your password after logging in.",
+                    sender=request.user,
+                    notification_type='account_created',
+                    action_url='/users/change_password/'
+                )
+            except Exception as e:
+                print(f"Error sending notification: {str(e)}")
+        
         return Response({
             'message': 'Patient added successfully',
-            'patient_id': patient.id
+            'patient_id': patient.id,
+            'username': username,
+            'temp_password': temp_password  # Only return this in development
         }, status=status.HTTP_201_CREATED)
             
     except Doctor.DoesNotExist:
@@ -1900,3 +2054,182 @@ def request_leave(request):
     except Exception as e:
         messages.error(request, f'Error requesting leave: {str(e)}')
         return redirect('users:doctor_dashboard')
+
+@login_required
+def doctor_calendar(request):
+    """View doctor's calendar"""
+    try:
+        # Check if user has doctor profile
+        if not hasattr(request.user, 'doctor'):
+            messages.error(request, "You don't have doctor access")
+            return redirect('users:login')
+            
+        doctor = request.user.doctor
+        if not doctor.clinic:
+            messages.error(request, "No clinic assigned to your account")
+            return redirect('users:login')
+        
+        # Get selected date from query parameters (if provided)
+        selected_date = request.GET.get('date', None)
+        if selected_date:
+            try:
+                # Validate the date format
+                selected_date = datetime.strptime(selected_date, '%Y-%m-%d').date()
+            except ValueError:
+                # If invalid date format, ignore the parameter
+                selected_date = None
+            
+        context = {
+            'doctor': doctor,
+            'clinic': doctor.clinic,
+            'selected_date': selected_date.isoformat() if selected_date else None
+        }
+        return render(request, 'doctor/calendar.html', context)
+    except Exception as e:
+        messages.error(request, f'Error accessing calendar: {str(e)}')
+        return redirect('users:doctor_dashboard')
+
+@login_required
+def doctor_calendar_events(request):
+    """Get appointments for calendar view - doctor specific"""
+    try:
+        # Check if user has doctor profile
+        if not hasattr(request.user, 'doctor'):
+            return JsonResponse({'error': "You don't have doctor access"}, status=403)
+            
+        doctor = request.user.doctor
+
+        # Get date range if provided, otherwise default to current month
+        start_date_str = request.GET.get('start')
+        end_date_str = request.GET.get('end')
+        
+        try:
+            if start_date_str:
+                # Convert ISO format string to datetime
+                start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00'))
+                # Extract just the date part for appointment filtering
+                start_date_for_query = start_date.date()
+            else:
+                # Default to start of current month
+                today = timezone.now().date()
+                start_date = datetime(today.year, today.month, 1)
+                start_date_for_query = start_date.date()
+                
+            if end_date_str:
+                # Convert ISO format string to datetime
+                end_date = datetime.fromisoformat(end_date_str.replace('Z', '+00:00'))
+                # Extract just the date part for appointment filtering
+                end_date_for_query = end_date.date()
+            else:
+                # Default to end of current month
+                next_month = start_date.replace(day=28) + timedelta(days=4)
+                end_date = next_month.replace(day=1) - timedelta(days=1)
+                end_date_for_query = end_date.date()
+        except ValueError:
+            # Handle invalid date format
+            start_date = timezone.now()
+            start_date_for_query = start_date.date()
+            end_date_for_query = (start_date + timedelta(days=30)).date()
+
+        # Get appointments for this doctor only
+        appointments = Appointment.objects.filter(
+            doctor=doctor,
+            appointment_date__gte=start_date_for_query,
+            appointment_date__lte=end_date_for_query
+        ).select_related('patient')
+
+        # Get doctor's availability
+        availability = DoctorAvailability.objects.filter(
+            doctor=doctor
+        )
+
+        # Group availability slots by day 
+        availability_summary = {}
+        total_available = 0
+        
+        for a in availability:
+            # Generate slots for each day in the range
+            current_date = start_date_for_query
+            while current_date <= end_date_for_query:
+                if current_date.weekday() == a.day_of_week:
+                    slots = a.generate_slots(current_date)
+                    date_str = current_date.strftime('%Y-%m-%d')
+                    
+                    # Count available slots for this day
+                    available_count = 0
+                    for slot in slots:
+                        # Check if there is an appointment at this time
+                        slot_date = slot.date()
+                        slot_time = slot.time()
+                        
+                        appointment_exists = appointments.filter(
+                            appointment_date=slot_date,
+                            appointment_time=slot_time
+                        ).exists()
+
+                        if not appointment_exists:
+                            available_count += 1
+                            total_available += 1
+                    
+                    # Store summary for this day
+                    if available_count > 0:
+                        if date_str not in availability_summary:
+                            availability_summary[date_str] = {
+                                'date': date_str,
+                                'available_count': 0,
+                                'start_time': a.start_time.strftime('%H:%M'),
+                                'end_time': a.end_time.strftime('%H:%M')
+                            }
+                        availability_summary[date_str]['available_count'] += available_count
+                
+                current_date += timedelta(days=1)
+
+        # Convert appointments to calendar events
+        events = []
+        for appointment in appointments:
+            try:
+                patient_name = appointment.patient.get_full_name() if appointment.patient else "No Patient"
+                
+                # Combine date and time into datetime objects
+                start_datetime = datetime.combine(appointment.appointment_date, appointment.appointment_time)
+                end_datetime = start_datetime + timedelta(minutes=30)
+
+                event = {
+                    'id': appointment.id,
+                    'title': f"{patient_name}",
+                    'start': start_datetime.strftime('%Y-%m-%dT%H:%M:%S'),
+                    'end': end_datetime.strftime('%Y-%m-%dT%H:%M:%S'),
+                    'status': appointment.status,
+                    'patient': patient_name,
+                    'doctor': doctor.name,
+                    'reason': appointment.reason,
+                    'token_number': appointment.token_number,
+                    'eventType': 'appointment'
+                }
+                events.append(event)
+            except (AttributeError, TypeError) as e:
+                logger.error(f"Error processing appointment {appointment.id}: {str(e)}")
+                continue
+
+        # Convert availability summary to events
+        for date_str, summary in availability_summary.items():
+            events.append({
+                'id': f"available_summary_{date_str}",
+                'title': f"{summary['available_count']} slots available",
+                'start': f"{date_str}T00:00:00",
+                'backgroundColor': '#e8f5e9',
+                'textColor': '#33691e',
+                'allDay': True,
+                'eventType': 'availabilitySummary',
+                'available_count': summary['available_count'],
+                'start_time': summary['start_time'],
+                'end_time': summary['end_time']
+            })
+
+        return JsonResponse({
+            'events': events,
+            'total_available': total_available
+        })
+    except Exception as e:
+        logger.error(f"Error in doctor_calendar_events: {str(e)}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=400)

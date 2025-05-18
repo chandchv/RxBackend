@@ -1,0 +1,516 @@
+{% extends 'base.html' %}
+
+{% block title %}Health Records{% endblock %}
+
+{% block content %}
+<div class="flex h-screen bg-gray-100">
+    
+    <div class="flex-1 overflow-y-auto transition-all duration-300 ease-in-out">
+        <div class="bg-white shadow-md rounded-lg p-6">
+            <h1 class="text-2xl font-bold mb-6">Health Records</h1>
+            
+            <!-- Search and Filter Controls -->
+            <div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
+                <div class="w-full md:w-1/2 lg:w-1/3">
+                    <div class="relative">
+                        <input type="text" id="searchInput" placeholder="Search records..." 
+                               class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="absolute left-3 top-2.5 text-gray-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <div>
+                        <label for="sortBy" class="block text-sm font-medium text-gray-700">Sort by</label>
+                        <select id="sortBy" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <option value="date_desc">Date (newest first)</option>
+                            <option value="date_asc">Date (oldest first)</option>
+                            <option value="type_asc">Record type (A-Z)</option>
+                            <option value="type_desc">Record type (Z-A)</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="filterType" class="block text-sm font-medium text-gray-700">Record Type</label>
+                        <select id="filterType" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <option value="all">All records</option>
+                            <option value="prescription">Prescriptions</option>
+                            <option value="lab">Lab Tests</option>
+                            <option value="vital">Vitals</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tab Navigation -->
+            <div class="mb-6 border-b border-gray-200">
+                <ul class="flex -mb-px" id="recordTabs">
+                    <li class="mr-2">
+                        <a href="#" class="tab-link inline-block p-4 text-blue-600 border-b-2 border-blue-500 font-medium text-sm" data-tab="all">
+                            All Records
+                        </a>
+                    </li>
+                    <li class="mr-2">
+                        <a href="#" class="tab-link inline-block p-4 text-gray-500 hover:text-gray-700 font-medium text-sm" data-tab="prescriptions">
+                            Prescriptions
+                        </a>
+                    </li>
+                    <li class="mr-2">
+                        <a href="#" class="tab-link inline-block p-4 text-gray-500 hover:text-gray-700 font-medium text-sm" data-tab="lab-tests">
+                            Lab Tests
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="tab-link inline-block p-4 text-gray-500 hover:text-gray-700 font-medium text-sm" data-tab="vitals">
+                            Vitals
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            
+            <!-- All Records Tab Content -->
+            <div class="tab-content" id="all-content">
+                <div class="overflow-x-auto">
+                    <table id="allRecordsTable" class="min-w-full bg-white">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" data-sort="type">
+                                    Record Type <span class="ml-1">↓</span>
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" data-sort="date">
+                                    Date <span class="ml-1">↓</span>
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="description">
+                                    Description
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200" id="allRecordsBody">
+                            <!-- Prescription Records -->
+                            {% for prescription in prescriptions %}
+                            <tr class="hover:bg-gray-50 record-row" data-type="prescription" data-date="{{ prescription.date|date:'Y-m-d' }}">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        Prescription
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-500">{{ prescription.date|date:"F j, Y" }}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm font-medium text-gray-900">By Dr. {{ prescription.doctor.name }}</div>
+                                    <div class="text-sm text-gray-500">
+                                        {% if prescription.diagnosis %}{{ prescription.diagnosis }}{% else %}Medication Prescription{% endif %}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <a href="{% url 'users:prescription_detail' prescription.id %}" class="text-blue-600 hover:text-blue-900">View</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            
+                            <!-- Lab Test Records -->
+                            {% for test in lab_tests %}
+                            <tr class="hover:bg-gray-50 record-row" data-type="lab" data-date="{{ test.updated_at|date:'Y-m-d' }}">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        Lab Test
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-500">{{ test.updated_at|date:"F j, Y" }}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm font-medium text-gray-900">{{ test.test_definition.name }}</div>
+                                    <div class="text-sm text-gray-500">
+                                        Status: {{ test.get_status_display }}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <a href="{% url 'users:patient_lab_test_detail' test.id %}" class="text-blue-600 hover:text-blue-900">View</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            
+                            <!-- Vital Records -->
+                            {% for vital in vitals %}
+                            <tr class="hover:bg-gray-50 record-row" data-type="vital" data-date="{{ vital.created_at|date:'Y-m-d' }}">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                        Vitals
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-500">{{ vital.created_at|date:"F j, Y" }}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm font-medium text-gray-900">Health Measurements</div>
+                                    <div class="text-sm text-gray-500">
+                                        {% if vital.weight %}Weight: {{ vital.weight }} kg{% endif %}
+                                        {% if vital.blood_pressure %}, BP: {{ vital.blood_pressure }}{% endif %}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <button class="text-blue-600 hover:text-blue-900 view-vitals" data-id="{{ vital.id }}">View</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            
+                            {% if not prescriptions and not lab_tests and not vitals %}
+                            <tr>
+                                <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                                    No health records found
+                                </td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Prescriptions Tab Content -->
+            <div class="tab-content hidden" id="prescriptions-content">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doctor</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Diagnosis</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            {% for prescription in prescriptions %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-500">{{ prescription.date|date:"F j, Y" }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">Dr. {{ prescription.doctor.name }}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-900">
+                                        {% if prescription.diagnosis %}{{ prescription.diagnosis }}{% else %}Medication Prescription{% endif %}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <a href="{% url 'users:prescription_detail' prescription.id %}" class="text-blue-600 hover:text-blue-900">View</a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                                    No prescriptions found
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Lab Tests Tab Content -->
+            <div class="tab-content hidden" id="lab-tests-content">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test Name</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            {% for test in lab_tests %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">{{ test.test_definition.name }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-500">{{ test.updated_at|date:"F j, Y" }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                        {% if test.status == 'COMPLETED' %}bg-blue-100 text-blue-800
+                                        {% elif test.status == 'REVIEWED' %}bg-green-100 text-green-800
+                                        {% elif test.status == 'PROCESSING' %}bg-yellow-100 text-yellow-800
+                                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                        {{ test.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <a href="{% url 'users:patient_lab_test_detail' test.id %}" class="text-blue-600 hover:text-blue-900">View</a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                                    No lab tests found
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Vitals Tab Content -->
+            <div class="tab-content hidden" id="vitals-content">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weight</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Blood Pressure</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">BMI</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            {% for vital in vitals %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-500">{{ vital.created_at|date:"F j, Y" }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">{% if vital.weight %}{{ vital.weight }} kg{% else %}-{% endif %}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">{% if vital.blood_pressure %}{{ vital.blood_pressure }}{% else %}-{% endif %}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">{% if vital.bmi %}{{ vital.bmi }}{% else %}-{% endif %}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <button class="text-blue-600 hover:text-blue-900 view-vitals" data-id="{{ vital.id }}">View</button>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                                    No vital records found
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Vitals Modal -->
+<div id="vitalsModal" class="fixed z-10 inset-0 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <div class="inline-block align-middle bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4" id="modal-title">
+                            Vitals Details
+                        </h3>
+                        <div class="mt-2 grid grid-cols-2 gap-4">
+                            <div class="col-span-2 sm:col-span-1">
+                                <div class="text-sm text-gray-500">Date:</div>
+                                <div class="text-sm font-medium" id="vital-date"></div>
+                            </div>
+                            <div class="col-span-2 sm:col-span-1">
+                                <div class="text-sm text-gray-500">Weight:</div>
+                                <div class="text-sm font-medium" id="vital-weight"></div>
+                            </div>
+                            <div class="col-span-2 sm:col-span-1">
+                                <div class="text-sm text-gray-500">Height:</div>
+                                <div class="text-sm font-medium" id="vital-height"></div>
+                            </div>
+                            <div class="col-span-2 sm:col-span-1">
+                                <div class="text-sm text-gray-500">BMI:</div>
+                                <div class="text-sm font-medium" id="vital-bmi"></div>
+                            </div>
+                            <div class="col-span-2 sm:col-span-1">
+                                <div class="text-sm text-gray-500">Blood Pressure:</div>
+                                <div class="text-sm font-medium" id="vital-bp"></div>
+                            </div>
+                            <div class="col-span-2 sm:col-span-1">
+                                <div class="text-sm text-gray-500">Heart Rate:</div>
+                                <div class="text-sm font-medium" id="vital-heartrate"></div>
+                            </div>
+                            <div class="col-span-2 sm:col-span-1">
+                                <div class="text-sm text-gray-500">Temperature:</div>
+                                <div class="text-sm font-medium" id="vital-temp"></div>
+                            </div>
+                            <div class="col-span-2 sm:col-span-1">
+                                <div class="text-sm text-gray-500">Oxygen Saturation:</div>
+                                <div class="text-sm font-medium" id="vital-o2sat"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm close-modal">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Tab switching
+    const tabLinks = document.querySelectorAll('.tab-link');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Remove active class from all tabs
+            tabLinks.forEach(tab => {
+                tab.classList.remove('text-blue-600', 'border-blue-500');
+                tab.classList.add('text-gray-500');
+            });
+            
+            // Add active class to clicked tab
+            this.classList.add('text-blue-600', 'border-blue-500');
+            this.classList.remove('text-gray-500');
+            
+            // Hide all tab content
+            tabContents.forEach(content => {
+                content.classList.add('hidden');
+            });
+            
+            // Show selected tab content
+            const tabId = this.getAttribute('data-tab');
+            document.getElementById(tabId + '-content').classList.remove('hidden');
+        });
+    });
+    
+    // Search and Filter functionality
+    const searchInput = document.getElementById('searchInput');
+    const sortSelect = document.getElementById('sortBy');
+    const typeFilter = document.getElementById('filterType');
+    const allRecordRows = document.querySelectorAll('.record-row');
+    
+    // Search functionality
+    searchInput.addEventListener('keyup', function() {
+        filterRecords();
+    });
+    
+    // Sort functionality
+    sortSelect.addEventListener('change', function() {
+        sortRecords(this.value);
+    });
+    
+    // Type filter
+    typeFilter.addEventListener('change', function() {
+        filterRecords();
+    });
+    
+    function filterRecords() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const typeValue = typeFilter.value;
+        
+        allRecordRows.forEach(row => {
+            const type = row.getAttribute('data-type');
+            const text = row.textContent.toLowerCase();
+            
+            const matchesSearch = text.includes(searchTerm);
+            const matchesType = typeValue === 'all' || type === typeValue;
+            
+            row.style.display = (matchesSearch && matchesType) ? '' : 'none';
+        });
+    }
+    
+    function sortRecords(sortValue) {
+        const tbody = document.getElementById('allRecordsBody');
+        const rows = Array.from(allRecordRows);
+        
+        rows.sort((a, b) => {
+            if (sortValue === 'date_desc' || sortValue === 'date_asc') {
+                const dateA = new Date(a.getAttribute('data-date'));
+                const dateB = new Date(b.getAttribute('data-date'));
+                return sortValue === 'date_asc' ? dateA - dateB : dateB - dateA;
+            } 
+            else if (sortValue === 'type_asc' || sortValue === 'type_desc') {
+                const typeA = a.getAttribute('data-type');
+                const typeB = b.getAttribute('data-type');
+                return sortValue === 'type_asc' ? 
+                    typeA.localeCompare(typeB) : 
+                    typeB.localeCompare(typeA);
+            }
+        });
+        
+        // Re-append rows in the new sorted order
+        rows.forEach(row => {
+            tbody.appendChild(row);
+        });
+    }
+    
+    // Vitals Modal Functionality
+    const vitalsModal = document.getElementById('vitalsModal');
+    const vitalsButtons = document.querySelectorAll('.view-vitals');
+    const closeModalButtons = document.querySelectorAll('.close-modal');
+    
+    vitalsButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const vitalId = this.getAttribute('data-id');
+            
+            // In a real implementation, you'd fetch the vitals data via AJAX
+            // For now, we'll just simulate it with the data we already have
+            
+            // Find the row with the vital data
+            const row = this.closest('tr');
+            const date = row.querySelector('td:nth-child(1) div').textContent;
+            
+            // Update modal content
+            document.getElementById('vital-date').textContent = date;
+            
+            // In a real implementation, you'd populate all these fields
+            // For now, we'll just use placeholder data
+            document.getElementById('vital-weight').textContent = row.querySelector('td:nth-child(2) div')?.textContent || 'N/A';
+            document.getElementById('vital-height').textContent = 'N/A';
+            document.getElementById('vital-bmi').textContent = 'N/A';
+            document.getElementById('vital-bp').textContent = row.querySelector('td:nth-child(3) div')?.textContent || 'N/A';
+            document.getElementById('vital-heartrate').textContent = 'N/A';
+            document.getElementById('vital-temp').textContent = 'N/A';
+            document.getElementById('vital-o2sat').textContent = 'N/A';
+            
+            // Show modal
+            vitalsModal.classList.remove('hidden');
+        });
+    });
+    
+    closeModalButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            vitalsModal.classList.add('hidden');
+        });
+    });
+    
+    // Close modal when clicking outside of it
+    window.addEventListener('click', function(event) {
+        if (event.target === vitalsModal) {
+            vitalsModal.classList.add('hidden');
+        }
+    });
+    
+    // Initialize with default sorting
+    sortRecords('date_desc');
+});
+</script>
+{% endblock %}
+ 

@@ -1,0 +1,88 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RxDoctor{% endblock %}</title>
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="bg-gray-100">
+    <!-- Header -->
+    <header class="bg-white shadow-md">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex justify-between items-center">
+                <div>
+                    <a href="{% url 'home' %}" class="text-xl font-bold text-blue-600">RxDoctor</a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="{% url 'users:staff_calendar' %}" class="text-gray-700 hover:text-gray-900">Calendar</a>
+                </div>
+                {% if user.is_authenticated %}
+                <div class="flex items-center space-x-4">
+                    {% include 'components/notification_modal.html' %}
+                    <div class="relative group">
+                        <button class="flex items-center space-x-2 text-gray-700 hover:text-gray-900">
+                            <span>{{ user.get_full_name|default:user.username }}</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg hidden group-hover:block">
+                            <div class="py-1">
+                                <a href="{% url 'users:profile' %}" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">Profile</a>
+                                <a href="{% url 'users:settings' %}" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">Settings</a>
+                                <hr class="my-1">
+                                <form method="post" action="{% url 'logout' %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100">Logout</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white shadow-md mt-8">
+        <div class="container mx-auto px-4 py-6">
+            <p class="text-center text-gray-600">&copy; {% now "Y" %} RxDoctor. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Debug Info (only in development) -->
+    {% if debug %}
+    <div class="fixed bottom-0 right-0 bg-gray-800 text-white p-2 text-xs">
+        <p>Debug Mode</p>
+    </div>
+    {% endif %}
+
+    <!-- Base Scripts -->
+    <script>
+        const csrfToken = "{{ csrf_token }}";
+        document.addEventListener('htmx:configRequest', function(evt) {
+            evt.detail.headers['X-CSRFToken'] = csrfToken;
+        });
+    </script>
+
+    <!-- Component Scripts -->
+    {% block notification_js %}{% endblock %}
+    
+    <!-- Additional Scripts -->
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

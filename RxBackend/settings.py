@@ -53,6 +53,11 @@ INSTALLED_APPS = [
     'HealthRecords',
     'widget_tweaks',
     'notifications',
+    'billing',
+    'django.contrib.humanize',
+    'pharmacy',
+    'appointment',
+    'scheduling',
 ]
 
 MIDDLEWARE = [
@@ -65,6 +70,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'users.middleware.RoleBasedRedirectionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
 ]
 
 ROOT_URLCONF = "RxBackend.urls"
@@ -96,9 +102,17 @@ WSGI_APPLICATION = "RxBackend.wsgi.application"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 DATABASES = {
+    #"default": {
+    #    "ENGINE": "django.db.backends.sqlite3",
+    #    "NAME": BASE_DIR / "db.sqlite3",
+    #}
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "rxdoctor",
+        "USER": "postgres",
+        "PASSWORD": "admin",
+        "HOST": "localhost",
+        "PORT": "5432",
     }
 }
 
