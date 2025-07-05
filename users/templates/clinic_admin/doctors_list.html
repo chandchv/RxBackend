@@ -23,14 +23,14 @@
                 </select>
                 {% endif %}
                 <div class="flex space-x-2">
-                    <button onclick="showAddDoctorModal()" 
-                            class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+                    <a href="{% url 'users:add_doctor' %}" 
+                       class="block w-full text-center bg-green-400 hover:bg-green-600 text-white !text-white font-bold text-sm px-6 py-3 rounded-lg shadow transition duration-300 text-center">
                         Add New Doctor
-                    </button>
-                    <button onclick="showAssignDoctorModal()" 
-                            class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+                    </a>
+                    <a href="{% url 'users:assign_doctor' %}" 
+                       class="block w-full text-center bg-green-400 hover:bg-green-600 text-white !text-white font-bold text-sm px-6 py-3 rounded-lg shadow transition duration-300 text-center">
                         Assign Existing Doctor
-                    </button>
+                    </a>
                 </div>
             </div>
         </div>

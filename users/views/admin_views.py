@@ -60,13 +60,13 @@ def superuser_dashboard(request):
             'completed_orders': LabOrder.objects.filter(status='completed').count(),
         }
         
-        # User Statistics
+        # User Statistics - Handle database schema changes gracefully
         user_stats = {
             'total_doctors': Doctor.objects.count(),
             'total_patients': Patient.objects.count(),
             'total_staff': Staff.objects.count(),
-            'active_doctors': Doctor.objects.filter(user__is_active=True).count(),
-            'active_patients': Patient.objects.filter(user__is_active=True).count(),
+            'active_doctors': Doctor.objects.filter(is_active=True).count(),
+            'active_patients': Patient.objects.count(),
         }
         
         # Health Records Statistics (if available)
@@ -85,11 +85,19 @@ def superuser_dashboard(request):
             logger.warning("HealthRecords app not available")
         
         # Recent Activity
-        recent_activity = {
-            'lab_orders': LabOrder.objects.select_related('patient', 'chosen_lab').order_by('-order_date')[:5],
-            'labs': LabProfile.objects.select_related('user').order_by('-created_at')[:5],
-            'doctors': Doctor.objects.select_related('user').order_by('-created_at')[:5],
-        }
+        try:
+            recent_activity = {
+                'lab_orders': LabOrder.objects.order_by('-order_date')[:5],
+                'labs': LabProfile.objects.order_by('-created_at')[:5],
+                'doctors': Doctor.objects.order_by('-created_at')[:5],
+            }
+        except Exception as e:
+            logger.error(f"Error fetching recent activity: {str(e)}")
+            recent_activity = {
+                'lab_orders': [],
+                'labs': [],
+                'doctors': [],
+            }
         
         context = {
             'lab_stats': lab_stats,

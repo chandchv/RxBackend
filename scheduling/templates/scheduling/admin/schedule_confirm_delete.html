@@ -1,0 +1,120 @@
+{% extends 'scheduling/base_scheduling.html' %}
+{% load static %}
+
+{% block title %}Delete Schedule{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">Delete Schedule</h1>
+        <a href="{% url 'scheduling:schedule_list' %}" 
+           class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Schedules
+        </a>
+    </div>
+
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="flex items-center mb-4">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-exclamation-triangle text-yellow-400 text-3xl"></i>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">
+                        Confirm Deletion
+                    </h3>
+                    <div class="mt-2 text-sm text-gray-500">
+                        <p>Are you sure you want to delete this schedule? This action cannot be undone.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Schedule Details -->
+            <div class="border-t border-gray-200 pt-4">
+                <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Doctor</dt>
+                        <dd class="mt-1 text-sm text-gray-900">
+                            Dr. {{ schedule.doctor.user.get_full_name }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Day</dt>
+                        <dd class="mt-1 text-sm text-gray-900">
+                            {% if schedule.day_of_week == 0 %}Monday
+                            {% elif schedule.day_of_week == 1 %}Tuesday
+                            {% elif schedule.day_of_week == 2 %}Wednesday
+                            {% elif schedule.day_of_week == 3 %}Thursday
+                            {% elif schedule.day_of_week == 4 %}Friday
+                            {% elif schedule.day_of_week == 5 %}Saturday
+                            {% elif schedule.day_of_week == 6 %}Sunday
+                            {% endif %}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Time</dt>
+                        <dd class="mt-1 text-sm text-gray-900">
+                            {{ schedule.start_time|time:"g:i A" }} - {{ schedule.end_time|time:"g:i A" }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Status</dt>
+                        <dd class="mt-1">
+                            {% if schedule.is_active %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                Active
+                            </span>
+                            {% else %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                Inactive
+                            </span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+
+            <!-- Warning Message -->
+            <div class="mt-6 bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-yellow-800">
+                            Warning
+                        </h3>
+                        <div class="mt-2 text-sm text-yellow-700">
+                            <p>Deleting this schedule will:</p>
+                            <ul class="list-disc pl-5 mt-1">
+                                <li>Remove all associated appointment slots</li>
+                                <li>Affect future appointment bookings</li>
+                                <li>Cannot be reversed</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <form method="post" class="mt-6">
+                {% csrf_token %}
+                <div class="flex justify-end space-x-3">
+                    <a href="{% url 'scheduling:schedule_list' %}" 
+                       class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Cancel
+                    </a>
+                    <button type="submit" 
+                            class="bg-red-600 border border-transparent rounded-md shadow-sm py-2 px-4 inline-flex justify-center text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                        <i class="fas fa-trash mr-2"></i>
+                        Delete Schedule
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

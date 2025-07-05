@@ -94,6 +94,9 @@
             <a href="#" class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 mr-2 mb-2">
                 <i class="fas fa-clock mr-2"></i> Office Hours
             </a>
+            <a href="{% url 'scheduling:sync_appointments' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 mr-2 mb-2">
+                <i class="fas fa-sync mr-2"></i> Sync with Existing Appointments
+            </a>
             {% elif user.is_staff or user.is_superuser %}
             <div class="flex flex-wrap">
                 <div class="mr-8 mb-4">
@@ -116,7 +119,7 @@
                     <a href="{% url 'scheduling:holiday_list' %}" class="inline-flex items-center px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 mr-2 mb-2">
                         <i class="fas fa-calendar-times mr-2"></i> Holidays
                     </a>
-                    <a href="{% url 'scheduling:appointment_types' %}" class="inline-flex items-center px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 mr-2 mb-2">
+                    <a href="{% url 'scheduling:appointment_type_list' %}" class="inline-flex items-center px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 mr-2 mb-2">
                         <i class="fas fa-tags mr-2"></i> Types
                     </a>
                     {% if user.is_superuser %}
@@ -429,7 +432,7 @@
                             <i class="fas fa-plus-circle me-2"></i> New Appointment
                         </a>
                         {% if user.doctor %}
-                        <a href="#" class="btn btn-outline-secondary">
+                        <a href="{/scheduling/schedules/create/}" class="btn btn-outline-secondary">
                             <i class="fas fa-user-md me-2"></i> My Schedule
                         </a>
                         <a href="#" class="btn btn-outline-secondary">

@@ -1,34 +1,17 @@
 from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import User
 from django.utils.html import format_html
-from .models import Clinic, Doctor, UserProfile, Patient, Appointment, Prescription, PrescriptionItem, ClinicAdmin
+from django.utils.translation import gettext_lazy as _
+from .models import (
+    Clinic, Doctor, UserProfile, Patient, Appointment, 
+    Prescription, PrescriptionItem, ClinicAdmin, DoctorAvailability, 
+    ActivityLog, DoctorLeave, Staff, StaffLeave, Bill, BillingItem, 
+    BillItem, Payment, AppointmentSlot
+)
 
-# First unregister if models are already registered
-try:
-    admin.site.unregister(Doctor)
-except admin.sites.NotRegistered:
-    pass
-
-try:
-    admin.site.unregister(UserProfile)
-except admin.sites.NotRegistered:
-    pass
-
-try:
-    admin.site.unregister(Patient)
-except admin.sites.NotRegistered:
-    pass
-
-try:
-    admin.site.unregister(Appointment)
-except admin.sites.NotRegistered:
-    pass
-
-try:
-    admin.site.unregister(Prescription)
-except admin.sites.NotRegistered:
-    pass
+# Remove custom User admin configuration
+# We'll use Django's built-in UserAdmin
 
 @admin.register(ClinicAdmin)
 class ClinicAdminAdmin(admin.ModelAdmin):

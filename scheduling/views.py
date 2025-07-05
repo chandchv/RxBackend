@@ -11,9 +11,10 @@ from django.views.decorators.http import require_POST
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User, Group
-from .models import AppointmentSchedule, Holiday, ScheduledAppointment
-from users.models import Doctor, Patient, Clinic
+from users.models import Doctor, Patient, Clinic, Appointment
+from .models import AppointmentSchedule, AppointmentType, Holiday, ScheduledAppointment, SchedulingSettings
 from .forms import AppointmentForm, AppointmentScheduleForm, HolidayForm
+from django.shortcuts import redirect, get_object_or_404
 
 def login_view(request):
     if request.user.is_authenticated:
@@ -57,7 +58,7 @@ def logout_view(request):
     return redirect('scheduling:login')
 
 class AppointmentListView(LoginRequiredMixin, ListView):
-    model = ScheduledAppointment
+    model = Appointment  # Use users.Appointment as primary model
     template_name = 'scheduling/appointment_list.html'
     context_object_name = 'appointments'
     paginate_by = 10
@@ -83,21 +84,16 @@ class AppointmentListView(LoginRequiredMixin, ListView):
         if doctor_id:
             queryset = queryset.filter(doctor_id=doctor_id)
             
-        clinic_id = self.request.GET.get('clinic')
-        if clinic_id:
-            queryset = queryset.filter(clinic_id=clinic_id)
-            
         # If user is a doctor, show only their appointments
         if hasattr(self.request.user, 'doctor'):
             queryset = queryset.filter(doctor=self.request.user.doctor)
             
-        return queryset
+        return queryset.order_by('-appointment_date', 'appointment_time')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['doctors'] = Doctor.objects.all()
-        context['clinics'] = Clinic.objects.all()
-        context['statuses'] = dict(ScheduledAppointment._meta.get_field('status').choices)
+        context['statuses'] = Appointment.STATUS_CHOICES
         
         # Add filters to context
         context['filters'] = {
@@ -105,17 +101,25 @@ class AppointmentListView(LoginRequiredMixin, ListView):
             'end_date': self.request.GET.get('end_date', ''),
             'status': self.request.GET.get('status', ''),
             'doctor': self.request.GET.get('doctor', ''),
-            'clinic': self.request.GET.get('clinic', ''),
         }
         return context
 
 class AppointmentDetailView(LoginRequiredMixin, DetailView):
-    model = ScheduledAppointment
+    model = Appointment  # Use users.Appointment
     template_name = 'scheduling/appointment_detail.html'
     context_object_name = 'appointment'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Get scheduling info if it exists
+        try:
+            context['scheduling_info'] = ScheduledAppointment.objects.get(appointment=self.object)
+        except ScheduledAppointment.DoesNotExist:
+            context['scheduling_info'] = None
+        return context
 
 class AppointmentCreateView(LoginRequiredMixin, CreateView):
-    model = ScheduledAppointment
+    model = Appointment  # Use users.Appointment
     form_class = AppointmentForm
     template_name = 'scheduling/appointment_form.html'
     success_url = reverse_lazy('scheduling:appointment_list')
@@ -126,12 +130,11 @@ class AppointmentCreateView(LoginRequiredMixin, CreateView):
         return kwargs
     
     def form_valid(self, form):
-        form.instance.created_by = self.request.user
         messages.success(self.request, 'Appointment created successfully.')
         return super().form_valid(form)
 
 class AppointmentUpdateView(LoginRequiredMixin, UpdateView):
-    model = ScheduledAppointment
+    model = Appointment  # Use users.Appointment
     form_class = AppointmentForm
     template_name = 'scheduling/appointment_form.html'
     success_url = reverse_lazy('scheduling:appointment_list')
@@ -146,7 +149,7 @@ class AppointmentUpdateView(LoginRequiredMixin, UpdateView):
         return super().form_valid(form)
 
 class AppointmentDeleteView(LoginRequiredMixin, DeleteView):
-    model = ScheduledAppointment
+    model = Appointment  # Use users.Appointment
     template_name = 'scheduling/appointment_confirm_delete.html'
     success_url = reverse_lazy('scheduling:appointment_list')
     
@@ -168,10 +171,9 @@ def get_calendar_appointments(request):
     """API endpoint to get appointments for the calendar"""
     start_date = request.GET.get('start')
     end_date = request.GET.get('end')
-    doctor_id = request.GET.get('doctor')
-    clinic_id = request.GET.get('clinic')
+    doctor_id = request.GET.get('doctor') 
     
-    appointments = ScheduledAppointment.objects.all()
+    appointments = Appointment.objects.all()  # Use users.Appointment
     
     if start_date:
         # Parse the ISO date string and extract just the date part
@@ -197,8 +199,6 @@ def get_calendar_appointments(request):
     
     if doctor_id:
         appointments = appointments.filter(doctor_id=doctor_id)
-    if clinic_id:
-        appointments = appointments.filter(clinic_id=clinic_id)
         
     # If user is a doctor, show only their appointments
     if hasattr(request.user, 'doctor'):
@@ -209,11 +209,10 @@ def get_calendar_appointments(request):
         # Different colors for different statuses
         color_map = {
             'scheduled': '#3788d8',
-            'confirmed': '#28a745',
-            'completed': '#6c757d',
+            'completed': '#28a745',
             'cancelled': '#dc3545',
             'no_show': '#fd7e14',
-            'rescheduled': '#17a2b8',
+            'missed': '#17a2b8',
         }
         
         # Create the appointment datetime
@@ -224,6 +223,13 @@ def get_calendar_appointments(request):
         
         # Assume appointments last 30 minutes
         end_datetime = start_datetime + timedelta(minutes=30)
+        
+        # Get scheduling info if available
+        scheduling_info = None
+        try:
+            scheduling_info = ScheduledAppointment.objects.get(appointment=appointment)
+        except ScheduledAppointment.DoesNotExist:
+            pass
         
         events.append({
             'id': appointment.id,
@@ -236,6 +242,8 @@ def get_calendar_appointments(request):
                 'doctor': str(appointment.doctor),
                 'status': appointment.get_status_display(),
                 'reason': appointment.reason,
+                'is_telemedicine': scheduling_info.is_telemedicine if scheduling_info else False,
+                'is_emergency': scheduling_info.is_emergency if scheduling_info else False,
             },
             'url': reverse_lazy('scheduling:appointment_detail', args=[appointment.id]),
         })
@@ -291,10 +299,10 @@ def get_available_slots(request):
         return JsonResponse({'slots': [], 'message': 'No schedule available for this day.'})
     
     # Get all existing appointments for this doctor and date
-    existing_appointments = ScheduledAppointment.objects.filter(
+    existing_appointments = Appointment.objects.filter(
         doctor=doctor,
         appointment_date=date,
-        status__in=['scheduled', 'confirmed']
+        status__in=['scheduled', 'completed']
     ).values_list('appointment_time', flat=True)
     
     # Convert to set for faster lookups
@@ -347,10 +355,10 @@ def get_available_slots(request):
 @login_required
 def change_appointment_status(request, pk):
     """Change the status of an appointment"""
-    appointment = get_object_or_404(ScheduledAppointment, pk=pk)
+    appointment = get_object_or_404(Appointment, pk=pk)  # Use users.Appointment
     status = request.POST.get('status')
     
-    if status and status in dict(ScheduledAppointment._meta.get_field('status').choices):
+    if status and status in dict(Appointment.STATUS_CHOICES):
         appointment.status = status
         appointment.save()
         messages.success(request, f'Appointment status changed to {appointment.get_status_display()}.')
@@ -363,14 +371,15 @@ def change_appointment_status(request, pk):
 def dashboard(request):
     """Dashboard view for scheduling app"""
     today = timezone.now().date()
-    # Get today's appointments
-    today_appointments_query = ScheduledAppointment.objects.filter(
+    
+    # Get today's appointments using users.Appointment
+    today_appointments_query = Appointment.objects.filter(
         appointment_date=today
     ).order_by('appointment_time')
     
     # Get upcoming appointments (next 7 days, excluding today)
     upcoming_date = today + timedelta(days=7)
-    upcoming_appointments_query = ScheduledAppointment.objects.filter(
+    upcoming_appointments_query = Appointment.objects.filter(
         appointment_date__gt=today,
         appointment_date__lte=upcoming_date
     ).order_by('appointment_date', 'appointment_time')
@@ -386,7 +395,7 @@ def dashboard(request):
     
     # Get appointment counts for stats
     today_count = today_appointments.count()
-    upcoming_count = ScheduledAppointment.objects.filter(
+    upcoming_count = Appointment.objects.filter(
         appointment_date__gt=today
     ).count()
     
@@ -394,18 +403,18 @@ def dashboard(request):
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
     
-    confirmed_count = ScheduledAppointment.objects.filter(
-        status='confirmed',
+    confirmed_count = Appointment.objects.filter(
+        status='completed',  # Use 'completed' instead of 'confirmed'
         appointment_date__range=[week_start, week_end]
     ).count()
     
-    pending_count = ScheduledAppointment.objects.filter(
+    pending_count = Appointment.objects.filter(
         status='scheduled'
     ).count()
     
     # Last 30 days for no-shows
     thirty_days_ago = today - timedelta(days=30)
-    no_show_count = ScheduledAppointment.objects.filter(
+    no_show_count = Appointment.objects.filter(
         status='no_show',
         appointment_date__gte=thirty_days_ago,
         appointment_date__lte=today
@@ -431,17 +440,9 @@ def dashboard(request):
             except:
                 doctor.todaySchedule = None
         
-        # Get appointment types
-        from django.apps import apps
-        if apps.is_installed('appointment'):
-            try:
-                AppointmentType = apps.get_model('appointment', 'AppointmentType')
-                # Apply all filters first then slice
-                appointment_types_query = AppointmentType.objects.all()
-                appointment_types = appointment_types_query[:5]
-            except LookupError:
-                # The model doesn't exist in the installed app
-                pass
+        # Get appointment types from our scheduling system
+        appointment_types_query = AppointmentType.objects.filter(is_active=True)
+        appointment_types = appointment_types_query[:5]
         
         # Get upcoming holidays
         upcoming_holidays = Holiday.objects.filter(
@@ -520,7 +521,7 @@ class DoctorDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['schedules'] = AppointmentSchedule.objects.filter(doctor=self.object)
-        context['appointments'] = ScheduledAppointment.objects.filter(doctor=self.object)
+        context['appointments'] = ScheduledAppointment.objects.filter(appointment__doctor=self.object)
         return context
 
 class DoctorUpdateView(LoginRequiredMixin, UpdateView):
@@ -540,7 +541,12 @@ class HolidayListView(LoginRequiredMixin, ListView):
     context_object_name = 'holidays'
     
     def get_queryset(self):
-        return Holiday.objects.all().order_by('-date')
+        return Holiday.objects.all().order_by('date')
+
+class HolidayDetailView(LoginRequiredMixin, DetailView):
+    model = Holiday
+    template_name = 'scheduling/admin/holiday_detail.html'
+    context_object_name = 'holiday'
 
 class HolidayCreateView(LoginRequiredMixin, CreateView):
     model = Holiday
@@ -591,7 +597,7 @@ class AppointmentTypeListView(LoginRequiredMixin, ListView):
 
 class AppointmentTypeCreateView(LoginRequiredMixin, CreateView):
     template_name = 'scheduling/admin/appointment_type_form.html'
-    success_url = reverse_lazy('scheduling:appointment_types')
+    success_url = reverse_lazy('scheduling:appointment_type_list')
     
     def get_form_class(self):
         from django.apps import apps
@@ -618,7 +624,7 @@ class AppointmentTypeCreateView(LoginRequiredMixin, CreateView):
     def get(self, request, *args, **kwargs):
         form_class = self.get_form_class()
         if form_class is None:
-            return redirect('scheduling:appointment_types')
+            return redirect('scheduling:appointment_type_list')
         return super().get(request, *args, **kwargs)
     
     def form_valid(self, form):
@@ -627,7 +633,7 @@ class AppointmentTypeCreateView(LoginRequiredMixin, CreateView):
 
 class AppointmentTypeUpdateView(LoginRequiredMixin, UpdateView):
     template_name = 'scheduling/admin/appointment_type_form.html'
-    success_url = reverse_lazy('scheduling:appointment_types')
+    success_url = reverse_lazy('scheduling:appointment_type_list')
     
     def get_queryset(self):
         from django.apps import apps
@@ -664,7 +670,7 @@ class AppointmentTypeUpdateView(LoginRequiredMixin, UpdateView):
     def get(self, request, *args, **kwargs):
         form_class = self.get_form_class()
         if form_class is None:
-            return redirect('scheduling:appointment_types')
+            return redirect('scheduling:appointment_type_list')
         return super().get(request, *args, **kwargs)
     
     def form_valid(self, form):
@@ -673,7 +679,7 @@ class AppointmentTypeUpdateView(LoginRequiredMixin, UpdateView):
 
 class AppointmentTypeDeleteView(LoginRequiredMixin, DeleteView):
     template_name = 'scheduling/admin/appointment_type_confirm_delete.html'
-    success_url = reverse_lazy('scheduling:appointment_types')
+    success_url = reverse_lazy('scheduling:appointment_type_list')
     
     def get_queryset(self):
         from django.apps import apps
@@ -690,7 +696,7 @@ class AppointmentTypeDeleteView(LoginRequiredMixin, DeleteView):
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         if queryset is None:
-            return redirect('scheduling:appointment_types')
+            return redirect('scheduling:appointment_type_list')
         return super().get(request, *args, **kwargs)
     
     def delete(self, request, *args, **kwargs):
@@ -706,17 +712,213 @@ def scheduling_settings(request):
     # Check if django-appointment is installed
     has_appointment_app = apps.is_installed('appointment')
     
-    context = {
-        'has_appointment_app': has_appointment_app,
-    }
+    # Get or create settings instance
+    settings = SchedulingSettings.get_settings()
     
     if request.method == 'POST':
-        # Process settings form
-        setting_name = request.POST.get('setting_name')
-        setting_value = request.POST.get('setting_value')
+        setting_category = request.POST.get('setting_category')
         
-        # Save setting (implementation depends on your settings storage mechanism)
-        messages.success(request, f'Setting "{setting_name}" updated successfully.')
+        if setting_category == 'general':
+            # Update general settings
+            settings.default_appointment_duration = int(request.POST.get('default_appointment_duration', 30))
+            settings.min_scheduling_notice = int(request.POST.get('min_scheduling_notice', 24))
+            settings.max_days_in_advance = int(request.POST.get('max_days_in_advance', 90))
+            settings.buffer_between_appointments = int(request.POST.get('buffer_between_appointments', 5))
+            settings.default_start_time = request.POST.get('default_start_time', '09:00')
+            settings.default_end_time = request.POST.get('default_end_time', '17:00')
+            settings.save()
+            messages.success(request, 'General settings updated successfully.')
+            
+        elif setting_category == 'notifications':
+            # Update notification settings
+            settings.send_confirmation_emails = 'send_confirmation_emails' in request.POST
+            settings.send_reminder_emails = 'send_reminder_emails' in request.POST
+            settings.reminder_hours = int(request.POST.get('reminder_hours', 24))
+            settings.send_sms_reminders = 'send_sms_reminders' in request.POST
+            settings.sms_reminder_hours = int(request.POST.get('sms_reminder_hours', 2))
+            settings.save()
+            messages.success(request, 'Notification settings updated successfully.')
+        
         return redirect('scheduling:settings')
     
+    context = {
+        'has_appointment_app': has_appointment_app,
+        'settings': settings,
+    }
+    
     return render(request, 'scheduling/admin/settings.html', context)
+
+@login_required
+def integrated_appointment_create(request):
+    """Create appointment using the existing appointment system but with scheduling integration"""
+    try:
+        if hasattr(request.user, 'doctor'):
+            doctor = request.user.doctor
+            
+            if request.method == 'POST':
+                form = AppointmentForm(request.POST, user=request.user)
+                if form.is_valid():
+                    # Create appointment using the existing Appointment model from users app
+                    from users.models import Appointment as UserAppointment
+                    
+                    appointment = UserAppointment.objects.create(
+                        doctor=doctor,
+                        patient=form.cleaned_data['patient'],
+                        appointment_date=form.cleaned_data['appointment_date'],
+                        appointment_time=form.cleaned_data['appointment_time'],
+                        reason=form.cleaned_data['reason'],
+                        status='scheduled'
+                    )
+                    
+                    # Mark the slot as booked if it exists
+                    from users.models import AppointmentSlot
+                    slot = AppointmentSlot.objects.filter(
+                        doctor=doctor,
+                        date=form.cleaned_data['appointment_date'],
+                        start_time=form.cleaned_data['appointment_time'],
+                        is_booked=False
+                    ).first()
+                    
+                    if slot:
+                        slot.is_booked = True
+                        slot.save()
+                    
+                    messages.success(request, 'Appointment scheduled successfully!')
+                    return redirect('scheduling:dashboard')
+            else:
+                form = AppointmentForm(user=request.user)
+                
+            context = {
+                'form': form,
+                'doctor': doctor,
+                'min_date': timezone.now().date().isoformat(),
+            }
+            return render(request, 'scheduling/appointment_form.html', context)
+        else:
+            messages.error(request, 'Only doctors can create appointments')
+            return redirect('scheduling:dashboard')
+            
+    except Exception as e:
+        messages.error(request, f'Error creating appointment: {str(e)}')
+        return redirect('scheduling:dashboard')
+
+@login_required
+def sync_with_existing_appointments(request):
+    """Sync scheduling system with existing appointments"""
+    try:
+        # Import existing appointment model
+        from users.models import Appointment as UserAppointment
+        
+        # Get all existing appointments that don't have scheduling counterparts
+        user_appointments = UserAppointment.objects.all()
+        synced_count = 0
+        
+        for user_appointment in user_appointments:
+            # Check if this appointment already has a bridge record
+            existing_scheduled = ScheduledAppointment.objects.filter(
+                appointment=user_appointment
+            ).exists()
+            
+            if not existing_scheduled:
+                # Create corresponding scheduled appointment bridge
+                ScheduledAppointment.objects.create(
+                    appointment=user_appointment,
+                    is_telemedicine=False,
+                    is_emergency=False,
+                    is_walk_in=getattr(user_appointment, 'is_walk_in', False),
+                    notes='',
+                    created_by=user_appointment.doctor.user
+                )
+                synced_count += 1
+        
+        messages.success(request, f'Successfully synced {synced_count} appointments with scheduling system')
+        return redirect('scheduling:dashboard')
+        
+    except Exception as e:
+        messages.error(request, f'Error syncing appointments: {str(e)}')
+        return redirect('scheduling:dashboard')
+
+@login_required 
+def generate_slots_from_existing_availability(request):
+    """Generate slots using existing DoctorAvailability from users app"""
+    try:
+        if not hasattr(request.user, 'doctor'):
+            messages.error(request, 'Only doctors can generate slots')
+            return redirect('scheduling:dashboard')
+            
+        doctor = request.user.doctor
+        
+        # Import existing availability model
+        from users.models import DoctorAvailability, AppointmentSlot
+        
+        # Get existing availability
+        availabilities = DoctorAvailability.objects.filter(
+            doctor=doctor,
+            is_available=True
+        )
+        
+        if not availabilities.exists():
+            messages.warning(request, 'No availability found. Please set up your availability first.')
+            return redirect('users:manage_availability')
+        
+        # Also create scheduling system availability if it doesn't exist
+        for availability in availabilities:
+            schedule, created = AppointmentSchedule.objects.get_or_create(
+                doctor=doctor,
+                clinic=doctor.clinic,
+                day_of_week=availability.day_of_week,
+                defaults={
+                    'start_time': availability.start_time,
+                    'end_time': availability.end_time,
+                    'appointment_duration': 30,  # Default 30 minutes
+                    'is_active': availability.is_available
+                }
+            )
+            
+            if created:
+                print(f"Created scheduling availability for {doctor} on day {availability.day_of_week}")
+        
+        # Generate slots for next 30 days
+        today = timezone.now().date()
+        end_date = today + timedelta(days=30)
+        slots_created = 0
+        
+        current_date = today
+        while current_date <= end_date:
+            # Get availability for current day
+            day_availability = availabilities.filter(
+                day_of_week=current_date.weekday()
+            ).first()
+            
+            if day_availability:
+                # Delete existing unbooked slots for this date
+                AppointmentSlot.objects.filter(
+                    doctor=doctor,
+                    date=current_date,
+                    is_booked=False
+                ).delete()
+                
+                # Generate new slots
+                try:
+                    slots = day_availability.generate_slots(current_date)
+                    for slot_time in slots:
+                        slot, created = AppointmentSlot.objects.get_or_create(
+                            doctor=doctor,
+                            date=current_date,
+                            start_time=slot_time.time(),
+                            end_time=(slot_time + timedelta(minutes=30)).time(),
+                            defaults={'is_booked': False}
+                        )
+                        if created:
+                            slots_created += 1
+                except Exception as e:
+                    print(f"Error generating slots for {current_date}: {str(e)}")
+            
+            current_date += timedelta(days=1)
+        
+        messages.success(request, f'Generated {slots_created} appointment slots')
+        return redirect('scheduling:dashboard')
+        
+    except Exception as e:
+        messages.error(request, f'Error generating slots: {str(e)}')
+        return redirect('scheduling:dashboard')

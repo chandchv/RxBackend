@@ -1,0 +1,250 @@
+{% extends 'base.html' %}
+
+{% block title %}My Appointments - Scheduling Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">My Appointments</h1>
+                <p class="text-gray-600">Manage all your appointments in one place</p>
+            </div>
+            <div class="flex space-x-3">
+                <a href="{% url 'users:patient_create_appointment' %}" 
+                   class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">
+                    Quick Book
+                </a>
+                <a href="{% url 'users:patient_book_appointment_scheduling' %}" 
+                   class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md">
+                    Advanced Booking
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Upcoming (7 days)</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ total_upcoming }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Total Future</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ total_all }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Active Doctors</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ patient.doctors.count }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <a href="{% url 'users:patient_create_appointment' %}" 
+           class="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-lg text-center">
+            <div class="text-lg font-semibold">Quick Book</div>
+            <div class="text-sm opacity-90">Legacy System</div>
+        </a>
+        <a href="{% url 'users:patient_book_appointment_scheduling' %}" 
+           class="bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-lg text-center">
+            <div class="text-lg font-semibold">Advanced Book</div>
+            <div class="text-sm opacity-90">Full Features</div>
+        </a>
+        <a href="{% url 'scheduling:appointment_calendar' %}" 
+           class="bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-lg text-center">
+            <div class="text-lg font-semibold">Calendar View</div>
+            <div class="text-sm opacity-90">Visual Schedule</div>
+        </a>
+        <a href="{% url 'users:patient_dashboard' %}" 
+           class="bg-green-600 hover:bg-green-700 text-white p-4 rounded-lg text-center">
+            <div class="text-lg font-semibold">Main Dashboard</div>
+            <div class="text-sm opacity-90">Patient Portal</div>
+        </a>
+    </div>
+
+    <!-- Upcoming Appointments (Next 7 Days) -->
+    {% if upcoming_appointments %}
+    <div class="bg-white shadow rounded-lg mb-8">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900">Upcoming Appointments (Next 7 Days)</h3>
+        </div>
+        <div class="px-6 py-4">
+            <div class="space-y-4">
+                {% for item in upcoming_appointments %}
+                <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex-shrink-0">
+                            <div class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">Dr. {{ item.doctor_name }}</p>
+                            <p class="text-sm text-gray-500">{{ item.reason }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4">
+                        <div class="text-sm text-gray-500">
+                            <div>{{ item.date|date:"M d, Y" }}</div>
+                            <div>{{ item.time|time:"g:i A" }}</div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                {% if item.status == 'scheduled' or item.status == 'confirmed' %}bg-green-100 text-green-800
+                                {% elif item.status == 'completed' %}bg-blue-100 text-blue-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ item.status|title }}
+                            </span>
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                {% if item.type == 'legacy' %}bg-gray-100 text-gray-800
+                                {% else %}bg-purple-100 text-purple-800{% endif %}">
+                                {% if item.type == 'legacy' %}Legacy{% else %}Scheduled{% endif %}
+                            </span>
+                        </div>
+                        <div class="flex space-x-2">
+                            {% if item.type == 'legacy' %}
+                                <a href="{% url 'users:appointment_detail' item.appointment.id %}" 
+                                   class="text-blue-600 hover:text-blue-900 text-sm">View</a>
+                            {% else %}
+                                <a href="{% url 'scheduling:appointment_detail' item.appointment.id %}" 
+                                   class="text-blue-600 hover:text-blue-900 text-sm">View</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- All Future Appointments -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900">All Future Appointments</h3>
+        </div>
+        <div class="px-6 py-4">
+            {% if all_appointments %}
+            <div class="space-y-4">
+                {% for item in all_appointments %}
+                <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex-shrink-0">
+                            <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                <span class="text-sm font-medium text-gray-700">
+                                    {{ item.doctor_name|slice:":2"|upper }}
+                                </span>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">Dr. {{ item.doctor_name }}</p>
+                            <p class="text-sm text-gray-500">{{ item.reason }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4">
+                        <div class="text-sm text-gray-500">
+                            <div>{{ item.date|date:"M d, Y" }}</div>
+                            <div>{{ item.time|time:"g:i A" }}</div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                {% if item.status == 'scheduled' or item.status == 'confirmed' %}bg-green-100 text-green-800
+                                {% elif item.status == 'completed' %}bg-blue-100 text-blue-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ item.status|title }}
+                            </span>
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                {% if item.type == 'legacy' %}bg-gray-100 text-gray-800
+                                {% else %}bg-purple-100 text-purple-800{% endif %}">
+                                {% if item.type == 'legacy' %}Legacy{% else %}Scheduled{% endif %}
+                            </span>
+                        </div>
+                        <div class="flex space-x-2">
+                            {% if item.type == 'legacy' %}
+                                <a href="{% url 'users:appointment_detail' item.appointment.id %}" 
+                                   class="text-blue-600 hover:text-blue-900 text-sm">View</a>
+                            {% else %}
+                                <a href="{% url 'scheduling:appointment_detail' item.appointment.id %}" 
+                                   class="text-blue-600 hover:text-blue-900 text-sm">View</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No upcoming appointments</h3>
+                <p class="mt-1 text-sm text-gray-500">Get started by booking your first appointment.</p>
+                <div class="mt-6 flex justify-center space-x-3">
+                    <a href="{% url 'users:patient_create_appointment' %}" 
+                       class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                        Quick Book
+                    </a>
+                    <a href="{% url 'users:patient_book_appointment_scheduling' %}" 
+                       class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                        Advanced Book
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

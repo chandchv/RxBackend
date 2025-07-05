@@ -1,0 +1,138 @@
+{% extends 'scheduling/base_scheduling.html' %}
+{% load static %}
+
+{% block title %}Schedule Detail{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">Schedule Detail</h1>
+        <div class="flex space-x-3">
+            <a href="{% url 'scheduling:schedule_list' %}" 
+               class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+                <i class="fas fa-arrow-left mr-2"></i>Back to Schedules
+            </a>
+            <a href="{% url 'scheduling:schedule_update' schedule.pk %}" 
+               class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                <i class="fas fa-edit mr-2"></i>Edit Schedule
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Doctor</dt>
+                    <dd class="mt-1 text-sm text-gray-900">
+                        Dr. {{ schedule.doctor.user.get_full_name }}
+                        <div class="text-xs text-gray-500">{{ schedule.doctor.specialization|default:"General Practice" }}</div>
+                    </dd>
+                </div>
+
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Clinic</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ schedule.clinic.name }}</dd>
+                </div>
+
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Day of Week</dt>
+                    <dd class="mt-1 text-sm text-gray-900">
+                        {% if schedule.day_of_week == 0 %}Monday
+                        {% elif schedule.day_of_week == 1 %}Tuesday
+                        {% elif schedule.day_of_week == 2 %}Wednesday
+                        {% elif schedule.day_of_week == 3 %}Thursday
+                        {% elif schedule.day_of_week == 4 %}Friday
+                        {% elif schedule.day_of_week == 5 %}Saturday
+                        {% elif schedule.day_of_week == 6 %}Sunday
+                        {% endif %}
+                    </dd>
+                </div>
+
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Working Hours</dt>
+                    <dd class="mt-1 text-sm text-gray-900">
+                        {{ schedule.start_time|time:"g:i A" }} - {{ schedule.end_time|time:"g:i A" }}
+                    </dd>
+                </div>
+
+                {% if schedule.break_start_time and schedule.break_end_time %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Break Time</dt>
+                    <dd class="mt-1 text-sm text-gray-900">
+                        {{ schedule.break_start_time|time:"g:i A" }} - {{ schedule.break_end_time|time:"g:i A" }}
+                    </dd>
+                </div>
+                {% endif %}
+
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Appointment Duration</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ schedule.appointment_duration }} minutes</dd>
+                </div>
+
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Status</dt>
+                    <dd class="mt-1">
+                        {% if schedule.is_active %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                            Active
+                        </span>
+                        {% else %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                            Inactive
+                        </span>
+                        {% endif %}
+                    </dd>
+                </div>
+
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Created</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ schedule.created_at|date:"F j, Y g:i A" }}</dd>
+                </div>
+            </dl>
+        </div>
+    </div>
+
+    <!-- Actions Section -->
+    <div class="mt-6 bg-white shadow overflow-hidden sm:rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Actions</h3>
+            <div class="flex flex-wrap gap-3">
+                <button onclick="generateSlots()" 
+                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <i class="fas fa-cog mr-2"></i>Generate Slots
+                </button>
+                <a href="{% url 'scheduling:schedule_update' schedule.pk %}" 
+                   class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <i class="fas fa-edit mr-2"></i>Edit Schedule
+                </a>
+                <button onclick="toggleStatus()" 
+                        class="{% if schedule.is_active %}bg-red-600 hover:bg-red-700{% else %}bg-green-600 hover:bg-green-700{% endif %} text-white font-bold py-2 px-4 rounded-lg">
+                    <i class="fas fa-{% if schedule.is_active %}pause{% else %}play{% endif %} mr-2"></i>
+                    {% if schedule.is_active %}Deactivate{% else %}Activate{% endif %}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function generateSlots() {
+    if (!confirm('This will generate appointment slots for the next 30 days. Continue?')) {
+        return;
+    }
+    
+    // Implementation for generating slots
+    alert('Slot generation feature coming soon!');
+}
+
+function toggleStatus() {
+    if (!confirm('Are you sure you want to {% if schedule.is_active %}deactivate{% else %}activate{% endif %} this schedule?')) {
+        return;
+    }
+    
+    // Implementation for toggling status
+    alert('Status toggle feature coming soon!');
+}
+</script>
+{% endblock %} 

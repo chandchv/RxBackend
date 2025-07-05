@@ -1,0 +1,253 @@
+{% extends 'base.html' %}
+
+{% block title %}Doctor Bills List{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">My Bills</h1>
+                <p class="text-gray-600">Dr. {{ doctor.user.get_full_name }}</p>
+            </div>
+            <div class="flex space-x-3">
+                <a href="{% url 'billing:doctor_create_bill' %}" 
+                   class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <i class="fas fa-plus mr-2"></i>Create Bill
+                </a>
+                <a href="{% url 'billing:doctor_billing_summary' %}" 
+                   class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <i class="fas fa-chart-line mr-2"></i>Summary
+                </a>
+                <a href="{% url 'users:doctor_dashboard' %}" 
+                   class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <i class="fas fa-arrow-left mr-2"></i>Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-file-invoice text-2xl text-blue-500"></i>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-sm font-medium text-gray-500">Total Bills</h3>
+                    <p class="text-2xl font-bold text-gray-900">{{ total_bills }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-rupee-sign text-2xl text-green-500"></i>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-sm font-medium text-gray-500">Total Amount</h3>
+                    <p class="text-2xl font-bold text-gray-900">₹{{ total_amount|floatformat:2 }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-emerald-500">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-check-circle text-2xl text-emerald-500"></i>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-sm font-medium text-gray-500">Collected</h3>
+                    <p class="text-2xl font-bold text-gray-900">₹{{ total_collected|floatformat:2 }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select name="status" id="status" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">All Statuses</option>
+                    {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if current_filters.status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div>
+                <label for="date_from" class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+                <input type="date" name="date_from" id="date_from" value="{{ current_filters.date_from|date:'Y-m-d' }}"
+                       class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            
+            <div>
+                <label for="date_to" class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                <input type="date" name="date_to" id="date_to" value="{{ current_filters.date_to|date:'Y-m-d' }}"
+                       class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            
+            <div>
+                <label for="q" class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                <div class="flex">
+                    <input type="text" name="q" id="q" value="{{ current_filters.search }}" placeholder="Bill number, patient name..."
+                           class="flex-1 border-gray-300 rounded-l-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-r-md hover:bg-blue-700">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+        </form>
+        
+        {% if current_filters.status or current_filters.date_from or current_filters.date_to or current_filters.search %}
+        <div class="mt-4">
+            <a href="{% url 'billing:doctor_bills_list' %}" class="text-blue-600 hover:text-blue-800 text-sm">
+                <i class="fas fa-times mr-1"></i>Clear all filters
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Bills Table -->
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Bills</h2>
+        </div>
+        
+        {% if bills %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Bill Number
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Date
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Patient
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Type
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Amount
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Paid
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for bill in bills %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {{ bill.bill_number }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ bill.bill_date|date:"M d, Y" }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ bill.patient.get_full_name }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ bill.get_bill_type_display }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            ₹{{ bill.total|floatformat:2 }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            ₹{{ bill.amount_paid|floatformat:2 }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                {% if bill.status == 'completed' %}bg-green-100 text-green-800
+                                {% elif bill.status == 'pending' %}bg-red-100 text-red-800
+                                {% elif bill.status == 'partial' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ bill.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div class="flex space-x-2">
+                                <a href="{% url 'billing:doctor_bill_detail' bill.id %}" 
+                                   class="text-blue-600 hover:text-blue-900" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'billing:bill_print' bill.id %}" 
+                                   class="text-green-600 hover:text-green-900" title="Print Bill">
+                                    <i class="fas fa-print"></i>
+                                </a>
+                                {% if bill.status == 'pending' or bill.status == 'partial' %}
+                                <a href="{% url 'billing:staff_record_payment' bill.id %}" 
+                                   class="text-purple-600 hover:text-purple-900" title="Record Payment">
+                                    <i class="fas fa-money-bill"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if bills.has_other_pages %}
+        <div class="px-6 py-4 border-t border-gray-200">
+            <nav class="flex justify-between items-center">
+                <div class="text-sm text-gray-700">
+                    Showing {{ bills.start_index }} to {{ bills.end_index }} of {{ bills.paginator.count }} bills
+                </div>
+                <div class="flex space-x-2">
+                    {% if bills.has_previous %}
+                    <a href="?page={{ bills.previous_page_number }}{% if current_filters.status %}&status={{ current_filters.status }}{% endif %}{% if current_filters.date_from %}&date_from={{ current_filters.date_from|date:'Y-m-d' }}{% endif %}{% if current_filters.date_to %}&date_to={{ current_filters.date_to|date:'Y-m-d' }}{% endif %}{% if current_filters.search %}&q={{ current_filters.search }}{% endif %}"
+                       class="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50">Previous</a>
+                    {% endif %}
+                    
+                    <span class="px-3 py-1 text-sm">
+                        Page {{ bills.number }} of {{ bills.paginator.num_pages }}
+                    </span>
+                    
+                    {% if bills.has_next %}
+                    <a href="?page={{ bills.next_page_number }}{% if current_filters.status %}&status={{ current_filters.status }}{% endif %}{% if current_filters.date_from %}&date_from={{ current_filters.date_from|date:'Y-m-d' }}{% endif %}{% if current_filters.date_to %}&date_to={{ current_filters.date_to|date:'Y-m-d' }}{% endif %}{% if current_filters.search %}&q={{ current_filters.search }}{% endif %}"
+                       class="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50">Next</a>
+                    {% endif %}
+                </div>
+            </nav>
+        </div>
+        {% endif %}
+        
+        {% else %}
+        <div class="px-6 py-8 text-center">
+            <i class="fas fa-file-invoice text-4xl text-gray-300 mb-4"></i>
+            <p class="text-gray-500 text-lg">No bills found.</p>
+            {% if current_filters.status or current_filters.date_from or current_filters.date_to or current_filters.search %}
+            <p class="text-gray-400 text-sm mt-2">Try adjusting your filters to see more results.</p>
+            {% else %}
+            <a href="{% url 'billing:doctor_create_bill' %}" 
+               class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                <i class="fas fa-plus mr-2"></i>Create Your First Bill
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 

@@ -51,6 +51,33 @@
                       rows="3"></textarea>
         </div>
         
+        <!-- Appointment Type Options -->
+        <div class="mb-6">
+            <label class="block text-gray-700 text-sm font-bold mb-3">
+                Appointment Type
+            </label>
+            <div class="space-y-2">
+                <div class="flex items-center">
+                    <input type="checkbox" id="is_emergency" name="is_emergency" class="rounded border-gray-300 text-red-600">
+                    <label for="is_emergency" class="ml-2 text-sm text-red-600 font-medium">
+                        Emergency Appointment
+                    </label>
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="is_telemedicine" name="is_telemedicine" class="rounded border-gray-300 text-blue-600">
+                    <label for="is_telemedicine" class="ml-2 text-sm text-blue-600 font-medium">
+                        Telemedicine Appointment
+                    </label>
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="is_walk_in" name="is_walk_in" class="rounded border-gray-300 text-green-600">
+                    <label for="is_walk_in" class="ml-2 text-sm text-green-600 font-medium">
+                        Walk-in Appointment
+                    </label>
+                </div>
+            </div>
+        </div>
+        
         <!-- Submit Button -->
         <div class="flex items-center justify-end">
             <button type="submit" 

@@ -22,7 +22,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 import json
 from django.contrib.auth import get_user_model
 import datetime as dt
-from django.db.models import Case, When, Value, IntegerField
+from django.db.models import Case, When, Value, IntegerField, Count, Q
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group
 # Add this import
@@ -1035,4 +1035,294 @@ def public_clinics_api(request):
     except Exception as e:
         logger.error(f"Error in public clinics API: {str(e)}")
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def doctor_dashboard_api(request):
+    """API endpoint for doctor dashboard data"""
+    try:
+        doctor = get_object_or_404(Doctor, user=request.user)
+        today = timezone.now().date()
+        
+        # Get today's appointments
+        todays_appointments = Appointment.objects.filter(
+            doctor=doctor,
+            appointment_date=today
+        ).select_related('patient').order_by('appointment_time')
+        
+        # Get upcoming appointments (next 7 days)
+        upcoming_appointments = Appointment.objects.filter(
+            doctor=doctor,
+            appointment_date__gt=today,
+            appointment_date__lte=today + timedelta(days=7)
+        ).select_related('patient').order_by('appointment_date', 'appointment_time')[:10]
+        
+        # Calculate stats
+        stats = {
+            'todays_patients_count': todays_appointments.count(),
+            'completed_today': todays_appointments.filter(status='completed').count(),
+            'upcoming_count': Appointment.objects.filter(
+                doctor=doctor,
+                appointment_date__gt=today,
+                status='scheduled'
+            ).count(),
+            'month_appointments_count': Appointment.objects.filter(
+                doctor=doctor,
+                appointment_date__month=today.month,
+                appointment_date__year=today.year
+            ).count(),
+            'pending_count': Appointment.objects.filter(
+                doctor=doctor,
+                status='pending'
+            ).count()
+        }
+        
+        # Serialize appointments
+        todays_serializer = AppointmentSerializer(todays_appointments, many=True)
+        upcoming_serializer = AppointmentSerializer(upcoming_appointments, many=True)
+        
+        # Format doctor data manually to match React Native expectations
+        doctor_data = {
+            'id': doctor.id,
+            'user': {
+                'id': doctor.user.id,
+                'first_name': doctor.user.first_name,
+                'last_name': doctor.user.last_name,
+                'email': doctor.user.email,
+            },
+            'specialization': doctor.specialization or 'General Practitioner',
+            'clinic': {
+                'id': doctor.clinic.id if doctor.clinic else None,
+                'name': doctor.clinic.name if doctor.clinic else 'No clinic assigned'
+            } if doctor.clinic else None,
+            'license_number': doctor.license_number,
+            'consultation_fee': getattr(doctor, 'consultation_fee', 0)
+        }
+        
+        return Response({
+            'doctor': doctor_data,
+            'stats': stats,
+            'todays_appointments': todays_serializer.data,
+            'upcoming_appointments': upcoming_serializer.data
+        })
+        
+    except Doctor.DoesNotExist:
+        return Response(
+            {'error': 'Doctor profile not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.error(f"Error in doctor_dashboard_api: {str(e)}")
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def doctor_patients_api(request):
+    """API endpoint for doctor's patients list"""
+    try:
+        doctor = get_object_or_404(Doctor, user=request.user)
+        
+        # Get patients who have appointments with this doctor
+        patients = Patient.objects.filter(
+            appointment__doctor=doctor
+        ).distinct().select_related('user')
+        
+        serializer = PatientSerializer(patients, many=True)
+        
+        return Response({
+            'patients': serializer.data
+        })
+        
+    except Doctor.DoesNotExist:
+        return Response(
+            {'error': 'Doctor profile not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.error(f"Error in doctor_patients_api: {str(e)}")
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def patient_detail_api(request, patient_id):
+    """API endpoint for patient details"""
+    try:
+        # Check if user is doctor and get patient
+        doctor = get_object_or_404(Doctor, user=request.user)
+        patient = get_object_or_404(Patient, id=patient_id)
+        
+        # Check if doctor has treated this patient
+        has_appointment = Appointment.objects.filter(
+            doctor=doctor,
+            patient=patient
+        ).exists()
+        
+        if not has_appointment:
+            return Response(
+                {'error': 'You do not have access to this patient'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = PatientDetailsSerializer(patient)
+        
+        return Response(serializer.data)
+        
+    except Doctor.DoesNotExist:
+        return Response(
+            {'error': 'Doctor profile not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Patient.DoesNotExist:
+        return Response(
+            {'error': 'Patient not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.error(f"Error in patient_detail_api: {str(e)}")
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def patient_records_api(request, patient_id):
+    """API endpoint for patient records"""
+    try:
+        doctor = get_object_or_404(Doctor, user=request.user)
+        patient = get_object_or_404(Patient, id=patient_id)
+        
+        # Check if doctor has access to this patient
+        has_appointment = Appointment.objects.filter(
+            doctor=doctor,
+            patient=patient
+        ).exists()
+        
+        if not has_appointment:
+            return Response(
+                {'error': 'You do not have access to this patient'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get appointments
+        appointments = Appointment.objects.filter(
+            patient=patient,
+            doctor=doctor
+        ).order_by('-appointment_date')
+        
+        # Get prescriptions
+        prescriptions = Prescription.objects.filter(
+            patient=patient,
+            doctor=doctor
+        ).order_by('-created_at')
+        
+        # Serialize data
+        appointments_serializer = AppointmentSerializer(appointments, many=True)
+        prescriptions_serializer = PrescriptionSerializer(prescriptions, many=True)
+        
+        return Response({
+            'appointments': appointments_serializer.data,
+            'prescriptions': prescriptions_serializer.data,
+            'tests': []  # Add lab tests when implemented
+        })
+        
+    except Doctor.DoesNotExist:
+        return Response(
+            {'error': 'Doctor profile not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Patient.DoesNotExist:
+        return Response(
+            {'error': 'Patient not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.error(f"Error in patient_records_api: {str(e)}")
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def appointment_actions_api(request, appointment_id):
+    """API endpoint for appointment actions (attend, complete, no_show)"""
+    try:
+        doctor = get_object_or_404(Doctor, user=request.user)
+        appointment = get_object_or_404(Appointment, id=appointment_id, doctor=doctor)
+        
+        action = request.data.get('action') or request.POST.get('action')
+        
+        if not action:
+            return Response(
+                {'error': 'Action is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Map actions to status
+        status_mapping = {
+            'attend': 'in_progress',
+            'complete': 'completed',
+            'no_show': 'no_show'
+        }
+        
+        if action not in status_mapping:
+            return Response(
+                {'error': 'Invalid action'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Update appointment status
+        old_status = appointment.status
+        new_status = status_mapping[action]
+        appointment.status = new_status
+        appointment.save()
+        
+        # Create notification
+        try:
+            status_messages = {
+                'in_progress': f"Dr. {doctor.user.get_full_name()} has started attending your appointment",
+                'completed': f"Your appointment with Dr. {doctor.user.get_full_name()} has been completed",
+                'no_show': f"You were marked as no-show for your appointment with Dr. {doctor.user.get_full_name()}"
+            }
+            
+            create_notification(
+                recipient=appointment.patient.user,
+                message=status_messages.get(new_status, f"Your appointment status has been updated to {new_status}"),
+                sender=request.user,
+                notification_type='appointment_status_update',
+                related_object=appointment
+            )
+        except Exception as e:
+            logger.error(f"Error creating notification in appointment_actions_api: {e}")
+        
+        return Response({
+            'success': True,
+            'message': f'Appointment {action} successfully',
+            'new_status': new_status,
+            'new_status_display': new_status.replace('_', ' ').title()
+        })
+        
+    except Doctor.DoesNotExist:
+        return Response(
+            {'error': 'Doctor profile not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Appointment.DoesNotExist:
+        return Response(
+            {'error': 'Appointment not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.error(f"Error in appointment_actions_api: {str(e)}")
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 

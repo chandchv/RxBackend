@@ -1,0 +1,174 @@
+{% extends 'scheduling/base_scheduling.html' %}
+{% load static %}
+
+{% block title %}Edit Doctor{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">Edit Doctor</h1>
+        <a href="{% url 'scheduling:doctor_list' %}" 
+           class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Doctors
+        </a>
+    </div>
+
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                
+                {% if form.errors %}
+                <div class="mb-4 bg-red-50 border border-red-200 rounded-md p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-exclamation-circle text-red-400"></i>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-red-800">
+                                There were errors with your submission
+                            </h3>
+                            <div class="mt-2 text-sm text-red-700">
+                                <ul class="list-disc pl-5 space-y-1">
+                                    {% for field, errors in form.errors.items %}
+                                        {% for error in errors %}
+                                            <li>{{ field|title }}: {{ error }}</li>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Doctor Info (Read-only) -->
+                <div class="mb-6 bg-gray-50 rounded-lg p-4">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Doctor Information</h3>
+                    <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Name</dt>
+                            <dd class="mt-1 text-sm text-gray-900">Dr. {{ object.user.get_full_name }}</dd>
+                        </div>
+
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Email</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ object.user.email|default:"Not provided" }}</dd>
+                        </div>
+
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">License Number</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ object.license_number|default:"Not provided" }}</dd>
+                        </div>
+
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Medical Council</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ object.medical_council|default:"Not provided" }}</dd>
+                        </div>
+                    </dl>
+                </div>
+
+                <!-- Editable Fields -->
+                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <!-- Is Active -->
+                    <div class="sm:col-span-2">
+                        <div class="flex items-center">
+                            {{ form.is_active }}
+                            <label for="{{ form.is_active.id_for_label }}" class="ml-2 block text-sm text-gray-900">
+                                Doctor is active in the scheduling system
+                            </label>
+                        </div>
+                        {% if form.is_active.help_text %}
+                            <p class="mt-2 text-sm text-gray-500">{{ form.is_active.help_text }}</p>
+                        {% endif %}
+                        <p class="mt-1 text-xs text-gray-400">
+                            Inactive doctors will not be available for new appointments
+                        </p>
+                    </div>
+
+                    <!-- Clinic -->
+                    <div>
+                        <label for="{{ form.clinic.id_for_label }}" class="block text-sm font-medium text-gray-700">Clinic</label>
+                        {{ form.clinic }}
+                        {% if form.clinic.help_text %}
+                            <p class="mt-2 text-sm text-gray-500">{{ form.clinic.help_text }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Specialization -->
+                    <div>
+                        <label for="{{ form.specialization.id_for_label }}" class="block text-sm font-medium text-gray-700">Specialization</label>
+                        {{ form.specialization }}
+                        {% if form.specialization.help_text %}
+                            <p class="mt-2 text-sm text-gray-500">{{ form.specialization.help_text }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Info Box -->
+                <div class="mt-6 bg-blue-50 border border-blue-200 rounded-md p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-info-circle text-blue-400"></i>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-blue-800">
+                                Note
+                            </h3>
+                            <div class="mt-2 text-sm text-blue-700">
+                                <p>
+                                    Only basic scheduling-related information can be edited here. 
+                                    To modify personal details like name, email, or credentials, 
+                                    please use the main doctor management system.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Buttons -->
+                <div class="mt-6 flex justify-end space-x-3">
+                    <a href="{% url 'scheduling:doctor_detail' object.pk %}" 
+                       class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Cancel
+                    </a>
+                    <button type="submit" 
+                            class="bg-blue-600 border border-transparent rounded-md shadow-sm py-2 px-4 inline-flex justify-center text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <i class="fas fa-save mr-2"></i>
+                        Update Doctor
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Form styling */
+.container select,
+.container input[type="text"] {
+    appearance: none;
+    background-color: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    width: 100%;
+}
+
+.container select:focus,
+.container input[type="text"]:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.container input[type="checkbox"] {
+    height: 1rem;
+    width: 1rem;
+    border-radius: 0.25rem;
+    border: 1px solid #d1d5db;
+}
+</style>
+{% endblock %} 

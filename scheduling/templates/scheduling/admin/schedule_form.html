@@ -1,0 +1,183 @@
+{% extends 'scheduling/base_scheduling.html' %}
+{% load static %}
+
+{% block title %}{% if form.instance.pk %}Edit Schedule{% else %}Create Schedule{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">
+            {% if form.instance.pk %}Edit Schedule{% else %}Create Schedule{% endif %}
+        </h1>
+        <a href="{% url 'scheduling:schedule_list' %}" 
+           class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Schedules
+        </a>
+    </div>
+
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                
+                {% if form.errors %}
+                <div class="mb-4 bg-red-50 border border-red-200 rounded-md p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-exclamation-circle text-red-400"></i>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-red-800">
+                                There were errors with your submission
+                            </h3>
+                            <div class="mt-2 text-sm text-red-700">
+                                <ul class="list-disc pl-5 space-y-1">
+                                    {% for field, errors in form.errors.items %}
+                                        {% for error in errors %}
+                                            <li>{{ field|title }}: {{ error }}</li>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <!-- Doctor -->
+                    <div>
+                        <label for="{{ form.doctor.id_for_label }}" class="block text-sm font-medium text-gray-700">Doctor</label>
+                        {{ form.doctor }}
+                        {% if form.doctor.help_text %}
+                            <p class="mt-2 text-sm text-gray-500">{{ form.doctor.help_text }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Clinic -->
+                    <div>
+                        <label for="{{ form.clinic.id_for_label }}" class="block text-sm font-medium text-gray-700">Clinic</label>
+                        {{ form.clinic }}
+                        {% if form.clinic.help_text %}
+                            <p class="mt-2 text-sm text-gray-500">{{ form.clinic.help_text }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Day of Week -->
+                    <div>
+                        <label for="{{ form.day_of_week.id_for_label }}" class="block text-sm font-medium text-gray-700">Day of Week</label>
+                        {{ form.day_of_week }}
+                        {% if form.day_of_week.help_text %}
+                            <p class="mt-2 text-sm text-gray-500">{{ form.day_of_week.help_text }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Appointment Duration -->
+                    <div>
+                        <label for="{{ form.appointment_duration.id_for_label }}" class="block text-sm font-medium text-gray-700">Appointment Duration (minutes)</label>
+                        {{ form.appointment_duration }}
+                        {% if form.appointment_duration.help_text %}
+                            <p class="mt-2 text-sm text-gray-500">{{ form.appointment_duration.help_text }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Start Time -->
+                    <div>
+                        <label for="{{ form.start_time.id_for_label }}" class="block text-sm font-medium text-gray-700">Start Time</label>
+                        {{ form.start_time }}
+                        {% if form.start_time.help_text %}
+                            <p class="mt-2 text-sm text-gray-500">{{ form.start_time.help_text }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- End Time -->
+                    <div>
+                        <label for="{{ form.end_time.id_for_label }}" class="block text-sm font-medium text-gray-700">End Time</label>
+                        {{ form.end_time }}
+                        {% if form.end_time.help_text %}
+                            <p class="mt-2 text-sm text-gray-500">{{ form.end_time.help_text }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Break Start Time -->
+                    <div>
+                        <label for="{{ form.break_start_time.id_for_label }}" class="block text-sm font-medium text-gray-700">Break Start Time (Optional)</label>
+                        {{ form.break_start_time }}
+                        {% if form.break_start_time.help_text %}
+                            <p class="mt-2 text-sm text-gray-500">{{ form.break_start_time.help_text }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Break End Time -->
+                    <div>
+                        <label for="{{ form.break_end_time.id_for_label }}" class="block text-sm font-medium text-gray-700">Break End Time (Optional)</label>
+                        {{ form.break_end_time }}
+                        {% if form.break_end_time.help_text %}
+                            <p class="mt-2 text-sm text-gray-500">{{ form.break_end_time.help_text }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Is Active -->
+                <div class="mt-6">
+                    <div class="flex items-center">
+                        {{ form.is_active }}
+                        <label for="{{ form.is_active.id_for_label }}" class="ml-2 block text-sm text-gray-900">
+                            Schedule is active
+                        </label>
+                    </div>
+                    {% if form.is_active.help_text %}
+                        <p class="mt-2 text-sm text-gray-500">{{ form.is_active.help_text }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Submit Buttons -->
+                <div class="mt-6 flex justify-end space-x-3">
+                    <a href="{% url 'scheduling:schedule_list' %}" 
+                       class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Cancel
+                    </a>
+                    <button type="submit" 
+                            class="bg-blue-600 border border-transparent rounded-md shadow-sm py-2 px-4 inline-flex justify-center text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <i class="fas fa-save mr-2"></i>
+                        {% if form.instance.pk %}Update Schedule{% else %}Create Schedule{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Form styling */
+.container select,
+.container input[type="text"],
+.container input[type="time"],
+.container input[type="number"] {
+    appearance: none;
+    background-color: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    width: 100%;
+}
+
+.container select:focus,
+.container input[type="text"]:focus,
+.container input[type="time"]:focus,
+.container input[type="number"]:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.container input[type="checkbox"] {
+    height: 1rem;
+    width: 1rem;
+    border-radius: 0.25rem;
+    border: 1px solid #d1d5db;
+}
+</style>
+{% endblock %} 

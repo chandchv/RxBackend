@@ -45,7 +45,7 @@ from .doctor_views import (
     verify_doctor_api_view,
     save_doctor,
     get_doctors_list,
-    doctor_dashboard_view,
+    doctor_dashboard,
     create_appointment,
 )
 

@@ -47,6 +47,32 @@
                         <p class="mt-1 text-gray-900">{{ appointment.reason }}</p>
                     </div>
                     {% endif %}
+
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500">Appointment Type</h3>
+                        <div class="mt-1 flex flex-wrap gap-2">
+                            {% if appointment.scheduling_info.is_emergency %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                Emergency
+                            </span>
+                            {% endif %}
+                            {% if appointment.scheduling_info.is_telemedicine %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                Telemedicine
+                            </span>
+                            {% endif %}
+                            {% if appointment.scheduling_info.is_walk_in %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                Walk-in
+                            </span>
+                            {% endif %}
+                            {% if not appointment.scheduling_info.is_emergency and not appointment.scheduling_info.is_telemedicine and not appointment.scheduling_info.is_walk_in %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                Regular
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
 
                 <div class="space-y-4">

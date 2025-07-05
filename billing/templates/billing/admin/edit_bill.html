@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}Edit Bill #{{ bill.bill_number }}{% endblock %}
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h2 class="text-2xl font-bold mb-4">Edit Bill #{{ bill.bill_number }}</h2>
+    <div class="mb-6">
+        <h4 class="text-lg font-semibold mb-2">Bill Items</h4>
+        <table class="min-w-full border border-gray-200 mb-4">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-2 text-left">Item</th>
+                    <th class="px-4 py-2 text-left">Description</th>
+                    <th class="px-4 py-2 text-right">Amount (₹)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in bill_items %}
+                <tr class="border-t">
+                    <td class="px-4 py-2">{{ item.item_name }}</td>
+                    <td class="px-4 py-2">{{ item.description }}</td>
+                    <td class="px-4 py-2 text-right">{{ item.unit_price|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="px-4 py-2 text-center text-gray-500">No items</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="text-right font-bold">Total: ₹{{ bill.total|floatformat:2 }}</div>
+    </div>
+    {% if can_edit %}
+    <form method="post" class="mb-6 bg-white p-4 rounded shadow">
+        {% csrf_token %}
+        <h4 class="text-lg font-semibold mb-2">Add Extra Charge</h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+                <label class="block text-sm font-medium">Item Name</label>
+                <input type="text" name="item_name" class="w-full border rounded px-2 py-1" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Description</label>
+                <input type="text" name="description" class="w-full border rounded px-2 py-1">
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Amount (₹)</label>
+                <input type="number" name="amount" step="0.01" min="0.01" class="w-full border rounded px-2 py-1" required>
+            </div>
+        </div>
+        <button type="submit" name="add_item" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Add Charge</button>
+    </form>
+    <form method="post" class="bg-white p-4 rounded shadow">
+        {% csrf_token %}
+        <button type="submit" name="finalize_bill" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 font-bold">Finalize Bill</button>
+        <span class="ml-4 text-gray-500">No further edits allowed after finalization.</span>
+    </form>
+    {% else %}
+    <div class="bg-yellow-100 text-yellow-800 p-4 rounded">This bill is finalized or paid and cannot be edited.</div>
+    {% endif %}
+    <div class="mt-8">
+        <a href="{% url 'billing:admin_bills_list' %}" class="text-blue-600 hover:underline">&larr; Back to Bills List</a>
+    </div>
+</div>
+{% endblock %} 

@@ -3,753 +3,998 @@
 {% block title %}Doctor Dashboard{% endblock %}
 
 {% block extra_head %}
-<link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 <style>
     /* Dashboard Calendar Styling */
-        .dashboard-calendar-container {
-            height: 220px; /* Slightly taller than before */
-            overflow-y: auto; /* Allow vertical scroll */
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            background-color: white;
-        }
-
-        /* Make calendar compact */
-        .dashboard-calendar .fc {
-            font-size: 0.65rem !important; /* Smaller text */
-        }
-
-        .dashboard-calendar .fc-view-harness {
-            min-height: 200px !important;
-            height: 200px !important;
-            max-height: 200px !important;
-            overflow-y: auto;
-        }
-
-        /* Remove spacing in toolbar */
-        .dashboard-calendar .fc-toolbar {
-            margin-bottom: 0 !important;
-            padding: 0.25rem !important;
-        }
-        .dashboard-calendar .fc-toolbar-title {
-            font-size: 0.85rem !important;
-        }
-
-        /* Extremely compact day grid */
-        .dashboard-calendar .fc-daygrid-day {
-            padding: 0 !important;
-            margin: 0 !important;
-        }
-        .dashboard-calendar .fc-daygrid-day-frame {
-            padding: 0px !important;
-            margin: 0 !important;
-            min-height: 18px !important;
-            height: 18px !important;
-            max-height: 18px !important;
-            overflow: hidden !important;
-        }
-        .dashboard-calendar .fc-daygrid-day-number {
-            font-size: 0.6rem !important;
-            line-height: 1 !important;
-            padding: 0 !important;
-            text-align: right;
-        }
-
-        /* Show event dots but keep it minimal */
-        .dashboard-calendar .fc-daygrid-day-events {
-            display: block !important;
-            margin-top: 0px !important;
-            padding: 0 2px !important;
-            height: 8px !important;
-            overflow: hidden;
-        }
-        .dashboard-calendar .fc-event {
-            font-size: 0 !important; /* Hide text */
-            height: 5px !important;
-            margin: 1px 0;
-        }
-        .dashboard-calendar .fc-event-dot {
-            width: 5px !important;
-            height: 5px !important;
-        }
-
-        /* Background colors for booking status */
-        .booking-status-free {
-            background-color: #4caf50 !important;
-            opacity: 0.2 !important;
-        }
-        .booking-status-partial {
-            background-color: #ffc107 !important;
-            opacity: 0.2 !important;
-        }
-        .booking-status-full {
-            background-color: #f44336 !important;
-            opacity: 0.2 !important;
-        }
-    
-    /* Enhanced tooltip for detailed information */
-    .appointment-tooltip {
-        position: absolute;
-        z-index: 9999 !important;
-        background-color: rgb(155, 150, 150);
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        padding: 12px;
-        max-width: 280px;
-        min-width: 220px;
-        display: none;
+    .dashboard-calendar-container {
+        height: 500px;
         border: 1px solid #e2e8f0;
-        pointer-events: none;
+        border-radius: 8px;
+        background-color: white;
+    }
+
+    /* Calendar styling - matches scheduling app */
+    .fc-event {
+        cursor: pointer;
     }
     
-    .tooltip-date {
+    .fc-daygrid-day.holiday {
+        background-color: rgba(254, 226, 226, 0.4);
+    }
+    
+    .fc-event-title {
+        white-space: normal;
+    }
+    
+    #calendar {
+        height: 480px;
+    }
+    
+    @media (max-width: 768px) {
+        #calendar {
+            height: 400px;
+        }
+    }
+
+    /* Responsive adjustments for dashboard */
+    @media (max-width: 1024px) {
+        .dashboard-calendar-container {
+            height: 400px;
+        }
+        #calendar {
+            height: 380px;
+        }
+    }
+
+    /* Event styling */
+    .dashboard-calendar .fc-view-harness {
+        min-height: 480px;
+        height: 480px;
+    }
+
+    .dashboard-calendar .fc-toolbar {
+        margin-bottom: 1rem;
+        padding: 0.5rem;
+    }
+
+    .dashboard-calendar .fc-toolbar-title {
+        font-size: 1.25rem;
         font-weight: 600;
-        font-size: 1em;
-        margin-bottom: 8px;
-        color: #1e40af;
-        border-bottom: 1px solid #e5e7eb;
-        padding-bottom: 4px;
     }
-    
-    .tooltip-status {
-        display: flex;
-        align-items: center;
-        margin-bottom: 8px;
+
+    .dashboard-calendar .fc-button {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+    }
+
+    /* Day styling */
+    .dashboard-calendar .fc-daygrid-day {
+        min-height: 60px;
+        position: relative;
+    }
+
+    .dashboard-calendar .fc-daygrid-day-number {
+        font-size: 0.875rem;
         font-weight: 500;
+        padding: 4px;
     }
-    
-    .tooltip-status-icon {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        margin-right: 8px;
+
+    /* Today highlighting */
+    .dashboard-calendar .fc-day-today {
+        background-color: #f0f9ff;
+        border: 1px solid #3b82f6;
     }
-    
-    .tooltip-appointments {
-        margin-top: 8px;
-        max-height: 150px;
-        overflow-y: auto;
-    }
-    
-    .tooltip-appointment {
-        padding: 4px 0;
-        border-bottom: 1px dotted #e5e7eb;
-        font-size: 0.85em;
+
+    /* Hover effects */
+    .dashboard-calendar .fc-daygrid-day:hover {
+        background-color: #f9fafb;
+        cursor: pointer;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="bg-gray-100">
-    {% csrf_token %}
-    <!-- Main Content -->
-    <div class="transition-all duration-300 ease-in-out">    
-    
-        <h1 class="text-2xl font-bold mb-6">Welcome {{ user.get_full_name }}</h1>
-        <!-- Stats Overview -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-semibold text-gray-700">Today's Appointments</h3>
-                <p class="text-3xl font-bold text-blue-600">{{ today_appointments_count }}</p>
-            </div>
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-semibold text-gray-700">Total Patients</h3>
-                <p class="text-3xl font-bold text-green-600">{{ total_patients }}</p> 
-            </div>
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-semibold text-gray-700">Pending Appointments</h3>
-                <p class="text-3xl font-bold text-yellow-600">{{ pending_appointments }}</p>
-            </div>
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <a href="{% url 'users:create_patient_doctor' %}" 
-               class="bg-blue-300 hover:bg-blue-600 text-bold rounded-lg p-4 text-center">
-                <i class="fas fa-user-plus mb-2"></i>
-                <span class="block">Add New Patient</span>
-            </a>
-            <a href="{% url 'users:manage_availability' %}" 
-               class="bg-green-300 hover:bg-green-600 text-white rounded-lg p-4 text-center">
-                <i class="fas fa-calendar-alt mb-2"></i>
-                <span class="block">Manage Schedule</span>
-            </a>
-            <a href="{% url 'users:manage_leaves' %}" 
-               class="bg-red-300 hover:bg-red-600 text-white rounded-lg p-4 text-center">
-                <i class="fas fa-calendar-times mb-2"></i>
-                <span class="block">Manage Leaves</span>
-            </a>
-            <a href="{% url 'users:doctor_create_appointment' %}" 
-               class="bg-purple-300 hover:bg-purple-600 text-white rounded-lg p-4 text-center">
-                <i class="fas fa-calendar-check mb-2"></i>
-                <span class="block">Create Appointments</span>
-            </a>
-            <a href="{% url 'users:doctor_appointments_view' %}" 
-               class="bg-purple-300 hover:bg-purple-600 text-white rounded-lg p-4 text-center">
-                <i class="fas fa-calendar-check mb-2"></i>
-                <span class="block">View Appointments</span>
-            </a>
-            <a href="{% url 'users:doctor_calendar' %}" 
-               class="bg-blue-300 hover:bg-blue-600 text-white rounded-lg p-4 text-center">
-                <i class="fas fa-calendar-alt mb-2"></i>
-                <span class="block">Calendar View</span>
-            </a>
-            <a href="{% url 'users:patients_list' %}" 
-               class="bg-indigo-300 hover:bg-indigo-600 text-white rounded-lg p-4 text-center">
-                <i class="fas fa-users mb-2"></i>
-                <span class="block">Patient List</span>
-            </a>
-        </div>
-
-        <!-- Main Dashboard Content - Calendar and Today's Schedule -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <!-- Calendar Overview -->
-            <div class="bg-white rounded-lg shadow p-6 overflow-hidden">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold text-gray-800">Appointment Calendar</h2>
-                    <a href="{% url 'users:doctor_calendar' %}" class="text-blue-500 hover:text-blue-600 text-sm">
-                        View Full Calendar
+<div class="min-h-screen bg-gray-100">
+    <div class="py-6">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- Header -->
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">Welcome, Dr. {{ doctor.user.get_full_name }}</h1>
+                    <p class="text-gray-600">{{ doctor.specialization|default:"General Practitioner" }}</p>
+                    <p class="text-gray-600">{{ doctor.clinic.name|default:"No clinic assigned" }} Clinic</p>
+                </div>
+                <div class="flex space-x-3">
+                    <a href="{% url 'users:doctor_create_appointment' %}" 
+                       class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                        New Appointment
+                    </a>
+                    <a href="{% url 'users:manage_availability' %}" 
+                       class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+                        Manage Availability
+                    </a>
+                    <a href="{% url 'users:doctor_appointments_view' %}" 
+                       class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">
+                        View Appointments
                     </a>
                 </div>
-                <div class="dashboard-calendar-container">
-                    <div id="dashboard-calendar" class="dashboard-calendar w-full" 
-                         data-calendar-events-url="{% url 'users:doctor_calendar_events' %}"></div>
-                </div>
-                <div id="appointment-tooltip" class="appointment-tooltip"></div>
             </div>
 
-            <!-- Today's Schedule -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-xl font-bold mb-4">Today's Schedule Total: {{ today_appointments_count }}</h2>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead>
-                            <tr>
-                                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
-                                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            {% if today_appointments %}
-                                {% for appointment in today_appointments %}
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <a href="{% url 'users:doctor_appointments_view' %}?date_from={{ today|date:'Y-m-d' }}&date_to={{ today|date:'Y-m-d' }}" class="bg-white overflow-hidden shadow rounded-lg block hover:bg-blue-50 transition-colors duration-200">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3a1 1 0 011-1h6a1 1 0 011 1v4h3a2 2 0 012 2v6a2 2 0 01-2 2H8a2 2 0 01-2-2V9a2 2 0 012-2h0z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt class="text-sm font-medium text-gray-500 truncate">Today's Patients</dt>
+                                    <dd class="text-lg font-medium text-gray-900">{{ todays_patients_count }}</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+
+                <a href="{% url 'users:doctor_appointments_view' %}?date_from={{ today|date:'Y-m-d' }}&date_to={{ today|date:'Y-m-d' }}&status=completed" class="bg-white overflow-hidden shadow rounded-lg block hover:bg-green-50 transition-colors duration-200">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt class="text-sm font-medium text-gray-500 truncate">Completed Today</dt>
+                                    <dd class="text-lg font-medium text-gray-900">{{ completed_today }}</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+
+                <a href="{% url 'users:doctor_appointments_view' %}?date_from={{ today|date:'Y-m-d' }}&status=scheduled" class="bg-white overflow-hidden shadow rounded-lg block hover:bg-yellow-50 transition-colors duration-200">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <div class="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt class="text-sm font-medium text-gray-500 truncate">Upcoming</dt>
+                                    <dd class="text-lg font-medium text-gray-900">{{ upcoming_count }}</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+
+                <a href="{% url 'users:doctor_appointments_view' %}?date_from={{ today|date:'Y-m-01' }}&date_to={{ today|date:'Y-m-t' }}" class="bg-white overflow-hidden shadow rounded-lg block hover:bg-indigo-50 transition-colors duration-200">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <div class="w-8 h-8 bg-indigo-500 rounded-md flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt class="text-sm font-medium text-gray-500 truncate">This Month</dt>
+                                    <dd class="text-lg font-medium text-gray-900">{{ month_appointments_count }}</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+
+                <a href="{% url 'users:doctor_appointments_view' %}?date_from={{ today|date:'Y-m-d' }}&date_to={{ today|date:'Y-m-d' }}&status=pending" class="bg-white overflow-hidden shadow rounded-lg block hover:bg-orange-50 transition-colors duration-200">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <div class="w-8 h-8 bg-orange-500 rounded-md flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt class="text-sm font-medium text-gray-500 truncate">Pending Appointments</dt>
+                                    <dd class="text-lg font-medium text-gray-900">{{ pending_count }}</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+
+                <a href="{% url 'billing:doctor_billing_summary' %}" class="bg-white overflow-hidden shadow rounded-lg block hover:bg-purple-50 transition-colors duration-200">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <div class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt class="text-sm font-medium text-gray-500 truncate">Monthly Revenue</dt>
+                                    <dd class="text-lg font-medium text-gray-900">₹{{ monthly_revenue|floatformat:0 }}</dd>
+                                </dl>
+                        </div>
+                    </div>
+                </div>
+                </a>
+            </div>
+
+            <!-- Quick Actions and Calendar -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+                <div class="lg:col-span-3 bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
+                        <div class="space-y-3">
+                            <a href="{% url 'users:doctor_create_appointment' %}" 
+                               class="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 px-4 rounded-md">
+                                Schedule Appointment
+                            </a>
+                            <a href="{% url 'scheduling:integrated_appointment_create' %}" 
+                               class="block w-full bg-indigo-600 hover:bg-indigo-700 text-white text-center py-2 px-4 rounded-md">
+                                Advanced Scheduling
+                            </a>
+                            <a href="{% url 'users:create_patient_doctor' %}" 
+                               class="block w-full bg-green-600 hover:bg-green-700 text-white text-center py-2 px-4 rounded-md">
+                                Add New Patient
+                            </a>
+                            <a href="{% url 'users:manage_availability' %}" 
+                               class="block w-full bg-yellow-600 hover:bg-yellow-700 text-white text-center py-2 px-4 rounded-md">
+                                Update Availability
+                            </a>
+                            <a href="{% url 'scheduling:appointment_calendar' %}" 
+                               class="block w-full bg-purple-600 hover:bg-purple-700 text-white text-center py-2 px-4 rounded-md">
+                                Full Calendar View
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Billing & Revenue -->
+                <div class="lg:col-span-3 bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">Billing & Revenue</h3>
+                        <div class="space-y-3">
+                            <a href="{% url 'billing:doctor_billing_summary' %}" 
+                               class="block w-full bg-emerald-600 hover:bg-emerald-700 text-white text-center py-2 px-4 rounded-md">
+                                <i class="fas fa-chart-line mr-2"></i>Billing Summary
+                            </a>
+                            <a href="{% url 'billing:doctor_create_bill' %}" 
+                               class="block w-full bg-teal-600 hover:bg-teal-700 text-white text-center py-2 px-4 rounded-md">
+                                <i class="fas fa-plus-circle mr-2"></i>Create Bill
+                            </a>
+                            <a href="{% url 'billing:doctor_bills_list' %}" 
+                               class="block w-full bg-cyan-600 hover:bg-cyan-700 text-white text-center py-2 px-4 rounded-md">
+                                <i class="fas fa-history mr-2"></i>Bill History
+                            </a>
+                            <a href="{% url 'billing:doctor_revenue_dashboard' %}" 
+                               class="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 px-4 rounded-md">
+                                <i class="fas fa-chart-bar mr-2"></i>Revenue Dashboard
+                            </a>
+                        </div>
+                        
+                        <!-- Mini billing stats -->
+                        <div class="mt-4 pt-4 border-t border-gray-200">
+                            <div class="grid grid-cols-2 gap-2 text-sm">
+                                <div class="text-center">
+                                    <div class="text-green-600 font-semibold">{{ bills_paid_today }}</div>
+                                    <div class="text-gray-500">Completed Today</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-yellow-600 font-semibold">{{ draft_bills_count }}</div>
+                                    <div class="text-gray-500">Draft Bills</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Appointment Calendar -->
+                <div class="lg:col-span-6 bg-white overflow-hidden shadow rounded-lg">
+                    <div class="bg-gray-50 px-4 py-3 rounded-t-lg flex justify-between items-center border-b border-gray-200">
+                        <h5 class="font-semibold text-gray-700">Appointment Calendar</h5>
+                        <a href="{% url 'scheduling:appointment_calendar' %}" class="text-sm px-3 py-1 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50">
+                            Full Calendar <i class="fas fa-external-link-alt ml-1"></i>
+                        </a>
+                    </div>
+                    <div class="p-4">
+                        <div id="calendar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Today's Appointments -->
+            <div class="bg-white shadow rounded-lg mb-8">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Today's Appointments</h3>
+                </div>
+                <div class="px-6 py-4">
+                        {% if todays_appointments %}
+                        <div class="space-y-3">
+                            {% for appointment in todays_appointments %}
+                            <div class="appointment-card border border-gray-200 rounded-lg p-4 bg-white hover:shadow-md transition-shadow duration-200" data-appointment-id="{{ appointment.id }}">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center flex-1">
+                                        <div class="flex-shrink-0 h-12 w-12">
+                                            <div class="h-12 w-12 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center text-white font-medium">
+                                                {{ appointment.patient.first_name|first }}{{ appointment.patient.last_name|first }}
+                                            </div>
+                                        </div>
+                                        <div class="ml-4 flex-1">
+                                            <div class="flex items-center justify-between">
+                                                <div>
+                                                    <p class="text-sm font-semibold text-gray-900">
+                                                        {{ appointment.patient.get_full_name }}
+                                                    </p>
+                                                    <p class="text-sm text-gray-500 flex items-center">
+                                                        <i class="fas fa-clock mr-1"></i>
+                                                        {{ appointment.appointment_time|time:"g:i A" }}
+                                                        {% if appointment.reason %}
+                                                            <span class="ml-2 text-xs text-gray-400">• {{ appointment.reason|truncatechars:30 }}</span>
+                                                        {% endif %}
+                                                    </p>
+                                                </div>
+                                                <div class="flex items-center space-x-3">
+                                                    <!-- Status Badge -->
+                                                    <span class="appointment-status px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                                        {% if appointment.status == 'scheduled' %}bg-green-100 text-green-800
+                                                        {% elif appointment.status == 'in_progress' %}bg-yellow-100 text-yellow-800
+                                                        {% elif appointment.status == 'completed' %}bg-blue-100 text-blue-800
+                                                        {% elif appointment.status == 'no_show' %}bg-red-100 text-red-800
+                                                        {% elif appointment.status == 'cancelled' %}bg-gray-100 text-gray-800
+                                                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                                        {% if appointment.status == 'in_progress' %}In Progress
+                                                        {% else %}{{ appointment.status|title }}{% endif %}
+                                                    </span>
+                                                    
+                                                    <!-- Action Buttons -->
+                                                    <div class="appointment-actions flex items-center space-x-1">
+                                                        {% if appointment.status == 'scheduled' %}
+                                                            <!-- Attend Button -->
+                                                            <button class="action-btn attend-btn inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                                                    data-action="attend" 
+                                                                    data-appointment-id="{{ appointment.id }}"
+                                                                    title="Start attending this patient">
+                                                                <i class="fas fa-user-md mr-1"></i>Attend
+                                                            </button>
+                                                            
+                                                            <!-- Postpone Button -->
+                                                            <a href="{% url 'users:postpone_appointment' appointment.id %}" 
+                                                               class="inline-flex items-center px-2 py-1 border border-orange-300 text-xs font-medium rounded text-orange-700 bg-orange-50 hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+                                                               title="Reschedule this appointment">
+                                                                <i class="fas fa-clock mr-1"></i>Postpone
+                                                            </a>
+                                                            
+                                                            <!-- No Show Button -->
+                                                            <button class="action-btn no-show-btn inline-flex items-center px-2 py-1 border border-red-300 text-xs font-medium rounded text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                                                    data-action="no_show" 
+                                                                    data-appointment-id="{{ appointment.id }}"
+                                                                    title="Mark patient as no-show">
+                                                                <i class="fas fa-user-times mr-1"></i>No Show
+                                                            </button>
+                                                        {% elif appointment.status == 'in_progress' %}
+                                                            <!-- Complete Button -->
+                                                            <button class="action-btn complete-btn inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                                    data-action="complete" 
+                                                                    data-appointment-id="{{ appointment.id }}"
+                                                                    title="Mark appointment as completed">
+                                                                <i class="fas fa-check mr-1"></i>Complete
+                                                            </button>
+                                                        {% endif %}
+                                                        
+                                                        <!-- Patient Details Button (Always visible) -->
+                                                        <a href="{% url 'users:patient_detail' appointment.patient.id %}" 
+                                                           class="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                                           title="View patient details">
+                                                            <i class="fas fa-eye mr-1"></i>Open
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-gray-500 text-center py-8">No appointments scheduled for today</p>
+                        {% endif %}
+                        
+                        <div class="mt-4">
+                            <a href="{% url 'users:doctor_appointments_view' %}"  
+                               class="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
+                                View all appointments →
+                            </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upcoming Appointments -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Upcoming Appointments</h3>
+                </div>
+                <div class="px-6 py-4">
+                    {% if upcoming_appointments %}
+                    <div class="overflow-hidden">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
                                 <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        {{ appointment.appointment_time|time:"H:i" }}
-                                    </td>
-                                    <td class="px-6 py-4">
+                                    <th class="px-3 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Patient
+                                    </th>
+                                    <th class="px-3 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Date & Time
+                                    </th>
+                                    <th class="px-3 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Status
+                                    </th>
+                                    <th class="px-3 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Actions
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for appointment in upcoming_appointments|slice:":5" %}
+                                <tr>
+                                    <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
                                         {{ appointment.patient.get_full_name }}
                                     </td>
-                                    <td class="px-6 py-4">
+                                    <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        {{ appointment.appointment_date|date:"M d, Y" }} {{ appointment.appointment_time|time:"g:i A" }}
+                                    </td>
+                                    <td class="px-3 py-4 whitespace-nowrap">
                                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                                   {% if appointment.status == 'scheduled' %}bg-yellow-100 text-yellow-800
-                                                   {% elif appointment.status == 'completed' %}bg-green-100 text-green-800
-                                                   {% else %}bg-red-100 text-red-800{% endif %}">
-                                            {{ appointment.get_status_display }}
+                                            {% if appointment.status == 'scheduled' %}bg-green-100 text-green-800
+                                            {% elif appointment.status == 'completed' %}bg-blue-100 text-blue-800
+                                            {% else %}bg-red-100 text-red-800{% endif %}">
+                                            {{ appointment.status|title }}
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4">
-                                        <div class="flex space-x-2">
-                                            <a href="{% url 'users:appointment_detail_doctor' appointment.id %}"
-                                            class="text-blue-600 hover:text-blue-900"
-                                            hx-get="{% url 'users:appointment_detail_doctor' appointment.id %}"
-                                            hx-target="#modal"
-                                            hx-trigger="click">
-                                                <i class="fas fa-eye"></i> View
-                                            </a>
-                                            
-                                            <a href="{% url 'users:patient_detail' appointment.patient.id %}" 
-                                               class="text-indigo-600 hover:text-indigo-900">
-                                                <i class="fas fa-user"></i> Patient
-                                            </a>
-                                            
-                                            {% if appointment.status == 'scheduled' or appointment.status == 'PENDING' %}
-                                            <button onclick="updateAppointmentStatus('{{ appointment.id }}', 'completed')"
-                                                    class="text-green-600 hover:text-green-900">
-                                                <i class="fas fa-check"></i> Complete
-                                            </button>
-                                            
-                                            <button onclick="editAppointment('{{ appointment.id }}')"
-                                                    class="text-blue-600 hover:text-blue-900">
-                                                <i class="fas fa-edit"></i> Change Date
-                                            </button>
-                                            
-                                            <button onclick="updateAppointmentStatus('{{ appointment.id }}', 'cancelled')"
-                                                    class="text-red-600 hover:text-red-900">
-                                                <i class="fas fa-times"></i> Cancel
-                                            </button>
-                                            {% endif %}
-                                        </div>
+                                    <td class="px-3 py-4 whitespace-nowrap text-sm font-medium">
+                                        <a href="{% url 'users:patient_detail' appointment.patient.id %}" 
+                                           class="text-indigo-600 hover:text-indigo-900">View</a>
                                     </td>
                                 </tr>
                                 {% endfor %}
-                            {% else %}
-                                <tr>
-                                    <td colspan="4" class="px-6 py-4 text-center text-gray-500">
-                                        No appointments scheduled for today ({{ today_date|date:"Y-m-d" }})
-                                    </td>
-                                </tr>
-                            {% endif %}
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-gray-500 text-center py-8">No upcoming appointments</p>
+                    {% endif %}
                 </div>
             </div>
+            
         </div>
+    </div>
+</div>
 
-        <!-- Lab Tests Needing Review -->
-        {% if completed_lab_tests %}
-        <div class="bg-white rounded-lg shadow p-6 mb-8">
-            <h2 class="text-xl font-bold mb-4">Lab Tests Needing Review</h2>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead>
-                        <tr>
-                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test Name</th>
-                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
-                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed Date</th>
-                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        {% for test in completed_lab_tests %}
-                        <tr>
-                            <td class="px-6 py-4 whitespace-nowrap font-medium">
-                                {{ test.test_definition.name }}
-                            </td>
-                            <td class="px-6 py-4">
-                                {{ test.prescription.patient.get_full_name }}
-                            </td>
-                            <td class="px-6 py-4">
-                                {{ test.updated_at|date:"F j, Y" }}
-                            </td>
-                            <td class="px-6 py-4">
-                                <a href="{% url 'users:doctor_lab_test_detail' test.id %}" class="bg-blue-300 hover:bg-blue-700 text-white px-3 py-1 rounded">
-                                    Review Now
-                                </a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+<!-- Slot Generation Modal -->
+<div id="slotGenerationModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Generate Appointment Slots</h3>
+            
+            <!-- Generation Type Selection -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Generation Type</label>
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="radio" name="generationType" value="week" checked class="mr-2">
+                        <span class="text-sm">Generate for specific week</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="generationType" value="range" class="mr-2">
+                        <span class="text-sm">Generate for date range</span>
+                    </label>
+                </div>
             </div>
-        </div>
-        {% endif %}
 
-        <div class="bg-white rounded-lg shadow p-4 mb-8">
-            <h2 class="text-xl font-bold mb-4">Quick Links</h2>
-            <div class="flex flex-wrap gap-4">
-                <a href="{% url 'users:doctor_billing_overview' %}" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-md">Billing Overview</a>
-                <a href="{% url 'users:doctor_report_overview' %}" class="bg-green-100 hover:bg-green-200 text-green-800 px-4 py-2 rounded-md">Report Overview</a>
+            <!-- Week Selection Form -->
+            <form id="weekSlotGenerationForm" class="generation-form">
+                <div class="mb-4">
+                    <label for="weekDate" class="block text-sm font-medium text-gray-700">Select Week (choose any date in the week)</label>
+                    <input type="date" id="weekDate" name="selected_date" 
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <p class="mt-1 text-xs text-gray-500">Slots will be generated for the entire week (Monday to Sunday) containing this date</p>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Days of Week</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="flex items-center">
+                            <input type="checkbox" name="weekdays" value="0" checked class="mr-2">
+                            Monday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="weekdays" value="1" checked class="mr-2">
+                            Tuesday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="weekdays" value="2" checked class="mr-2">
+                            Wednesday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="weekdays" value="3" checked class="mr-2">
+                            Thursday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="weekdays" value="4" checked class="mr-2">
+                            Friday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="weekdays" value="5" class="mr-2">
+                            Saturday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="weekdays" value="6" class="mr-2">
+                            Sunday
+                        </label>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="closeSlotGenerationModal()" 
+                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700">
+                        Generate Week Slots
+                    </button>
+                </div>
+            </form>
+
+            <!-- Date Range Form -->
+            <form id="rangeSlotGenerationForm" class="generation-form hidden">
+                <div class="mb-4">
+                    <label for="startDate" class="block text-sm font-medium text-gray-700">Start Date</label>
+                    <input type="date" id="startDate" name="start_date" 
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </div>
+                <div class="mb-4">
+                    <label for="endDate" class="block text-sm font-medium text-gray-700">End Date</label>
+                    <input type="date" id="endDate" name="end_date" 
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Days</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="flex items-center">
+                            <input type="checkbox" name="weekdays_range" value="0" checked class="mr-2">
+                            Monday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="weekdays_range" value="1" checked class="mr-2">
+                            Tuesday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="weekdays_range" value="2" checked class="mr-2">
+                            Wednesday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="weekdays_range" value="3" checked class="mr-2">
+                            Thursday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="weekdays_range" value="4" checked class="mr-2">
+                            Friday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="weekdays_range" value="5" class="mr-2">
+                            Saturday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="weekdays_range" value="6" class="mr-2">
+                            Sunday
+                        </label>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="closeSlotGenerationModal()" 
+                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700">
+                        Generate Range Slots
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Modal -->
+<div id="loadingModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
+                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            </div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mt-2">Generating Slots</h3>
+            <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500" id="loadingMessage">
+                    Please wait while we generate appointment slots...
+                </p>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Add modal container at the bottom of the page -->
-<div id="modal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center hidden">
-    <!-- Modal content will be loaded here -->
-</div>
-
-{% endblock %}
-
-{% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-document.addEventListener('htmx:afterSwap', function(evt) {
-    if (evt.target.id === 'modal') {
-        evt.target.classList.remove('hidden');
-    }
-});
 
-// Close modal when clicking outside
-document.getElementById('modal').addEventListener('click', function(e) {
-    if (e.target === this) {
-        this.classList.add('hidden');
-    }
-});
-
-function closeModal() {
-    document.getElementById('modal').classList.add('hidden');
-}
-
-function updateAppointmentStatus(appointmentId, status) {
-    // Map the status to the correct value from the model
-    const statusMap = {
-        'completed': 'completed',
-        'cancelled': 'cancelled',
-        'no_show': 'no_show',
-        'missed': 'missed'
-    };
+function openSlotGenerationModal() {
+    document.getElementById('slotGenerationModal').classList.remove('hidden');
     
-    const mappedStatus = statusMap[status];
-    if (!mappedStatus) {
-        alert('Invalid status');
-        return;
-    }
-
-    if (confirm('Are you sure you want to ' + status + ' this appointment?')) {
-        fetch(`/appointments/${appointmentId}/update-status/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify({ status: mappedStatus })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error updating appointment status: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error updating appointment status');
-        });
-    }
+    // Set default date to next Monday for week selection
+    const today = new Date();
+    const nextWeek = new Date();
+    nextWeek.setDate(today.getDate() + (7 - today.getDay() + 1) % 7); // Next Monday
+    
+    document.getElementById('weekDate').value = nextWeek.toISOString().split('T')[0];
+    
+    // Set default dates for range selection
+    const futureDate = new Date();
+    futureDate.setDate(today.getDate() + 30);
+    
+    document.getElementById('startDate').value = today.toISOString().split('T')[0];
+    document.getElementById('endDate').value = futureDate.toISOString().split('T')[0];
 }
 
-function editAppointment(appointmentId) {
-    // Open the edit modal
-    htmx.ajax('GET', `/appointments/${appointmentId}/edit/`, {
-        target: '#modal',
-        swap: 'innerHTML'
-    });
+function closeSlotGenerationModal() {
+    document.getElementById('slotGenerationModal').classList.add('hidden');
 }
 
-// Helper function to get CSRF token
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
+function showLoading(message = 'Please wait while we generate appointment slots...') {
+    document.getElementById('loadingMessage').textContent = message;
+    document.getElementById('loadingModal').classList.remove('hidden');
 }
 
-// Define global URL variables for use in JavaScript
-window.DOCTOR_APPOINTMENT_URL = "{% url 'users:appointment_detail_doctor' 999 %}".replace('999', '');
-window.DOCTOR_CALENDAR_URL = "{% url 'users:doctor_calendar' %}";
-
-// Initialize dashboard calendar
+function hideLoading() {
+    document.getElementById('loadingModal').classList.add('hidden');
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js"></script>
+<script>
+// Initialize appointment calendar
 document.addEventListener('DOMContentLoaded', function() {
-    initializeDashboardCalendar();
+    console.log('DOM loaded, initializing calendar...');
+    var calendarEl = document.getElementById('calendar');
+    
+    if (calendarEl) {
+        console.log('Calendar element found:', calendarEl);
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            },
+            events: '{% url "scheduling:get_calendar_appointments" %}',
+            eventClick: function(info) {
+                console.log('Event clicked:', info.event);
+                window.location.href = info.event.url;
+            },
+            eventTimeFormat: {
+                hour: 'numeric',
+                minute: '2-digit',
+                meridiem: 'short'
+            },
+            businessHours: {
+                daysOfWeek: [1, 2, 3, 4, 5], // Monday - Friday
+                startTime: '08:00',
+                endTime: '18:00',
+            },
+            height: 450,
+            loading: function(bool) {
+                console.log('Calendar loading:', bool);
+            },
+            eventDidMount: function(info) {
+                console.log('Event mounted:', info.event.title);
+            }
+        });
+        
+        console.log('Rendering calendar...');
+        calendar.render();
+        console.log('Calendar rendered successfully');
+    } else {
+        console.error('Calendar element not found!');
+    }
 });
-
-function initializeDashboardCalendar() {
-    const calendarEl = document.getElementById('dashboard-calendar');
-    const appointmentTooltip = document.getElementById('appointment-tooltip');
-    
-    if (!calendarEl) return;
-    
-    // Get calendar events URL from data attribute
-    const eventsUrl = calendarEl.getAttribute('data-calendar-events-url');
-    
-    // Initialize FullCalendar with more compact settings for dashboard
-    window.calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
-        headerToolbar: {
-            left: 'prev,next',
-            center: 'title',
-            right: ''
-        },
-        height: 'auto',
-        contentHeight: 'auto',
-        aspectRatio: 1,
-        handleWindowResize: true,
-        stickyHeaderDates: true,
-        fixedWeekCount: true, // Ensure 6 weeks are always shown
-        showNonCurrentDates: true, // Show days from adjacent months
-        dayMaxEvents: 0, // Hide all events in month view
-        navLinks: true,
-        themeSystem: 'standard',
-        events: function(info, successCallback, failureCallback) {
-            // Store this for later reference
-            window.calendarStartDate = info.start;
-            window.calendarEndDate = info.end;
-            
-            // Fetch events for the date range
-            fetch(`${eventsUrl}?start=${info.startStr}&end=${info.endStr}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    // Store all events for direct access
-                    window.allCalendarEvents = data.events || [];
-                    
-                    // Process events and create booking status for each day
-                    const processedEvents = window.allCalendarEvents;
-                    
-                    // Group appointments by date
-                    const appointmentsByDate = {};
-                    const availabilityByDate = {};
-                    
-                    // Process availability summary events
-                    processedEvents.forEach(event => {
-                        if (event.eventType === 'availabilitySummary') {
-                            // Extract date from the ISO string
-                            let date = event.start.split('T')[0];
-                            
-                            // Store with consistent formatting
-                            availabilityByDate[date] = {
-                                availableCount: event.available_count,
-                                start_time: event.start_time,
-                                end_time: event.end_time
-                            };
-                        }
-                    });
-                    
-                    // Process appointment events
-                    processedEvents.forEach(event => {
-                        if (event.eventType === 'appointment') {
-                            // Extract date from the ISO string
-                            let date = event.start.split('T')[0];
-                            
-                            if (!appointmentsByDate[date]) {
-                                appointmentsByDate[date] = [];
-                            }
-                            
-                            appointmentsByDate[date].push({
-                                id: event.id,
-                                title: event.title,
-                                patient: event.patient,
-                                start: event.start,
-                                end: event.end,
-                                status: event.status,
-                                reason: event.reason
-                            });
-                        }
-                    });
-                    
-                    // Store this for later reference
-                    window.appointmentsByDate = appointmentsByDate;
-                    window.availabilityByDate = availabilityByDate;
-                    
-                    // Create day status events
-                    const dayStatusEvents = [];
-                    
-                    // Process each day in the range
-                    const startDate = new Date(info.start);
-                    const endDate = new Date(info.end);
-                    const currentDate = new Date(startDate);
-                    
-                    while (currentDate < endDate) {
-                        // Format date consistently
-                        const year = currentDate.getUTCFullYear();
-                        const month = String(currentDate.getUTCMonth() + 1).padStart(2, '0');
-                        const day = String(currentDate.getUTCDate()).padStart(2, '0');
-                        const dateStr = `${year}-${month}-${day}`;
-                        
-                        const dayAppointments = appointmentsByDate[dateStr] || [];
-                        const dayAvailability = availabilityByDate[dateStr] || { availableCount: 0 };
-                        
-                        // Determine booking status and colors
-                        let bookingStatus = 'free';
-                        let statusColor = '#4caf50'; // Bright green for free
-                        
-                        if (dayAppointments.length > 0) {
-                            if (dayAvailability.availableCount === 0) {
-                                bookingStatus = 'full';
-                                statusColor = '#f44336'; // Bright red for fully booked
-                            } else {
-                                bookingStatus = 'partial';
-                                statusColor = '#ffc107'; // Bright yellow for partially booked
-                            }
-                        }
-                        
-                        // Create a day status event with explicit color
-                        dayStatusEvents.push({
-                            start: dateStr,
-                            allDay: true,
-                            display: 'background',
-                            backgroundColor: statusColor,
-                            classNames: [`booking-status-${bookingStatus}`],
-                            extendedProps: {
-                                bookingStatus: bookingStatus,
-                                appointmentsCount: dayAppointments.length,
-                                availableCount: dayAvailability.availableCount,
-                                appointments: dayAppointments,
-                                dateStr: dateStr, // Store the date string consistently
-                                dayOfMonth: currentDate.getUTCDate(), // Store day number
-                                formattedDate: new Date(dateStr).toLocaleDateString('en-US', {
-                                    weekday: 'long',
-                                    month: 'long',
-                                    day: 'numeric'
-                                })
-                            }
-                        });
-                        
-                        // Move to next day
-                        currentDate.setDate(currentDate.getDate() + 1);
-                    }
-                    
-                    // Return the day status events and the original appointment events
-                    // We'll hide appointment events in the calendar but keep them for reference
-                    successCallback([...dayStatusEvents]);
-                })
-                .catch(error => {
-                    console.error('Error loading events:', error);
-                    failureCallback(error);
-                });
-        },
-        dateClick: function(info) {
-            // Navigate to full calendar view with the selected date
-            window.location.href = window.DOCTOR_CALENDAR_URL + '?date=' + info.dateStr;
-        },
-        dayCellDidMount: function(info) {
-            // Set a data attribute with the day number for easy access
-            const dayNum = info.date.getDate();
-            info.el.setAttribute('data-day', dayNum);
-            
-            // Add event listeners to each day cell
-            info.el.addEventListener('mouseenter', function(e) {
-                // Use the day number from the data attribute
-                const dayNum = parseInt(this.getAttribute('data-day'));
-                showDayTooltipByDayNum(dayNum, info.el);
-            });
-            
-            info.el.addEventListener('mouseleave', function(e) {
-                hideDayTooltip();
-            });
+</script>
+<script>
+// Handle generation type radio button changes
+document.querySelectorAll('input[name="generationType"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        const weekForm = document.getElementById('weekSlotGenerationForm');
+        const rangeForm = document.getElementById('rangeSlotGenerationForm');
+        
+        if (this.value === 'week') {
+            weekForm.classList.remove('hidden');
+            rangeForm.classList.add('hidden');
+        } else {
+            weekForm.classList.add('hidden');
+            rangeForm.classList.remove('hidden');
         }
     });
-    
-    calendar.render();
-    
-    // After calendar is rendered, force tooltip containers to be visible
-    const tooltipEl = document.getElementById('appointment-tooltip');
-    if (tooltipEl) {
-        tooltipEl.style.zIndex = '1000';
-    }
-}
+});
 
-// Function to show tooltip by day number
-function showDayTooltipByDayNum(dayNum, element) {
-    console.log("Showing tooltip for day:", dayNum);
+// Handle week-based slot generation form submission
+document.getElementById('weekSlotGenerationForm').addEventListener('submit', function(e) {
+    e.preventDefault();
     
-    // Get all events
-    const events = window.calendar.getEvents();
+    const formData = new FormData(this);
+    const selectedDays = Array.from(formData.getAll('weekdays')).map(day => parseInt(day));
     
-    // Find the event with matching day number
-    const dayEvent = events.find(event => {
-        return event.extendedProps && 
-               event.extendedProps.dayOfMonth === dayNum;
-    });
-    
-    if (!dayEvent) {
-        console.log("No event found for day:", dayNum);
+    if (selectedDays.length === 0) {
+        alert('Please select at least one day of the week.');
         return;
     }
     
-    const props = dayEvent.extendedProps;
-    const bookingStatus = props.bookingStatus;
-    const appointmentsCount = props.appointmentsCount;
-    const availableCount = props.availableCount;
-    const appointments = props.appointments || [];
-    
-    // Get status text and color with new color scheme
-    let statusText, statusColor;
-    
-    switch (bookingStatus) {
-        case 'free':
-            statusText = 'Free - No Appointments';
-            statusColor = '#4caf50'; // Bright green
-            break;
-        case 'partial':
-            statusText = 'Partially Booked';
-            statusColor = '#ffc107'; // Bright yellow
-            break;
-        case 'full':
-            statusText = 'Fully Booked';
-            statusColor = '#f44336'; // Bright red
-            break;
-        default:
-            statusText = 'Unknown Status';
-            statusColor = '#9e9e9e'; // Gray
+    if (!formData.get('selected_date')) {
+        alert('Please select a date for the week.');
+        return;
     }
     
-    // Build appointments list
-    let appointmentsHtml = '';
+    closeSlotGenerationModal();
+    showLoading('Generating appointment slots for the week...');
     
-    if (appointments.length > 0) {
-        appointments.forEach(appt => {
-            const time = new Date(appt.start).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch('/users/doctor/generate-slots-week/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrftoken
+        },
+        body: new URLSearchParams({
+            'selected_date': formData.get('selected_date'),
+            'weekdays': selectedDays.join(',')
+        }).toString()
+    })
+    .then(response => {
+        hideLoading();
+        if (response.ok) {
+            alert('Week slots generated successfully!');
+            location.reload();
+        } else {
+            alert('Error generating slots. Please try again.');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error:', error);
+        alert('Error generating slots. Please try again.');
+    });
+});
+
+// Handle range-based slot generation form submission
+document.getElementById('rangeSlotGenerationForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const selectedDays = Array.from(formData.getAll('weekdays_range')).map(day => parseInt(day));
+    
+    if (selectedDays.length === 0) {
+        alert('Please select at least one day of the week.');
+        return;
+    }
+    
+    closeSlotGenerationModal();
+    showLoading('Generating appointment slots for date range...');
+    
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch('/users/doctor/generate-slots/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrftoken
+        },
+        body: new URLSearchParams({
+            'generate_slots_form': '1',
+            'start_date': formData.get('start_date'),
+            'end_date': formData.get('end_date'),
+            'weekdays': selectedDays.join(',')
+        }).toString()
+    })
+    .then(response => {
+        hideLoading();
+        if (response.ok) {
+            alert('Range slots generated successfully!');
+            location.reload();
+        } else {
+            alert('Error generating slots. Please try again.');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error:', error);
+        alert('Error generating slots. Please try again.');
+    });
+});
+</script>
+
+<script>
+// Handle appointment actions
+document.addEventListener('DOMContentLoaded', function() {
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    // Add event listeners to action buttons
+    document.querySelectorAll('.action-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const action = this.dataset.action;
+            const appointmentId = this.dataset.appointmentId;
             
-            appointmentsHtml += `
-                <div class="tooltip-appointment">
-                    <div><strong>${time}</strong> - ${appt.patient}</div>
-                    ${appt.reason ? `<div class="text-gray-600 text-xs">${appt.reason}</div>` : ''}
-                </div>
-            `;
+            // Confirm action
+            let confirmMessage;
+            switch(action) {
+                case 'attend':
+                    confirmMessage = 'Start attending this patient?';
+                    break;
+                case 'complete':
+                    confirmMessage = 'Mark this appointment as completed?';
+                    break;
+                case 'no_show':
+                    confirmMessage = 'Mark this patient as no-show?';
+                    break;
+                default:
+                    return;
+            }
+            
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+            
+            // Disable button and show loading
+            this.disabled = true;
+            const originalText = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Processing...';
+            
+            // Make AJAX request
+            fetch(`/users/doctor/appointments/${appointmentId}/actions/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': csrfToken
+                },
+                body: `action=${action}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    showMessage(data.message, 'success');
+                    
+                    // Update the appointment card
+                    updateAppointmentCard(appointmentId, data.new_status, data.new_status_display);
+                } else {
+                    // Show error message
+                    showMessage(data.error || 'An error occurred', 'error');
+                    
+                    // Re-enable button
+                    this.disabled = false;
+                    this.innerHTML = originalText;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showMessage('Network error occurred', 'error');
+                
+                // Re-enable button
+                this.disabled = false;
+                this.innerHTML = originalText;
+            });
         });
-    } else {
-        appointmentsHtml = '<div class="tooltip-appointment">No appointments scheduled</div>';
-    }
+    });
     
-    // Build tooltip HTML with more prominent styling
-    const tooltipHtml = `
-        <div class="tooltip-date">${props.formattedDate}</div>
-        <div class="tooltip-status">
-            <span class="tooltip-status-icon" style="background-color: ${statusColor}"></span>
-            <strong>${statusText}</strong>
-        </div>
-        <div class="text-sm font-medium mt-2">
-            <div>Appointments: ${appointmentsCount}</div>
-            <div>Available Slots: ${availableCount}</div>
-        </div>
-        ${appointments.length > 0 ? '<div class="font-medium mt-2">Scheduled Appointments:</div>' : ''}
-        <div class="tooltip-appointments">
-            ${appointmentsHtml}
-        </div>
-        <div class="text-xs font-bold text-blue-600 mt-2">Click for detailed view</div>
-    `;
-    
-    // Update tooltip content
-    const tooltipEl = document.getElementById('appointment-tooltip');
-    if (tooltipEl) {
-        tooltipEl.innerHTML = tooltipHtml;
+    function updateAppointmentCard(appointmentId, newStatus, newStatusDisplay) {
+        const card = document.querySelector(`[data-appointment-id="${appointmentId}"]`);
+        if (!card) return;
         
-        // Position the tooltip
-        const rect = element.getBoundingClientRect();
-        const calendarEl = document.getElementById('dashboard-calendar');
-        const calendarRect = calendarEl.getBoundingClientRect();
-        
-        tooltipEl.style.left = rect.right + 10 + 'px';
-        tooltipEl.style.top = rect.top + window.scrollY + 'px';
-        
-        // Make sure tooltip doesn't go off the right edge
-        const tooltipRect = tooltipEl.getBoundingClientRect();
-        if (tooltipRect.right > calendarRect.right) {
-            tooltipEl.style.left = rect.left - tooltipRect.width - 10 + 'px';
+        // Update status badge
+        const statusBadge = card.querySelector('.appointment-status');
+        if (statusBadge) {
+            // Remove old classes
+            statusBadge.className = 'appointment-status px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full';
+            
+            // Add new classes based on status
+            switch(newStatus) {
+                case 'scheduled':
+                    statusBadge.classList.add('bg-green-100', 'text-green-800');
+                    break;
+                case 'in_progress':
+                    statusBadge.classList.add('bg-yellow-100', 'text-yellow-800');
+                    break;
+                case 'completed':
+                    statusBadge.classList.add('bg-blue-100', 'text-blue-800');
+                    break;
+                case 'no_show':
+                    statusBadge.classList.add('bg-red-100', 'text-red-800');
+                    break;
+                default:
+                    statusBadge.classList.add('bg-gray-100', 'text-gray-800');
+            }
+            
+            statusBadge.textContent = newStatusDisplay;
         }
         
-        tooltipEl.style.display = 'block';
+        // Update action buttons
+        const actionsContainer = card.querySelector('.appointment-actions');
+        if (actionsContainer) {
+            // Remove old action buttons (keep only the "Open" button)
+            const actionButtons = actionsContainer.querySelectorAll('.action-btn');
+            actionButtons.forEach(btn => btn.remove());
+            
+            // Add new action buttons based on new status
+            if (newStatus === 'in_progress') {
+                // Add complete button
+                const completeBtn = document.createElement('button');
+                completeBtn.className = 'action-btn complete-btn inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500';
+                completeBtn.setAttribute('data-action', 'complete');
+                completeBtn.setAttribute('data-appointment-id', appointmentId);
+                completeBtn.setAttribute('title', 'Mark appointment as completed');
+                completeBtn.innerHTML = '<i class="fas fa-check mr-1"></i>Complete';
+                
+                // Add event listener
+                completeBtn.addEventListener('click', arguments.callee);
+                
+                // Insert before the "Open" button
+                const openBtn = actionsContainer.querySelector('a');
+                actionsContainer.insertBefore(completeBtn, openBtn);
+            }
+        }
     }
-}
-
-function hideDayTooltip() {
-    const tooltipEl = document.getElementById('appointment-tooltip');
-    if (tooltipEl) {
-        tooltipEl.style.display = 'none';
+    
+    function showMessage(message, type) {
+        // Create message element
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `fixed top-4 right-4 z-50 px-4 py-2 rounded-md text-sm font-medium ${
+            type === 'success' 
+                ? 'bg-green-100 text-green-800 border border-green-200' 
+                : 'bg-red-100 text-red-800 border border-red-200'
+        }`;
+        messageDiv.innerHTML = `
+            <div class="flex items-center">
+                <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2"></i>
+                ${message}
+            </div>
+        `;
+        
+        document.body.appendChild(messageDiv);
+        
+        // Remove after 5 seconds
+        setTimeout(() => {
+            messageDiv.remove();
+        }, 5000);
     }
-}
+});
 </script>
 
 {% csrf_token %}

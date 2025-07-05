@@ -275,7 +275,7 @@
 
     async function getPrescriptionPDF(prescriptionId, format) {
         try {
-            const response = await fetch(`/doctor/prescriptions/${prescriptionId}/pdf/?format=${format}`);
+            const response = await fetch(`/users/doctor/prescriptions/${prescriptionId}/pdf/?format=${format}`);
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.message || 'Failed to generate PDF');

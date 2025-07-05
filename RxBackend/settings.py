@@ -58,6 +58,10 @@ INSTALLED_APPS = [
     'pharmacy',
     'appointment',
     'scheduling',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
 ]
 
 MIDDLEWARE = [
@@ -71,6 +75,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'users.middleware.RoleBasedRedirectionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = "RxBackend.urls"
@@ -106,13 +111,21 @@ DATABASES = {
     #    "ENGINE": "django.db.backends.sqlite3",
     #    "NAME": BASE_DIR / "db.sqlite3",
     #}
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": "rxdoctor",
-        "USER": "postgres",
-        "PASSWORD": "admin",
-        "HOST": "localhost",
-        "PORT": "5432",
+    #"default": {
+    #    "ENGINE": "django.db.backends.postgresql",
+    #    "NAME": "rxdoctor",
+    #    "USER": "postgres",
+    #    "PASSWORD": "admin",
+    #    "HOST": "localhost",
+    #    "PORT": "5432",
+    #}
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'rxdoctor',
+        'USER': 'REMOVED ',
+        'PASSWORD': 'REMOVED',
+        'HOST': 'REMOVED',
+        'PORT': 'REMOVED',
     }
 }
 
@@ -271,6 +284,20 @@ ALLOWED_HOSTS = ['*', 'localhost', '127.0.0.1', '192.168.29.57']
 LOGIN_URL = 'users:login'  # This matches your login URL pattern
 LOGIN_REDIRECT_URL = 'users:dashboard'  # Where to redirect after successful login
 LOGOUT_REDIRECT_URL = 'users:login'  # Where to redirect after logout
+
+# User Model - Using Django's built-in User model
+# AUTH_USER_MODEL = 'auth.User'  # This is the default, so we can comment it out
+
+# Migration Safety Settings
+MIGRATION_MODULES = {
+    # Prevent dangerous migrations in these apps
+    'HealthRecords': 'HealthRecords.migrations',
+    'users': 'users.migrations', 
+    'scheduling': 'scheduling.migrations',
+}
+
+# Custom setting to prevent dangerous User model operations
+PREVENT_USER_MODEL_MIGRATIONS = True
 
 # Email settings
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # For development

@@ -55,20 +55,30 @@ def dashboard_view(request):
 @login_required
 def profile_view(request):
     profile = request.user.userprofile
-    return render(request, 'profile.html', {'profile': profile})
+    if hasattr(request.user, 'is_doctor') and request.user.is_doctor:
+        return render(request, 'doctor/profile.html', {'profile': profile})
+    else:
+        return render(request, 'profile.html', {'profile': profile})
 
 @login_required
 def profile_edit_view(request):
     profile = request.user.userprofile
+    
     if request.method == 'POST':
         # Handle profile update
-        profile.phone_number = request.POST.get('phone_number')
-        profile.address = request.POST.get('address')
-        profile.pincode = request.POST.get('pincode')
-        profile.medical_degree = request.POST.get('medical_degree')
-        profile.license_number = request.POST.get('license_number')
-        profile.state_council = request.POST.get('state_council')
-        profile.save()
+        if hasattr(request.user, 'is_doctor') and request.user.is_doctor:
+            profile.phone_number = request.POST.get('phone_number')
+            profile.address = request.POST.get('address')
+            profile.pincode = request.POST.get('pincode')
+            profile.medical_degree = request.POST.get('medical_degree')
+            profile.license_number = request.POST.get('license_number')
+            profile.state_council = request.POST.get('state_council')
+            profile.save()
+        else:
+            profile.phone_number = request.POST.get('phone_number')
+            profile.address = request.POST.get('address')
+            profile.pincode = request.POST.get('pincode')
+            profile.save()
         
         # Update user information
         user = request.user
@@ -77,9 +87,13 @@ def profile_edit_view(request):
         user.email = request.POST.get('email')
         user.save()
         
-        return redirect('profile')
+        return redirect('users:profile')
     
-    return render(request, 'profile_edit.html', {'profile': profile})
+    # For GET requests, render the appropriate template
+    if hasattr(request.user, 'is_doctor') and request.user.is_doctor:
+        return render(request, 'doctor/profile_edit.html', {'profile': profile})
+    else:
+        return render(request, 'profile_edit.html', {'profile': profile})
 
 def logout_view(request):
     logout(request)

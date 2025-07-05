@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+
+{% block title %}Postpone Appointment{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-100">
+    <div class="py-6">
+        <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Postpone Appointment</h3>
+                    <p class="text-sm text-gray-600">
+                        Reschedule appointment with {{ appointment.patient.get_full_name }}
+                    </p>
+                </div>
+                
+                <div class="px-6 py-4">
+                    <!-- Current Appointment Details -->
+                    <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                        <h4 class="text-sm font-medium text-gray-900 mb-2">Current Appointment</h4>
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-500">Patient:</span>
+                                <span class="ml-2 font-medium">{{ appointment.patient.get_full_name }}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Date:</span>
+                                <span class="ml-2 font-medium">{{ appointment.appointment_date|date:"M d, Y" }}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Time:</span>
+                                <span class="ml-2 font-medium">{{ appointment.appointment_time|time:"g:i A" }}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Status:</span>
+                                <span class="ml-2 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                                    {{ appointment.get_status_display }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Postpone Form -->
+                    <form method="post" class="space-y-4">
+                        {% csrf_token %}
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="new_date" class="block text-sm font-medium text-gray-700">New Date</label>
+                                <input type="date" 
+                                       id="new_date" 
+                                       name="new_date" 
+                                       min="{{ min_date|date:'Y-m-d' }}"
+                                       required
+                                       class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                            
+                            <div>
+                                <label for="new_time" class="block text-sm font-medium text-gray-700">New Time</label>
+                                <input type="time" 
+                                       id="new_time" 
+                                       name="new_time" 
+                                       required
+                                       class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label for="reason" class="block text-sm font-medium text-gray-700">Reason for Postponement</label>
+                            <textarea id="reason" 
+                                      name="reason" 
+                                      rows="3" 
+                                      placeholder="Optional: Explain why the appointment is being postponed"
+                                      class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                        </div>
+                        
+                        <div class="flex justify-end space-x-3 pt-4">
+                            <a href="{% url 'users:doctor_dashboard' %}" 
+                               class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                Cancel
+                            </a>
+                            <button type="submit" 
+                                    class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                <i class="fas fa-clock mr-2"></i>
+                                Postpone Appointment
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set default time suggestions based on common appointment slots
+    const timeInput = document.getElementById('new_time');
+    const commonTimes = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'];
+    
+    // Add click handler to suggest common times
+    timeInput.addEventListener('focus', function() {
+        if (!this.value) {
+            // Suggest next available common time
+            const now = new Date();
+            const currentHour = now.getHours();
+            
+            for (let time of commonTimes) {
+                const [hour] = time.split(':').map(Number);
+                if (hour > currentHour) {
+                    this.value = time;
+                    break;
+                }
+            }
+        }
+    });
+    
+    // Validate that the selected date/time is in the future
+    const dateInput = document.getElementById('new_date');
+    const form = document.querySelector('form');
+    
+    form.addEventListener('submit', function(e) {
+        const selectedDate = new Date(dateInput.value + 'T' + timeInput.value);
+        const now = new Date();
+        
+        if (selectedDate <= now) {
+            e.preventDefault();
+            alert('Please select a future date and time for the appointment.');
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %} 

@@ -117,6 +117,20 @@ def appointment_detail(request, pk):
             request.user == appointment.patient.user):
         return HttpResponse("Permission denied", status=403)
     
+    # Get scheduling information if it exists
+    try:
+        from scheduling.models import ScheduledAppointment
+        scheduling_info = ScheduledAppointment.objects.get(appointment=appointment)
+        appointment.scheduling_info = scheduling_info
+    except ScheduledAppointment.DoesNotExist:
+        # Create default scheduling info for display
+        appointment.scheduling_info = type('obj', (object,), {
+            'is_emergency': False,
+            'is_telemedicine': False, 
+            'is_walk_in': False,
+            'notes': ''
+        })()
+
     context = {
         'appointment': appointment,
         'patient': appointment.patient,

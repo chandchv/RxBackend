@@ -21,19 +21,16 @@ class Bill(TimeStampedModel):
         ('pending', 'Pending'),
         ('partial', 'Partially Paid'),
         ('paid', 'Paid'),
+        ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
     ]
     
     PAYMENT_METHODS = [
         ('cash', 'Cash'),
-        ('card', 'Credit/Debit Card'),
-        ('insurance', 'Insurance'),
-        ('upi', 'UPI'),
-        ('bank_transfer', 'Bank Transfer'),
-        ('credit_card', 'Credit Card'),
         ('debit_card', 'Debit Card'),
-        ('net_banking', 'Net Banking'),
-        ('other', 'Other'),
+        ('credit_card', 'Credit Card'),
+        ('upi', 'UPI'),
+        ('insurance', 'Insurance'),
     ]
     
     BILL_TYPES = [
@@ -100,8 +97,16 @@ class Bill(TimeStampedModel):
     
     def calculate_total(self):
         """Calculate total bill amount"""
+        old_total = self.total
+        old_subtotal = self.subtotal
+        
         self.subtotal = sum(item.total for item in self.items.all())
         self.total = self.subtotal + self.tax - self.discount
+        
+        # Set flag if total changed
+        if old_total != self.total or old_subtotal != self.subtotal:
+            self._total_updated = True
+            
         return self.total
     
     def update_status(self):
@@ -110,7 +115,7 @@ class Bill(TimeStampedModel):
         self.amount_paid = total_paid
         
         if total_paid >= self.total:
-            self.status = 'paid'
+            self.status = 'completed'  # Changed from 'paid' to 'completed'
             self.is_paid = True
         elif total_paid > 0:
             self.status = 'partial'
@@ -136,15 +141,20 @@ class Bill(TimeStampedModel):
                 
             self.bill_number = f'B-{date_str}-{new_num:04d}'
         
-        # Calculate totals
-        if not self.id:  # Only for new bills
-            self.calculate_total()
-        
         # Set due date if not provided (default: 15 days from bill date)
         if not self.due_date:
             self.due_date = self.bill_date + timezone.timedelta(days=15)
             
+        # Save first to get primary key
         super().save(*args, **kwargs)
+        
+        # Only calculate total after bill is saved and can have items
+        if self.pk:
+            self.calculate_total()
+            # Save again if total was updated
+            if hasattr(self, '_total_updated'):
+                del self._total_updated
+                super().save(update_fields=['subtotal', 'total'])
 
 
 class BillItem(TimeStampedModel):
@@ -289,7 +299,7 @@ class LabTestBilling(TimeStampedModel):
 
 class ConsultationBilling(TimeStampedModel):
     """Billing for doctor consultations"""
-    appointment = models.OneToOneField('users.Appointment', on_delete=models.CASCADE, related_name='consultation_billing', to_field='id')
+    appointment = models.OneToOneField('users.Appointment', on_delete=models.CASCADE, related_name='consultation_billing')
     bill = models.ForeignKey(Bill, on_delete=models.SET_NULL, null=True, blank=True, related_name='consultation_billings')
     base_fee = models.DecimalField(max_digits=10, decimal_places=2)
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)

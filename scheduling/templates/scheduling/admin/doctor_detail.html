@@ -1,0 +1,195 @@
+{% extends 'scheduling/base_scheduling.html' %}
+{% load static %}
+
+{% block title %}Doctor Detail{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">Doctor Detail</h1>
+        <div class="flex space-x-3">
+            <a href="{% url 'scheduling:doctor_list' %}" 
+               class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+                <i class="fas fa-arrow-left mr-2"></i>Back to Doctors
+            </a>
+            <a href="{% url 'scheduling:doctor_edit' doctor.pk %}" 
+               class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                <i class="fas fa-edit mr-2"></i>Edit Doctor
+            </a>
+        </div>
+    </div>
+
+    <!-- Doctor Info -->
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="flex items-center mb-6">
+                <div class="h-20 w-20 rounded-full bg-blue-100 flex items-center justify-center">
+                    <span class="text-2xl font-bold text-blue-600">
+                        {{ doctor.user.first_name|first }}{{ doctor.user.last_name|first }}
+                    </span>
+                </div>
+                <div class="ml-6">
+                    <h2 class="text-2xl font-bold text-gray-900">Dr. {{ doctor.user.get_full_name }}</h2>
+                    <p class="text-lg text-gray-600">{{ doctor.specialization|default:"General Practice" }}</p>
+                    <div class="flex items-center mt-2">
+                        {% if doctor.is_active %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                            Active
+                        </span>
+                        {% else %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                            Inactive
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Email</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ doctor.user.email|default:"Not provided" }}</dd>
+                </div>
+
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Phone</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ doctor.phone_number|default:"Not provided" }}</dd>
+                </div>
+
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Clinic</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ doctor.clinic.name|default:"Not assigned" }}</dd>
+                </div>
+
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">License Number</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ doctor.license_number|default:"Not provided" }}</dd>
+                </div>
+
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Medical Council</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ doctor.medical_council|default:"Not provided" }}</dd>
+                </div>
+
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Verified</dt>
+                    <dd class="mt-1">
+                        {% if doctor.verified %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                            <i class="fas fa-check mr-1"></i>Verified
+                        </span>
+                        {% else %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                            <i class="fas fa-clock mr-1"></i>Pending
+                        </span>
+                        {% endif %}
+                    </dd>
+                </div>
+            </dl>
+        </div>
+    </div>
+
+    <!-- Schedule Information -->
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+        <div class="px-4 py-5 sm:p-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Weekly Schedule</h3>
+            
+            {% if doctor_schedules %}
+            <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                <table class="min-w-full divide-y divide-gray-300">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for schedule in doctor_schedules %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {% if schedule.day_of_week == 0 %}Monday
+                                {% elif schedule.day_of_week == 1 %}Tuesday
+                                {% elif schedule.day_of_week == 2 %}Wednesday
+                                {% elif schedule.day_of_week == 3 %}Thursday
+                                {% elif schedule.day_of_week == 4 %}Friday
+                                {% elif schedule.day_of_week == 5 %}Saturday
+                                {% elif schedule.day_of_week == 6 %}Sunday
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {{ schedule.start_time|time:"g:i A" }} - {{ schedule.end_time|time:"g:i A" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {{ schedule.appointment_duration }} min
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if schedule.is_active %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    Active
+                                </span>
+                                {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    Inactive
+                                </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <i class="fas fa-calendar-times text-gray-300 text-4xl mb-3"></i>
+                <p class="text-gray-500">No schedules configured</p>
+                <a href="{% url 'scheduling:schedule_create' %}" 
+                   class="mt-2 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200">
+                    Create Schedule
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                    <i class="fas fa-calendar-alt text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-600">Total Appointments</p>
+                    <p class="text-2xl font-semibold text-gray-900">{{ total_appointments|default:0 }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 text-green-600">
+                    <i class="fas fa-clock text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-600">This Week</p>
+                    <p class="text-2xl font-semibold text-gray-900">{{ weekly_appointments|default:0 }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                    <i class="fas fa-user-friends text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-600">Patients</p>
+                    <p class="text-2xl font-semibold text-gray-900">{{ total_patients|default:0 }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

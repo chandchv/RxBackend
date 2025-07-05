@@ -53,6 +53,23 @@ class PatientForm(forms.ModelForm):
 class AppointmentForm_patient(forms.ModelForm):
     appointment_time = forms.TimeField(input_formats=['%H:%M'])
     
+    # Appointment type fields
+    is_emergency = forms.BooleanField(
+        required=False,
+        label="Emergency Appointment",
+        widget=forms.CheckboxInput(attrs={'class': 'rounded border-gray-300 text-red-600'})
+    )
+    is_telemedicine = forms.BooleanField(
+        required=False,
+        label="Telemedicine Appointment",
+        widget=forms.CheckboxInput(attrs={'class': 'rounded border-gray-300 text-blue-600'})
+    )
+    is_walk_in = forms.BooleanField(
+        required=False,
+        label="Walk-in Appointment",
+        widget=forms.CheckboxInput(attrs={'class': 'rounded border-gray-300 text-green-600'})
+    )
+    
     class Meta:
         model = Appointment
         fields = ['doctor', 'appointment_date', 'appointment_time', 'reason']
@@ -72,6 +89,33 @@ class AppointmentForm_patient(forms.ModelForm):
                 raise forms.ValidationError("Cannot schedule appointments in the past")
         
         return cleaned_data
+    
+    def save(self, commit=True):
+        appointment = super().save(commit=False)
+        
+        if commit:
+            appointment.save()
+            
+            # Create or update scheduling bridge record with appointment types
+            from scheduling.models import ScheduledAppointment
+            scheduling_info, created = ScheduledAppointment.objects.get_or_create(
+                appointment=appointment,
+                defaults={
+                    'is_emergency': self.cleaned_data.get('is_emergency', False),
+                    'is_telemedicine': self.cleaned_data.get('is_telemedicine', False),
+                    'is_walk_in': self.cleaned_data.get('is_walk_in', False),
+                    'notes': '',
+                }
+            )
+            
+            if not created:
+                # Update existing scheduling info
+                scheduling_info.is_emergency = self.cleaned_data.get('is_emergency', False)
+                scheduling_info.is_telemedicine = self.cleaned_data.get('is_telemedicine', False)
+                scheduling_info.is_walk_in = self.cleaned_data.get('is_walk_in', False)
+                scheduling_info.save()
+        
+        return appointment
 
 class AppointmentForm(forms.ModelForm):
     doctor = forms.ModelChoiceField(
@@ -80,6 +124,23 @@ class AppointmentForm(forms.ModelForm):
         required=True
     )
     appointment_time = forms.TimeField(required=False, widget=forms.HiddenInput())
+    
+    # Appointment type fields
+    is_emergency = forms.BooleanField(
+        required=False,
+        label="Emergency Appointment",
+        widget=forms.CheckboxInput(attrs={'class': 'rounded border-gray-300 text-red-600'})
+    )
+    is_telemedicine = forms.BooleanField(
+        required=False,
+        label="Telemedicine Appointment",
+        widget=forms.CheckboxInput(attrs={'class': 'rounded border-gray-300 text-blue-600'})
+    )
+    is_walk_in = forms.BooleanField(
+        required=False,
+        label="Walk-in Appointment",
+        widget=forms.CheckboxInput(attrs={'class': 'rounded border-gray-300 text-green-600'})
+    )
     
     class Meta:
         model = Appointment
@@ -108,12 +169,44 @@ class AppointmentForm(forms.ModelForm):
         if doctor:
             self.fields['doctor'].initial = doctor
             self.fields['patient'].queryset = Patient.objects.filter(clinic=doctor.clinic)
+        
+        # If editing an existing appointment, populate appointment type fields
+        if self.instance and self.instance.pk:
+            try:
+                from scheduling.models import ScheduledAppointment
+                scheduling_info = ScheduledAppointment.objects.get(appointment=self.instance)
+                self.fields['is_emergency'].initial = scheduling_info.is_emergency
+                self.fields['is_telemedicine'].initial = scheduling_info.is_telemedicine
+                self.fields['is_walk_in'].initial = scheduling_info.is_walk_in
+            except ScheduledAppointment.DoesNotExist:
+                pass
 
     def save(self, commit=True):
         instance = super().save(commit=False)
         if commit:
             instance.save()
+            
+            # Create or update scheduling bridge record with appointment types
+            from scheduling.models import ScheduledAppointment
+            scheduling_info, created = ScheduledAppointment.objects.get_or_create(
+                appointment=instance,
+                defaults={
+                    'is_emergency': self.cleaned_data.get('is_emergency', False),
+                    'is_telemedicine': self.cleaned_data.get('is_telemedicine', False),
+                    'is_walk_in': self.cleaned_data.get('is_walk_in', False),
+                    'notes': '',
+                }
+            )
+            
+            if not created:
+                # Update existing scheduling info
+                scheduling_info.is_emergency = self.cleaned_data.get('is_emergency', False)
+                scheduling_info.is_telemedicine = self.cleaned_data.get('is_telemedicine', False)
+                scheduling_info.is_walk_in = self.cleaned_data.get('is_walk_in', False)
+                scheduling_info.save()
+                
         return instance
+        
     def clean(self):
         cleaned_data = super().clean()
         appointment_date = cleaned_data.get('appointment_date')
@@ -176,6 +269,23 @@ class StaffAppointmentForm(forms.ModelForm):
     )
     appointment_time = forms.TimeField(required=False, widget=forms.HiddenInput())
     
+    # Appointment type fields
+    is_emergency = forms.BooleanField(
+        required=False,
+        label="Emergency Appointment",
+        widget=forms.CheckboxInput(attrs={'class': 'rounded border-gray-300 text-red-600'})
+    )
+    is_telemedicine = forms.BooleanField(
+        required=False,
+        label="Telemedicine Appointment",
+        widget=forms.CheckboxInput(attrs={'class': 'rounded border-gray-300 text-blue-600'})
+    )
+    is_walk_in = forms.BooleanField(
+        required=False,
+        label="Walk-in Appointment",
+        widget=forms.CheckboxInput(attrs={'class': 'rounded border-gray-300 text-green-600'})
+    )
+    
     class Meta:
         model = Appointment
         fields = ['doctor', 'patient', 'appointment_date', 'appointment_time', 'reason']
@@ -203,6 +313,44 @@ class StaffAppointmentForm(forms.ModelForm):
         if clinic:
             self.fields['doctor'].queryset = Doctor.objects.filter(clinic=clinic)
             self.fields['patient'].queryset = Patient.objects.filter(clinic=clinic)
+        
+        # If editing an existing appointment, populate appointment type fields
+        if self.instance and self.instance.pk:
+            try:
+                from scheduling.models import ScheduledAppointment
+                scheduling_info = ScheduledAppointment.objects.get(appointment=self.instance)
+                self.fields['is_emergency'].initial = scheduling_info.is_emergency
+                self.fields['is_telemedicine'].initial = scheduling_info.is_telemedicine
+                self.fields['is_walk_in'].initial = scheduling_info.is_walk_in
+            except ScheduledAppointment.DoesNotExist:
+                pass
+    
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if commit:
+            instance.save()
+            
+            # Create or update scheduling bridge record with appointment types
+            from scheduling.models import ScheduledAppointment
+            scheduling_info, created = ScheduledAppointment.objects.get_or_create(
+                appointment=instance,
+                defaults={
+                    'is_emergency': self.cleaned_data.get('is_emergency', False),
+                    'is_telemedicine': self.cleaned_data.get('is_telemedicine', False),
+                    'is_walk_in': self.cleaned_data.get('is_walk_in', False),
+                    'notes': '',
+                }
+            )
+            
+            if not created:
+                # Update existing scheduling info
+                scheduling_info.is_emergency = self.cleaned_data.get('is_emergency', False)
+                scheduling_info.is_telemedicine = self.cleaned_data.get('is_telemedicine', False)
+                scheduling_info.is_walk_in = self.cleaned_data.get('is_walk_in', False)
+                scheduling_info.save()
+                
+        return instance
+        
     def clean(self):
         cleaned_data = super().clean()
         appointment_date = cleaned_data.get('appointment_date')

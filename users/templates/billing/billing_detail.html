@@ -5,13 +5,15 @@
     <div class="mb-8">
         <div class="flex justify-between items-start">
             <div>
-                <h1 class="text-2xl font-bold text-gray-900">Bill #{{ bill.id }}</h1>
+                <h1 class="text-2xl font-bold text-gray-900">Bill #{{ bill.bill_number }}</h1>
                 <p class="text-sm text-gray-600">Date: {{ bill.bill_date|date:"F j, Y" }}</p>
+                <p class="text-sm text-gray-600">Due Date: {{ bill.due_date|date:"F j, Y" }}</p>
+                <p class="text-sm text-gray-600">Type: {{ bill.get_bill_type_display }}</p>
             </div>
             <div class="text-right">
                 <p class="text-sm text-gray-600">Status:</p>
                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                    {% if bill.status == 'paid' %}bg-green-100 text-green-800
+                    {% if bill.status == 'paid' or bill.status == 'completed' %}bg-green-100 text-green-800
                     {% elif bill.status == 'pending' %}bg-red-100 text-red-800
                     {% elif bill.status == 'partial' %}bg-yellow-100 text-yellow-800
                     {% else %}bg-gray-100 text-gray-800{% endif %}">
@@ -22,15 +24,19 @@
     </div>
 
     <div class="grid grid-cols-2 gap-8 mb-8">
+        {% if bill.doctor %}
         <div>
             <h3 class="text-lg font-medium text-gray-900 mb-2">Doctor Details</h3>
-            <p class="text-sm text-gray-600">Dr. {{ bill.doctor.name }}</p>
+            <p class="text-sm text-gray-600">Dr. {{ bill.doctor.user.get_full_name }}</p>
+            {% if bill.doctor.specialization %}
             <p class="text-sm text-gray-600">{{ bill.doctor.specialization }}</p>
+            {% endif %}
         </div>
+        {% endif %}
         <div>
             <h3 class="text-lg font-medium text-gray-900 mb-2">Patient Details</h3>
-            <p class="text-sm text-gray-600">{{ bill.patient.get_full_name }}</p>
-            <p class="text-sm text-gray-600">ID: {{ bill.patient.id }}</p>
+            <p class="text-sm text-gray-600">{{ bill.patient.user.get_full_name }}</p>
+            <p class="text-sm text-gray-600">ID: {{ bill.patient.patient_id|default:bill.patient.id }}</p>
         </div>
     </div>
 
@@ -43,10 +49,13 @@
                         Item
                     </th>
                     <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Description
+                    </th>
+                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Quantity
                     </th>
                     <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Price
+                        Unit Price
                     </th>
                     <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Total
@@ -54,19 +63,28 @@
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-                {% for item in items %}
+                {% for item in bill_items %}
                 <tr>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {{ item.billing_item.name }}
+                        {{ item.item_name }}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900">
+                        {{ item.description|default:"" }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {{ item.quantity }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ₹{{ item.price }}
+                        ₹{{ item.unit_price }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         ₹{{ item.total }}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">
+                        No items found
                     </td>
                 </tr>
                 {% endfor %}
@@ -78,14 +96,22 @@
         <div class="flex justify-end">
             <div class="text-right">
                 <p class="text-sm text-gray-600">Subtotal: ₹{{ bill.subtotal }}</p>
+                {% if bill.tax > 0 %}
                 <p class="text-sm text-gray-600">Tax: ₹{{ bill.tax }}</p>
-                <p class="text-sm text-gray-600">Discount: ₹{{ bill.discount }}</p>
+                {% endif %}
+                {% if bill.discount > 0 %}
+                <p class="text-sm text-gray-600">Discount: -₹{{ bill.discount }}</p>
+                {% endif %}
                 <p class="text-lg font-bold text-gray-900 mt-2">Total: ₹{{ bill.total }}</p>
+                <p class="text-sm font-medium text-green-600">Paid: ₹{{ bill.amount_paid }}</p>
+                {% if due_amount > 0 %}
+                <p class="text-sm font-medium text-red-600">Due: ₹{{ due_amount }}</p>
+                {% endif %}
             </div>
         </div>
     </div>
 
-    {% if payments %}
+    {% if payment_history %}
     <div class="mt-8">
         <h3 class="text-lg font-medium text-gray-900 mb-4">Payment History</h3>
         <table class="min-w-full divide-y divide-gray-200">
@@ -100,10 +126,13 @@
                     <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Method
                     </th>
+                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Reference
+                    </th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-                {% for payment in payments %}
+                {% for payment in payment_history %}
                 <tr>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {{ payment.payment_date|date:"M d, Y" }}
@@ -114,6 +143,9 @@
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {{ payment.get_payment_method_display }}
                     </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {{ payment.reference_number|default:"-" }}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -121,13 +153,288 @@
     </div>
     {% endif %}
 
-    {% if user_type == 'admin' and bill.status != 'paid' %}
-    <div class="mt-8 flex justify-end">
-        <a href="{% url 'users:record_payment' bill.id %}" 
-           class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
-            Record Payment
-        </a>
+    <div class="mt-8 flex justify-between">
+        <div class="flex space-x-3">
+            <a href="{% url 'billing:bill_pdf' bill.id %}" 
+               class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                Download PDF
+            </a>
+            
+            <a href="{% url 'billing:bill_print' bill.id %}" 
+               target="_blank"
+               class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                </svg>
+                Print Bill
+            </a>
+        </div>
+        
+        <div class="flex space-x-3">
+            {% comment %}
+            Show payment recording button for:
+            - Staff members in the same clinic
+            - Doctors for their own bills  
+            - Clinic admins in the same clinic
+            - Superusers
+            {% endcomment %}
+            {% if bill.status != 'completed' %}
+                {% if user.is_superuser or user.is_staff %}
+                <button onclick="openPaymentModal()" 
+                   class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+                    <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                    </svg>
+                    💳 Quick Payment
+                </button>
+                <a href="{% url 'billing:staff_record_payment' bill.id %}" 
+                   class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                    <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                    </svg>
+                    📄 Full Payment Page
+                </a>
+                {% elif user_type == 'doctor' and bill.doctor.user == user %}
+                <button onclick="openPaymentModal()" 
+                   class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+                    <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                    </svg>
+                    💳 Quick Payment
+                </a>
+                <a href="{% url 'billing:staff_record_payment' bill.id %}" 
+                   class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                    <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                    </svg>
+                    📄 Full Payment Page
+                </a>
+                {% endif %}
+            {% endif %}
+            
+            {% if user_type == 'patient' and due_amount > 0 %}
+            <a href="{% url 'billing:patient_bill_detail' bill.id %}?pay=true" 
+               class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+                Make Payment
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if pay_mode and user_type == 'patient' and due_amount > 0 %}
+    <div class="mt-8 bg-gray-50 p-6 rounded-lg">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Make Payment</h3>
+        <form method="post" action="{% url 'billing:process_payment' bill.id %}">
+            {% csrf_token %}
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label for="payment_amount" class="block text-sm font-medium text-gray-700">Amount</label>
+                    <input type="number" step="0.01" max="{{ due_amount }}" name="payment_amount" id="payment_amount" 
+                           value="{{ due_amount }}" required
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="payment_method" class="block text-sm font-medium text-gray-700">Payment Method</label>
+                    <select name="payment_method" id="payment_method" required
+                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        {% for value, label in payment_methods %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="reference_number" class="block text-sm font-medium text-gray-700">Reference Number (Optional)</label>
+                    <input type="text" name="reference_number" id="reference_number"
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="notes" class="block text-sm font-medium text-gray-700">Notes (Optional)</label>
+                    <input type="text" name="notes" id="notes"
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+            </div>
+            <div class="mt-4 flex justify-end space-x-3">
+                <a href="{% url 'billing:patient_bill_detail' bill.id %}" 
+                   class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    Cancel
+                </a>
+                <button type="submit" 
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+                    Process Payment
+                </button>
+            </div>
+        </form>
     </div>
     {% endif %}
 </div>
+
+<!-- Quick Payment Modal -->
+<div id="paymentModal" class="fixed inset-0 z-50 hidden payment-modal">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 modal-slide-in">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold text-gray-900">💳 Quick Payment</h3>
+                <button onclick="closePaymentModal()" 
+                        class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <form id="quickPaymentForm" method="post" action="{% url 'billing:staff_record_payment' bill.id %}">
+                {% csrf_token %}
+                
+                <!-- Payment Amount -->
+                <div class="mb-6">
+                    <label for="modal_payment_amount" class="block text-lg font-medium text-gray-700 mb-2">
+                        💰 Payment Amount (₹)
+                    </label>
+                    <div class="flex items-center space-x-4">
+                        <input type="number" 
+                               id="modal_payment_amount" 
+                               name="payment_amount" 
+                               step="0.01" 
+                               max="{{ due_amount }}"
+                               value="{{ due_amount }}"
+                               class="text-xl font-bold w-40 border-2 border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               required>
+                        <span class="text-gray-500">Due: ₹{{ due_amount|floatformat:2 }}</span>
+                    </div>
+                    
+                    <!-- Quick Amount Buttons -->
+                    <div class="mt-3 flex space-x-2 flex-wrap">
+                        <button type="button" onclick="setModalPaymentAmount({{ due_amount }})" 
+                                class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded text-sm">
+                            Full Amount
+                        </button>
+                        {% if due_amount >= 1000 %}
+                        <button type="button" onclick="setModalPaymentAmount(1000)" 
+                                class="bg-purple-100 hover:bg-purple-200 text-purple-800 px-3 py-1 rounded text-sm">
+                            ₹1,000
+                        </button>
+                        {% endif %}
+                        {% if due_amount >= 500 %}
+                        <button type="button" onclick="setModalPaymentAmount(500)" 
+                                class="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-1 rounded text-sm">
+                            ₹500
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Payment Method Selection -->
+                <div class="mb-6">
+                    <label class="block text-lg font-medium text-gray-700 mb-3">
+                        💳 Payment Method
+                    </label>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        {% for value, label in payment_methods %}
+                        <div class="payment-method-card bg-white rounded-lg p-3 text-center border-2" 
+                             onclick="selectModalPaymentMethod('{{ value }}')">
+                            <div class="payment-icon">
+                                {% if value == 'cash' %}
+                                    <i class="fas fa-money-bills text-green-600"></i>
+                                {% elif value == 'debit_card' %}
+                                    <i class="fas fa-credit-card text-blue-600"></i>
+                                {% elif value == 'credit_card' %}
+                                    <i class="fas fa-credit-card text-purple-600"></i>
+                                {% elif value == 'upi' %}
+                                    <i class="fas fa-mobile-alt text-orange-600"></i>
+                                {% elif value == 'insurance' %}
+                                    <i class="fas fa-shield-alt text-indigo-600"></i>
+                                {% endif %}
+                            </div>
+                            <p class="font-medium text-gray-900 text-sm">{{ label }}</p>
+                            <input type="radio" name="payment_method" value="{{ value }}" class="hidden" required>
+                            
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Additional Details -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label for="modal_reference_number" class="block text-sm font-medium text-gray-700 mb-1">
+                            Reference Number (Optional)
+                        </label>
+                        <input type="text" 
+                               id="modal_reference_number" 
+                               name="reference_number" 
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               placeholder="Transaction ID, Check number, etc.">
+                    </div>
+                    
+                    <div>
+                        <label for="modal_notes" class="block text-sm font-medium text-gray-700 mb-1">
+                            Notes (Optional)
+                        </label>
+                        <input type="text" 
+                               id="modal_notes" 
+                               name="notes" 
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               placeholder="Additional notes">
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="flex justify-end space-x-3">
+                    <button type="button" 
+                            onclick="closePaymentModal()"
+                            class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg">
+                        ✅ Record Payment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openPaymentModal() {
+    document.getElementById('paymentModal').classList.remove('hidden');
+    document.getElementById('modal_payment_amount').focus();
+}
+
+function closePaymentModal() {
+    document.getElementById('paymentModal').classList.add('hidden');
+}
+
+function setModalPaymentAmount(amount) {
+    document.getElementById('modal_payment_amount').value = amount.toFixed(2);
+}
+
+function selectModalPaymentMethod(method) {
+    // Remove selected class from all cards
+    document.querySelectorAll('.payment-method-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // Add selected class to clicked card
+    event.currentTarget.classList.add('selected');
+    
+    // Set the radio button
+    document.querySelector(`input[name="payment_method"][value="${method}"]`).checked = true;
+}
+
+// Close modal when clicking outside
+document.getElementById('paymentModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closePaymentModal();
+    }
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closePaymentModal();
+    }
+});
+</script>
 {% endblock %} 

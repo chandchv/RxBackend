@@ -728,4 +728,267 @@ def doctor_billing_summary_api(request):
             'recent_bills': serializer.data
         })
     except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST) 
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def make_payment(request, bill_id):
+    """
+    Make a payment (partial or full) against a bill
+    """
+    try:
+        bill = get_object_or_404(Bill, id=bill_id)
+        
+        # Check if user has permission to pay this bill
+        if not (request.user.is_staff or 
+                bill.patient.user == request.user or 
+                (hasattr(request.user, 'doctor') and bill.doctor.user == request.user)):
+            return Response(
+                {'error': 'You do not have permission to pay this bill'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get payment data
+        amount = request.data.get('amount')
+        payment_method = request.data.get('payment_method', 'cash')
+        reference_number = request.data.get('reference_number', '')
+        notes = request.data.get('notes', '')
+        
+        # Validate amount
+        if not amount:
+            return Response(
+                {'error': 'Payment amount is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            amount = float(amount)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'Invalid payment amount'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if amount <= 0:
+            return Response(
+                {'error': 'Payment amount must be greater than 0'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if payment amount exceeds due amount
+        due_amount = bill.total - bill.amount_paid
+        if amount > due_amount:
+            return Response(
+                {'error': f'Payment amount (₹{amount}) exceeds due amount (₹{due_amount})'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create payment record
+        payment = Payment.objects.create(
+            bill=bill,
+            amount=amount,
+            payment_method=payment_method,
+            reference_number=reference_number,
+            notes=notes,
+            created_by=request.user
+        )
+        
+        # Update bill amounts and status
+        bill.amount_paid += amount
+        
+        # Update bill status based on payment
+        if bill.amount_paid >= bill.total:
+            bill.status = 'paid'
+            bill.is_paid = True
+        elif bill.amount_paid > 0:
+            bill.status = 'partial'
+        
+        bill.save()
+        
+        # Return response with updated bill info
+        return Response({
+            'success': True,
+            'message': 'Payment recorded successfully',
+            'payment_id': payment.id,
+            'bill_status': bill.status,
+            'amount_paid': float(bill.amount_paid),
+            'due_amount': float(bill.total - bill.amount_paid),
+            'payment': {
+                'id': payment.id,
+                'amount': float(payment.amount),
+                'payment_method': payment.payment_method,
+                'payment_date': payment.payment_date.isoformat(),
+                'reference_number': payment.reference_number
+            }
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to process payment: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def create_appointment_bill(request):
+    """
+    Create a bill for an appointment
+    """
+    try:
+        appointment_id = request.data.get('appointment_id')
+        if not appointment_id:
+            return Response(
+                {'error': 'Appointment ID is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get appointment
+        appointment = get_object_or_404(Appointment, id=appointment_id)
+        
+        # Check if bill already exists
+        if hasattr(appointment, 'billing_bill') and appointment.billing_bill:
+            return Response(
+                {'error': 'Bill already exists for this appointment'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check permissions
+        if not (request.user.is_staff or 
+                appointment.patient.user == request.user or 
+                (hasattr(request.user, 'doctor') and appointment.doctor.user == request.user)):
+            return Response(
+                {'error': 'You do not have permission to create a bill for this appointment'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get consultation fee (use doctor's fee or default)
+        consultation_fee = request.data.get('consultation_fee')
+        if not consultation_fee:
+            if hasattr(appointment.doctor, 'consultation_fee'):
+                consultation_fee = appointment.doctor.consultation_fee
+            else:
+                consultation_fee = 500  # Default consultation fee
+        
+        # Create bill
+        bill = Bill.objects.create(
+            patient=appointment.patient,
+            doctor=appointment.doctor,
+            clinic=appointment.doctor.clinic if appointment.doctor.clinic else None,
+            appointment=appointment,
+            bill_type='consultation',
+            subtotal=consultation_fee,
+            total=consultation_fee,
+            bill_date=timezone.now().date(),
+            due_date=timezone.now().date() + timedelta(days=7)  # Due in 7 days
+        )
+        
+        # Create bill item
+        BillItem.objects.create(
+            bill=bill,
+            item_name=f'Consultation with Dr. {appointment.doctor.user.first_name} {appointment.doctor.user.last_name}',
+            description=f'Appointment on {appointment.appointment_date}',
+            quantity=1,
+            unit_price=consultation_fee,
+            total=consultation_fee
+        )
+        
+        # Create consultation billing record
+        ConsultationBilling.objects.create(
+            appointment=appointment,
+            bill=bill,
+            doctor=appointment.doctor,
+            base_fee=consultation_fee,
+            final_fee=consultation_fee
+        )
+        
+        return Response({
+            'success': True,
+            'message': 'Bill created successfully',
+            'bill_id': bill.id,
+            'bill_number': bill.bill_number,
+            'total_amount': float(bill.total)
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to create bill: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def create_lab_bill(request):
+    """
+    Create a bill for lab tests
+    """
+    try:
+        lab_order_id = request.data.get('lab_order_id')
+        if not lab_order_id:
+            return Response(
+                {'error': 'Lab order ID is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Note: You'll need to import LabOrder from your labs app
+        # from labs.models import LabOrder
+        
+        # Get lab order
+        try:
+            from labs.models import LabOrder
+            lab_order = get_object_or_404(LabOrder, id=lab_order_id)
+        except ImportError:
+            return Response(
+                {'error': 'Lab module not available'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if bill already exists
+        if hasattr(lab_order, 'billing_bill') and lab_order.billing_bill:
+            return Response(
+                {'error': 'Bill already exists for this lab order'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Calculate total cost
+        total_cost = sum(test.test.cost for test in lab_order.tests.all())
+        
+        # Create bill
+        bill = Bill.objects.create(
+            patient=lab_order.patient,
+            doctor=lab_order.ordered_by if hasattr(lab_order, 'ordered_by') else None,
+            clinic=lab_order.lab.clinic if hasattr(lab_order.lab, 'clinic') else None,
+            lab_order=lab_order,
+            bill_type='lab',
+            subtotal=total_cost,
+            total=total_cost,
+            bill_date=timezone.now().date(),
+            due_date=timezone.now().date() + timedelta(days=3)  # Lab bills due in 3 days
+        )
+        
+        # Create bill items for each test
+        for lab_test in lab_order.tests.all():
+            BillItem.objects.create(
+                bill=bill,
+                item_name=lab_test.test.name,
+                description=lab_test.test.description,
+                quantity=1,
+                unit_price=lab_test.test.cost,
+                total=lab_test.test.cost
+            )
+        
+        return Response({
+            'success': True,
+            'message': 'Lab bill created successfully',
+            'bill_id': bill.id,
+            'bill_number': bill.bill_number,
+            'total_amount': float(bill.total)
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to create lab bill: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        ) 

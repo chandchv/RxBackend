@@ -27,6 +27,8 @@ from django.db import transaction
 from ..forms import PrescriptionForm, VitalsForm, BasePrescriptionItemFormSet, BaseLabTestFormSet
 from django.db.models import Count
 from django.db.models import Q
+from billing.models import Bill, BillItem
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +79,24 @@ def create_prescription(request, patient_id):
                          form.instance.delete()
                 item_formset.save_m2m() # Save any m2m if needed (not in this form)
                 logger.info(f"Saved {len(items)} items for prescription {prescription.id}")
+
+                # --- BILLING: Add prescription items to bill ---
+                # Try to find the related appointment (if prescription links to one)
+                appointment = getattr(prescription, 'appointment', None)
+                if appointment and hasattr(appointment, 'billing_bill'):
+                    bill = appointment.billing_bill
+                    # Only add if bill is not finalized/paid
+                    if bill.status in ['draft', 'pending', 'partial']:
+                        for item in items:
+                            BillItem.objects.create(
+                                bill=bill,
+                                item_name=f"Prescription: {item.medicine}",
+                                description=f"{item.dosage or ''} {item.instructions or ''}",
+                                quantity=1,
+                                unit_price=getattr(item, 'price', Decimal('0.00'))
+                            )
+                        bill.calculate_total()
+                        bill.save()
 
                 # Process and Save Lab Tests
                 lab_prescription = None

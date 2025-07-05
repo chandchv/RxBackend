@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import User, AbstractUser
+from django.contrib.auth.models import User  # Use Django's built-in User model
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -8,7 +8,6 @@ from django.core.validators import RegexValidator, MinValueValidator, MaxValueVa
 from datetime import datetime, timedelta
 from decimal import Decimal
 from django.conf import settings
-from django.contrib.auth import get_user_model
 import uuid
 
 from elasticsearch_dsl import Q
@@ -250,6 +249,7 @@ class Patient(TimeStampedModel):
 class Appointment(TimeStampedModel):
     STATUS_CHOICES = [
         ('scheduled', 'Scheduled'),
+        ('in_progress', 'In Progress'),
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
         ('no_show', 'No Show'),
@@ -277,6 +277,10 @@ class Appointment(TimeStampedModel):
     )
     token_number = models.IntegerField(null=True, blank=True)
     is_walk_in = models.BooleanField(default=False)
+    
+    # Appointment type fields
+    is_emergency = models.BooleanField(default=False, help_text="Emergency appointment")
+    is_telemedicine = models.BooleanField(default=False, help_text="Telemedicine/video consultation")
     
     # Payment related fields
     fee = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
@@ -565,17 +569,44 @@ class DoctorAvailability(TimeStampedModel):
     def generate_slots(self, date):
         """Generate 10-minute slots for the given date"""
         if not isinstance(date, datetime):
-            date = datetime.combine(date, datetime.min.time())
+            try:
+                # Convert date to datetime for slot generation
+                date = datetime.combine(date, datetime.min.time())
+                print(f"Converting date {date.date()} to datetime")
+            except Exception as e:
+                print(f"Error converting date: {str(e)}")
+                # Fallback to current date
+                date = datetime.combine(timezone.now().date(), datetime.min.time())
             
         slots = []
-        current_time = datetime.combine(date, self.start_time)
-        end_datetime = datetime.combine(date, self.end_time)
-        
-        while current_time + timedelta(minutes=10) <= end_datetime:
-            slots.append(current_time)
-            current_time += timedelta(minutes=10)
+        try:
+            current_time = datetime.combine(date.date(), self.start_time)
+            end_datetime = datetime.combine(date.date(), self.end_time)
             
-        return slots
+            print(f"Generating slots from {current_time.time()} to {end_datetime.time()} for {date.date()}")
+            
+            # Ensure end time is after start time
+            if end_datetime <= current_time:
+                print(f"Warning: end time ({self.end_time}) is not after start time ({self.start_time})")
+                return slots
+            
+            # Safety limit to prevent infinite loops
+            max_slots = 100  # This is a reasonable upper limit for slots in a day
+            slot_count = 0
+            
+            while current_time + timedelta(minutes=10) <= end_datetime and slot_count < max_slots:
+                slots.append(current_time)
+                current_time += timedelta(minutes=10)
+                slot_count += 1
+                
+            if slot_count >= max_slots:
+                print(f"WARNING: Reached maximum slot count ({max_slots}). Possible infinite loop prevented.")
+            
+            print(f"Generated {len(slots)} slots for {date.date()}")
+            return slots
+        except Exception as e:
+            print(f"Error in generate_slots: {str(e)}")
+            return []
 
     def __str__(self):
         return f"{self.doctor.name} - {self.get_day_of_week_display()} ({self.shift})"
@@ -799,6 +830,7 @@ class Bill(models.Model):
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, null=True, blank=True)
     
     notes = models.TextField(blank=True)
+
 class AppointmentSlot(TimeStampedModel):
     doctor = models.ForeignKey(
         'Doctor', 

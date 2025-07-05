@@ -13,11 +13,12 @@ urlpatterns = [
     
     # Appointments
     path('appointments/', views.AppointmentListView.as_view(), name='appointment_list'),
-    path('appointments/<int:pk>/', views.AppointmentDetailView.as_view(), name='appointment_detail'),
+    path('appointments/<uuid:pk>/', views.AppointmentDetailView.as_view(), name='appointment_detail'),
     path('appointments/create/', views.AppointmentCreateView.as_view(), name='appointment_create'),
-    path('appointments/<int:pk>/update/', views.AppointmentUpdateView.as_view(), name='appointment_update'),
-    path('appointments/<int:pk>/delete/', views.AppointmentDeleteView.as_view(), name='appointment_delete'),
-    path('appointments/<int:pk>/status/', views.change_appointment_status, name='change_appointment_status'),
+    path('appointments/create-integrated/', views.integrated_appointment_create, name='integrated_appointment_create'),
+    path('appointments/<uuid:pk>/update/', views.AppointmentUpdateView.as_view(), name='appointment_update'),
+    path('appointments/<uuid:pk>/delete/', views.AppointmentDeleteView.as_view(), name='appointment_delete'),
+    path('appointments/<uuid:pk>/status/', views.change_appointment_status, name='change_appointment_status'),
     
     # Calendar
     path('calendar/', views.appointment_calendar, name='appointment_calendar'),
@@ -39,15 +40,20 @@ urlpatterns = [
     # Admin - Holidays
     path('holidays/', views.HolidayListView.as_view(), name='holiday_list'),
     path('holidays/create/', views.HolidayCreateView.as_view(), name='holiday_create'),
+    path('holidays/<int:pk>/', views.HolidayDetailView.as_view(), name='holiday_detail'),
     path('holidays/<int:pk>/update/', views.HolidayUpdateView.as_view(), name='holiday_update'),
     path('holidays/<int:pk>/delete/', views.HolidayDeleteView.as_view(), name='holiday_delete'),
     
-    # Admin - Appointment Types
-    path('appointment-types/', views.AppointmentTypeListView.as_view(), name='appointment_types'),
+    # Admin - Settings
+    path('settings/', views.scheduling_settings, name='settings'),
+    
+    # Integration endpoints
+    path('sync-appointments/', views.sync_with_existing_appointments, name='sync_appointments'),
+    path('generate-slots/', views.generate_slots_from_existing_availability, name='generate_slots'),
+    
+    # Appointment Types (if django-appointment is installed)
+    path('appointment-types/', views.AppointmentTypeListView.as_view(), name='appointment_type_list'),
     path('appointment-types/create/', views.AppointmentTypeCreateView.as_view(), name='appointment_type_create'),
     path('appointment-types/<int:pk>/update/', views.AppointmentTypeUpdateView.as_view(), name='appointment_type_update'),
     path('appointment-types/<int:pk>/delete/', views.AppointmentTypeDeleteView.as_view(), name='appointment_type_delete'),
-    
-    # Admin - Settings
-    path('settings/', views.scheduling_settings, name='settings'),
 ] 

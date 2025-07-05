@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.core.validators import MinValueValidator
 from users.models import Clinic, Doctor, Drug, Patient
 # Create your models here.
-class User(models.Model):
+class PharmacyUserProfile(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

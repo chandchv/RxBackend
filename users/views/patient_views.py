@@ -19,6 +19,8 @@ from notifications.utils import create_notification
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db.models import Q
 import logging
+from decimal import Decimal
+from billing.models import Bill, BillItem, ConsultationBilling
 
 logger = logging.getLogger(__name__)
 
@@ -212,6 +214,38 @@ def patient_create_appointment(request):
                     
                     # Save the appointment
                     appointment.save()
+                    
+                    # --- BILLING: Create Bill and BillItem for consultation fee ---
+                    if not hasattr(appointment, 'billing_bill'):
+                        doctor = appointment.doctor
+                        consultation_fee = getattr(doctor, 'consultation_fee', Decimal('500.00'))
+                        bill = Bill.objects.create(
+                            bill_type='consultation',
+                            patient=patient,
+                            doctor=doctor,
+                            clinic=doctor.clinic,
+                            appointment=appointment,
+                            bill_date=appointment.appointment_date,
+                            due_date=appointment.appointment_date,
+                            status='draft',
+                            notes=f"Consultation with Dr. {doctor.name} on {appointment.appointment_date}"
+                        )
+                        BillItem.objects.create(
+                            bill=bill,
+                            item_name=f"Consultation with Dr. {doctor.name}",
+                            description="Medical consultation",
+                            quantity=1,
+                            unit_price=consultation_fee
+                        )
+                        ConsultationBilling.objects.create(
+                            appointment=appointment,
+                            bill=bill,
+                            doctor=doctor,
+                            base_fee=consultation_fee,
+                            final_fee=consultation_fee
+                        )
+                        bill.calculate_total()
+                        bill.save()
                     
                     # Create notification for doctor
                     try:
@@ -660,4 +694,147 @@ def patient_appointments(request):
         print(f"Error in patient_appointments: {str(e)}")
         messages.error(request, 'Error accessing appointments')
         return redirect('users:patient_dashboard')
+
+@login_required
+def patient_scheduling_dashboard(request):
+    """Patient dashboard for scheduling system integration"""
+    try:
+        patient = Patient.objects.get(user=request.user)
+        today = timezone.now().date()
+        
+        # Get appointments from both systems
+        from scheduling.models import ScheduledAppointment
+        
+        # Legacy appointments (users app)
+        legacy_appointments = Appointment.objects.filter(
+            patient=patient,
+            appointment_date__gte=today
+        ).order_by('appointment_date', 'appointment_time')
+        
+        # Scheduling app appointments
+        scheduled_appointments = ScheduledAppointment.objects.filter(
+            patient=patient,
+            appointment_date__gte=today
+        ).order_by('appointment_date', 'appointment_time')
+        
+        # Combine all appointments
+        all_appointments = []
+        
+        # Add legacy appointments
+        for apt in legacy_appointments:
+            all_appointments.append({
+                'type': 'legacy',
+                'appointment': apt,
+                'doctor_name': apt.doctor.name,
+                'date': apt.appointment_date,
+                'time': apt.appointment_time,
+                'status': apt.status,
+                'reason': apt.reason or 'General Consultation'
+            })
+        
+        # Add scheduled appointments
+        for apt in scheduled_appointments:
+            all_appointments.append({
+                'type': 'scheduled',
+                'appointment': apt,
+                'doctor_name': apt.doctor.name,
+                'date': apt.appointment_date,
+                'time': apt.appointment_time,
+                'status': apt.status,
+                'reason': apt.reason or 'General Consultation'
+            })
+        
+        # Sort by date and time
+        all_appointments.sort(key=lambda x: (x['date'], x['time']))
+        
+        # Get upcoming appointments (next 7 days)
+        week_from_now = today + timedelta(days=7)
+        upcoming_appointments = [apt for apt in all_appointments if apt['date'] <= week_from_now]
+        
+        # Statistics
+        total_upcoming = len(upcoming_appointments)
+        total_all = len(all_appointments)
+        
+        context = {
+            'patient': patient,
+            'today': today,
+            'all_appointments': all_appointments[:10],  # Show latest 10
+            'upcoming_appointments': upcoming_appointments,
+            'total_upcoming': total_upcoming,
+            'total_all': total_all,
+        }
+        
+        return render(request, 'patient/scheduling_dashboard.html', context)
+        
+    except Patient.DoesNotExist:
+        messages.error(request, 'Patient profile not found.')
+        return redirect('users:patient_profile')
+    except Exception as e:
+        messages.error(request, f'Error loading dashboard: {str(e)}')
+        return redirect('users:patient_profile')
+
+@login_required
+def patient_book_appointment_scheduling(request):
+    """Patient appointment booking using the scheduling system"""
+    try:
+        patient = Patient.objects.get(user=request.user)
+        
+        if request.method == 'POST':
+            doctor_id = request.POST.get('doctor')
+            appointment_date = request.POST.get('appointment_date')
+            appointment_time = request.POST.get('appointment_time')
+            reason = request.POST.get('reason', 'General Consultation')
+            
+            if doctor_id and appointment_date and appointment_time:
+                doctor = Doctor.objects.get(id=doctor_id)
+                
+                # Create appointment in scheduling system
+                from scheduling.models import ScheduledAppointment
+                
+                appointment = ScheduledAppointment.objects.create(
+                    patient=patient,
+                    doctor=doctor,
+                    clinic=doctor.clinic,
+                    appointment_date=appointment_date,
+                    appointment_time=appointment_time,
+                    reason=reason,
+                    status='scheduled',
+                    created_by=request.user
+                )
+                
+                # Mark slot as booked if exists
+                from users.models import AppointmentSlot
+                slot = AppointmentSlot.objects.filter(
+                    doctor=doctor,
+                    date=appointment_date,
+                    start_time=appointment_time,
+                    is_booked=False
+                ).first()
+                
+                if slot:
+                    slot.is_booked = True
+                    slot.save()
+                
+                messages.success(request, f'Appointment booked successfully with Dr. {doctor.name}!')
+                return redirect('users:patient_scheduling_dashboard')
+            else:
+                messages.error(request, 'Please fill in all required fields.')
+        
+        # GET request - show booking form
+        doctors = Doctor.objects.filter(is_active=True)
+        
+        context = {
+            'patient': patient,
+            'doctors': doctors,
+            'min_date': timezone.now().date().isoformat(),
+        }
+        
+        return render(request, 'patient/book_appointment_scheduling.html', context)
+        
+    except Patient.DoesNotExist:
+        messages.error(request, 'Patient profile not found.')
+        return redirect('users:patient_profile')
+    except Exception as e:
+        messages.error(request, f'Error booking appointment: {str(e)}')
+        return redirect('users:patient_scheduling_dashboard')
 

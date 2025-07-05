@@ -26,9 +26,17 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.sites",  # Required for django-allauth
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    # Third-party authentication apps
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+    'allauth.socialaccount.providers.facebook',
+    # Local apps
     'users',
     'labs',
     'billing',
@@ -49,6 +57,8 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
+    # Add allauth middleware
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = "RxBackend.urls"
@@ -80,14 +90,22 @@ WSGI_APPLICATION = "RxBackend.wsgi.application"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'rxdoctor',
-        'USER': 'postgres',
-        'PASSWORD': 'admin',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
+   'default': {
+       'ENGINE': 'django.db.backends.postgresql',
+       'NAME': 'rxdoctor',
+       'USER': 'postgres',
+       'PASSWORD': 'admin',
+       'HOST': 'localhost',
+       'PORT': '5432',
+   },
+#    'default': {
+#        'ENGINE': 'django.db.backends.postgresql',
+#        'NAME': 'rxdoctor',
+#        'USER': 'REMOVED ',
+#        'PASSWORD': 'REMOVED',
+#        'HOST': 'REMOVED',
+#        'PORT': 'REMOVED',
+#    }
 }
 
 # Add the new PostgreSQL configuration
@@ -190,6 +208,7 @@ CORS_ALLOW_HEADERS = [
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',  # Added for allauth compatibility
     ),
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -209,3 +228,60 @@ LOGOUT_REDIRECT_URL = 'users:login'  # URL to redirect after logout
 # Add media settings
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Custom User Model
+AUTH_USER_MODEL = 'users.User'
+
+# django-allauth settings
+AUTHENTICATION_BACKENDS = [
+    # Needed to login by username in Django admin
+    'django.contrib.auth.backends.ModelBackend',
+    # allauth specific authentication methods
+    'allauth.account.auth_backends.AuthenticationBackend',
+    # Firebase authentication
+    'users.firebase_auth.FirebaseAuthBackend',
+]
+
+SITE_ID = 1
+
+# allauth settings
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
+ACCOUNT_ADAPTER = 'users.adapters.CustomAccountAdapter'
+SOCIALACCOUNT_ADAPTER = 'users.adapters.CustomSocialAccountAdapter'
+ACCOUNT_UNIQUE_EMAIL = True
+
+# Social account providers settings
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'SCOPE': [
+            'profile',
+            'email',
+        ],
+        'AUTH_PARAMS': {
+            'access_type': 'online',
+        }
+    },
+    'facebook': {
+        'METHOD': 'oauth2',
+        'SCOPE': ['email', 'public_profile'],
+        'AUTH_PARAMS': {'auth_type': 'reauthenticate'},
+        'FIELDS': [
+            'id',
+            'email',
+            'name',
+            'first_name',
+            'last_name',
+            'picture',
+        ],
+        'EXCHANGE_TOKEN': True,
+        'VERIFIED_EMAIL': False,
+    }
+}
+
+# Firebase Authentication
+FIREBASE_AUTH = {
+    'SERVICE_ACCOUNT_KEY_FILE': os.path.join(BASE_DIR, 'firebase-service-account.json'),
+}

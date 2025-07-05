@@ -7,6 +7,7 @@ from django.utils import timezone
 from datetime import datetime, timedelta
 from ..forms import StaffAppointmentForm, BillForm, BillItemForm
 from ..models import Appointment, Patient, Prescription, LabTest, Billing, Doctor, PatientVitals, StaffLeave, DoctorAvailability
+from labs.models import LabOrder
 from notifications.models import Notification
 from ..serializers import AppointmentSerializer, PatientSerializer, PrescriptionSerializer, LabTestSerializer, BillingSerializer
 from rest_framework.decorators import api_view, permission_classes
@@ -21,6 +22,9 @@ from django.core.exceptions import PermissionDenied
 import logging
 from notifications.utils import create_notification
 from django.http import JsonResponse
+from billing.models import Bill, BillItem, ConsultationBilling
+from decimal import Decimal
+from django.db.models import Sum
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -28,13 +32,31 @@ User = get_user_model()
 @login_required
 @user_is_staff
 def billing_overview(request):
-    # Logic for staff billing overview
-    context = {
-        'total_patients': 0,  # Replace with actual logic
-        'total_appointments': 0,  # Replace with actual logic
-        'total_billing': 0,  # Replace with actual logic
-    }
-    return render(request, 'staff/billing_overview.html', context) 
+    """Staff billing overview dashboard"""
+    try:
+        staff = request.user.staff
+        clinic = staff.clinic
+        
+        # Get clinic statistics
+        total_patients = Patient.objects.filter(clinic=clinic).count()
+        total_appointments = Appointment.objects.filter(doctor__clinic=clinic).count()
+        
+        # Get billing totals
+        total_billing = Bill.objects.filter(
+            doctor__clinic=clinic,
+            status='completed'
+        ).aggregate(total=Sum('total'))['total'] or 0
+        
+        context = {
+            'total_patients': total_patients,
+            'total_appointments': total_appointments,
+            'total_billing': total_billing,
+            'clinic': clinic,
+        }
+        return render(request, 'staff/billing_overview.html', context)
+    except Exception as e:
+        messages.error(request, f'Error accessing billing overview: {str(e)}')
+        return redirect('users:staff_dashboard') 
 
 @login_required
 @user_is_staff
@@ -57,6 +79,11 @@ def staff_create_appointment(request):
                 appointment_time = request.POST.get('appointment_time')
                 reason = request.POST.get('reason')
                 
+                # Get appointment type fields
+                is_emergency = request.POST.get('is_emergency') == 'on'
+                is_telemedicine = request.POST.get('is_telemedicine') == 'on'
+                is_walk_in = request.POST.get('is_walk_in') == 'on'
+                
                 # Validate required fields
                 if not all([patient_id, doctor_id, appointment_date, appointment_time, reason]):
                     messages.error(request, 'Please fill in all required fields.')
@@ -74,6 +101,50 @@ def staff_create_appointment(request):
                     appointment_time=appointment_time,
                     reason=reason,
                     status='scheduled'
+                )
+                
+                # --- BILLING: Create Bill and BillItem for consultation fee ---
+                # Check if bill already exists for this appointment
+                if not hasattr(appointment, 'billing_bill'):
+                    consultation_fee = getattr(doctor, 'consultation_fee', Decimal('500.00'))
+                    bill = Bill.objects.create(
+                        bill_type='consultation',
+                        patient=patient,
+                        doctor=doctor,
+                        clinic=clinic,
+                        appointment=appointment,
+                        bill_date=appointment_date,
+                        due_date=appointment_date,
+                        status='draft',
+                        notes=f"Consultation with Dr. {doctor.name} on {appointment_date}"
+                    )
+                    BillItem.objects.create(
+                        bill=bill,
+                        item_name=f"Consultation with Dr. {doctor.name}",
+                        description="Medical consultation",
+                        quantity=1,
+                        unit_price=consultation_fee
+                    )
+                    # Optionally create ConsultationBilling record
+                    ConsultationBilling.objects.create(
+                        appointment=appointment,
+                        bill=bill,
+                        doctor=doctor,
+                        base_fee=consultation_fee,
+                        final_fee=consultation_fee
+                    )
+                    bill.calculate_total()
+                    bill.save()
+                
+                # Create scheduling bridge record with appointment types
+                from scheduling.models import ScheduledAppointment
+                ScheduledAppointment.objects.create(
+                    appointment=appointment,
+                    is_emergency=is_emergency,
+                    is_telemedicine=is_telemedicine,
+                    is_walk_in=is_walk_in,
+                    notes='',
+                    created_by=request.user
                 )
                 
                 # --- Add Notifications --- 
@@ -138,55 +209,74 @@ def staff_create_appointment(request):
 def staff_dashboard(request):
     """Staff dashboard view"""
     try:
-        # Check if user has staff profile
-        if not hasattr(request.user, 'staff'):
-            messages.error(request, "You don't have staff access")
-            return redirect('users:login')
-            
-        staff = request.user.staff
-        if not staff.clinic:
-            messages.error(request, "No clinic assigned to your account")
-            return redirect('users:login')
-            
+        # Get the staff member's clinic
+        staff_member = request.user.staff
+        clinic = staff_member.clinic
+        
         # Get today's date
         today = timezone.now().date()
         
-        # Get clinic's doctors
-        doctors = Doctor.objects.filter(clinic=staff.clinic, is_active=True)
-        if not doctors:
-            messages.error(request, "No doctors found for your clinic")
-            return redirect('users:staff_dashboard')
+        # Get appointments for today
+        appointments = Appointment.objects.filter(
+            appointment_date=today,
+            doctor__clinic=clinic
+        ).select_related('patient', 'doctor')
         
-        # Get today's appointments
-        todays_appointments = Appointment.objects.filter(
-            doctor__in=doctors,
-            appointment_date=today
-        ).order_by('appointment_time')
-        
-        # Get pending appointments
-        pending_appointments = Appointment.objects.filter(
-            doctor__in=doctors,
-            status='PENDING'
-        ).order_by('appointment_date', 'appointment_time')
-        
-        # Get recent patients
+        # Get recent patients (last 10 patients with appointments)
         recent_patients = Patient.objects.filter(
-            clinic=staff.clinic
-        ).order_by('-created_at')[:5]
+            clinic=clinic,
+            appointments__isnull=False
+        ).distinct().order_by('-appointments__created_at')[:10]
         
-        # Get recent lab tests - using prescription relationship
-        recent_tests = LabTest.objects.filter(
-            prescription__doctor__in=[doctor.user for doctor in doctors]
-        ).order_by('-created_at')[:5]
+        # Get pending lab tests
+        pending_tests = LabOrder.objects.filter(
+            doctor__clinic=clinic,
+            status__in=['PENDING_PAYMENT', 'PENDING_LAB']
+        ).select_related('patient', 'doctor').prefetch_related('tests')[:10]
+        
+        # Get pending bills
+        pending_bills = Bill.objects.filter(
+            doctor__clinic=clinic,
+            status='pending'
+        ).select_related('patient', 'doctor')[:10]
+        
+        # --- BILLING DATA ---
+        
+        # Bills paid today
+        bills_paid_today = Bill.objects.filter(
+            doctor__clinic=clinic,
+            status='completed',
+            updated_at__date=today
+        )
+        
+        # Draft bills
+        draft_bills = Bill.objects.filter(
+            doctor__clinic=clinic,
+            status='draft'
+        )
+        
+        # Total revenue (this month)
+        first_day_of_month = today.replace(day=1)
+        total_revenue = Bill.objects.filter(
+            doctor__clinic=clinic,
+            status='completed',
+            updated_at__date__gte=first_day_of_month
+        ).aggregate(total=Sum('total'))['total'] or 0
+        
+        # Get doctors for the clinic (for calendar filter)
+        doctors = Doctor.objects.filter(clinic=clinic, is_active=True)
         
         context = {
-            'staff': staff,
-            'clinic': staff.clinic,
-            'todays_appointments': todays_appointments,
-            'pending_appointments': pending_appointments,
+            'clinic': clinic,
+            'today': today,
+            'appointments': appointments,
             'recent_patients': recent_patients,
-            'recent_tests': recent_tests,
-            'doctors': doctors
+            'pending_tests': pending_tests,
+            'pending_bills': pending_bills,
+            'bills_paid_today': bills_paid_today,
+            'draft_bills': draft_bills,
+            'total_revenue': total_revenue,
+            'doctors': doctors,
         }
         
         return render(request, 'staff/dashboard.html', context)
@@ -207,6 +297,20 @@ def staff_appointment_detail(request, appointment_id):
         if appointment.doctor.clinic != staff.clinic:
             messages.error(request, "You don't have permission to view this appointment")
             return redirect('users:staff_dashboard')
+
+        # Get scheduling information if it exists
+        try:
+            from scheduling.models import ScheduledAppointment
+            scheduling_info = ScheduledAppointment.objects.get(appointment=appointment)
+            appointment.scheduling_info = scheduling_info
+        except ScheduledAppointment.DoesNotExist:
+            # Create default scheduling info for display
+            appointment.scheduling_info = type('obj', (object,), {
+                'is_emergency': False,
+                'is_telemedicine': False, 
+                'is_walk_in': False,
+                'notes': ''
+            })()
 
         context = {
             'appointment': appointment,
@@ -376,29 +480,11 @@ def staff_lab_tests(request):
         messages.error(request, f'Error listing lab tests: {str(e)}')
         return redirect('users:staff_dashboard')
 
-@api_view(['GET'])
-@permission_classes([IsStaff])
+@login_required
+@user_is_staff
 def staff_billing(request):
-    """Get billing records for staff dashboard"""
-    try:
-        staff = request.user.staff
-        clinic = staff.clinic
-        
-        # Get clinic's doctors
-        doctors = Doctor.objects.filter(clinic=clinic)
-        
-        # Get billing records through appointment relationship
-        billing = Billing.objects.filter(
-            appointment__doctor__in=doctors
-        ).select_related(
-            'appointment__doctor',
-            'appointment__patient'
-        ).order_by('-created_at')
-        
-        serializer = BillingSerializer(billing, many=True)
-        return Response(serializer.data)
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    """Redirect to billing app for viewing billing records"""
+    return redirect('billing:billing_list')
 
 @api_view(['POST'])
 @permission_classes([IsStaff])
@@ -439,24 +525,11 @@ def create_lab_test(request):
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['POST'])
-@permission_classes([IsStaff])
-def create_billing(request):
-    """Create new billing record"""
-    try:
-        staff = request.user.staff
-        clinic = staff.clinic
-        
-        data = request.data
-        data['clinic'] = clinic.id
-        
-        serializer = BillingSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+@login_required
+def staff_create_billing(request):
+    """Redirect to billing app for creating bills"""
+    # Redirect to the billing app's create bill view
+    return redirect('billing:create_bill')
 
 @login_required
 @user_is_staff
@@ -466,10 +539,10 @@ def staff_billing_detail(request, billing_id):
         staff = request.user.staff
         clinic = staff.clinic
         
-        billing = get_object_or_404(Billing, id=billing_id, appointment__doctor__clinic=clinic)
+        bill = get_object_or_404(Bill, id=billing_id, doctor__clinic=clinic)
         
         context = {
-            'billing': billing,
+            'bill': bill,
             'clinic': clinic
         }
         
@@ -555,9 +628,9 @@ def staff_patient_detail(request, patient_id):
         ).order_by('-created_at')[:5]
         
         # Get patient's recent bills
-        recent_bills = Billing.objects.filter(
+        recent_bills = Bill.objects.filter(
             patient=patient,
-            appointment__doctor__clinic=clinic
+            doctor__clinic=clinic
         ).order_by('-created_at')[:5]
         
         context = {
@@ -716,25 +789,6 @@ def staff_calendar_events(request):
         # Get doctors for the clinic
         doctors = Doctor.objects.filter(clinic=clinic, is_active=True)
 
-        # Get doctor availability for the date range
-        doctor_availability = {}
-        for doctor in doctors:
-            availability = DoctorAvailability.objects.filter(
-                doctor=doctor
-            )
-
-            slots = []
-            for a in availability:
-                # Generate slots for each day in the range
-                # Make sure we're working with date objects consistently
-                current_date = start_date_for_query
-                while current_date <= end_date_for_query:
-                    if current_date.weekday() == a.day_of_week:
-                        slots.extend(a.generate_slots(current_date))
-                    current_date += timedelta(days=1)
-
-            doctor_availability[doctor.id] = slots
-
         # Convert appointments to calendar events
         events = []
         for appointment in appointments:
@@ -762,41 +816,9 @@ def staff_calendar_events(request):
                 logger.error(f"Error processing appointment {appointment.id}: {str(e)}")
                 continue
 
-        # Prepare available slots for the template
-        available_slots = []
-        for doctor_id, slots in doctor_availability.items():
-            doctor_obj = next((d for d in doctors if d.id == doctor_id), None)
-            if not doctor_obj:
-                continue
-                
-            for slot in slots:
-                # Check if there is an appointment at this time
-                # Extract date and time from the datetime slot object
-                slot_date = slot.date()
-                slot_time = slot.time()
-                
-                appointment_exists = appointments.filter(
-                    appointment_date=slot_date,
-                    appointment_time=slot_time,
-                    doctor_id=doctor_id
-                ).exists()
-
-                if not appointment_exists:
-                    available_slots.append({
-                        'id': f"available_{doctor_id}_{slot.strftime('%Y%m%d%H%M')}",
-                        'title': f"Available - Dr. {doctor_obj.name}",
-                        'start': slot.strftime('%Y-%m-%dT%H:%M:%S'),
-                        'end': (slot + timedelta(minutes=30)).strftime('%Y-%m-%dT%H:%M:%S'),
-                        'status': 'AVAILABLE',
-                        'doctor': doctor_obj.name,
-                        'doctor_id': doctor_id,
-                        'rendering': 'background',
-                        'backgroundColor': '#e8f5e9'
-                    })
-
         return JsonResponse({
             'events': events,
-            'available_slots': available_slots
+            'available_slots': []  # No automatic slot generation
         })
     except Exception as e:
         logger.error(f"Error in staff_calendar_events: {str(e)}", exc_info=True)
@@ -930,6 +952,17 @@ def staff_walk_in_appointment(request):
                     is_walk_in=True
                 )
                 
+                # Create scheduling bridge record with walk-in type
+                from scheduling.models import ScheduledAppointment
+                ScheduledAppointment.objects.create(
+                    appointment=appointment,
+                    is_emergency=False,
+                    is_telemedicine=False,
+                    is_walk_in=True,
+                    notes='Walk-in appointment',
+                    created_by=request.user
+                )
+                
                 messages.success(request, f'Appointment created successfully! Token Number: {token_number}')
                 return redirect('users:staff_appointment_detail', appointment_id=appointment.id)
                 
@@ -1056,3 +1089,21 @@ def staff_manage_leaves(request):
     except Exception as e:
         messages.error(request, f'Error accessing leave management: {str(e)}')
         return redirect('users:staff_dashboard')
+
+@login_required
+def debug_staff_permissions(request):
+    """Debug view to check staff permissions"""
+    debug_info = {
+        'user': request.user,
+        'is_authenticated': request.user.is_authenticated,
+        'has_staff_attr': hasattr(request.user, 'staff'),
+        'is_superuser': request.user.is_superuser,
+    }
+    
+    if hasattr(request.user, 'staff'):
+        debug_info.update({
+            'staff': request.user.staff,
+            'staff_clinic': request.user.staff.clinic if request.user.staff.clinic else None,
+        })
+    
+    return JsonResponse(debug_info, safe=False)

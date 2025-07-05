@@ -1,0 +1,40 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RxDoctor{% endblock %}</title>
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="bg-gray-50">
+    <!-- Main Content (No Header/Footer for auth pages) -->
+    {% block content %}{% endblock %}
+
+    <!-- Debug Info (only in development) -->
+    {% if debug %}
+    <div class="fixed bottom-0 right-0 bg-gray-800 text-white p-2 text-xs">
+        <p>Debug Mode</p>
+    </div>
+    {% endif %}
+
+    <!-- Base Scripts -->
+    <script>
+        const csrfToken = "{{ csrf_token }}";
+        document.addEventListener('htmx:configRequest', function(evt) {
+            evt.detail.headers['X-CSRFToken'] = csrfToken;
+        });
+    </script>
+
+    <!-- Additional Scripts -->
+    {% block extra_js %}{% endblock %}
+</body>
+</html> 

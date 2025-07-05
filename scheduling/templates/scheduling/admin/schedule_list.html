@@ -1,0 +1,328 @@
+{% extends 'scheduling/base_scheduling.html' %}
+{% load static %}
+
+{% block title %}Doctor Schedules{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">Doctor Schedules</h1>
+        <div class="flex space-x-3">
+            <a href="{% url 'scheduling:schedule_create' %}" 
+               class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                <i class="fas fa-plus mr-2"></i>Add Schedule
+            </a>
+            <button onclick="generateAllSlots()" 
+                    class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+                <i class="fas fa-cog mr-2"></i>Generate Slots
+            </button>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                    <i class="fas fa-calendar-alt text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-600">Total Schedules</p>
+                    <p class="text-2xl font-semibold text-gray-900">{{ schedules.count }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 text-green-600">
+                    <i class="fas fa-user-md text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-600">Active Doctors</p>
+                    <p class="text-2xl font-semibold text-gray-900">
+                        {% regroup schedules by doctor as doctor_groups %}
+                        {{ doctor_groups|length }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                    <i class="fas fa-clock text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-600">Total Schedules</p>
+                    <p class="text-2xl font-semibold text-gray-900">{{ schedules.count }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Schedules Table -->
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Doctor
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Day
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Time
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Duration
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for schedule in schedules %}
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 h-10 w-10">
+                                <div class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                    <span class="text-sm font-medium text-blue-600">
+                                        {{ schedule.doctor.user.first_name|first }}{{ schedule.doctor.user.last_name|first }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">
+                                    Dr. {{ schedule.doctor.user.get_full_name }}
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    {{ schedule.doctor.specialization|default:"General Practice" }}
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {% if schedule.day_of_week == 0 %}Monday
+                        {% elif schedule.day_of_week == 1 %}Tuesday
+                        {% elif schedule.day_of_week == 2 %}Wednesday
+                        {% elif schedule.day_of_week == 3 %}Thursday
+                        {% elif schedule.day_of_week == 4 %}Friday
+                        {% elif schedule.day_of_week == 5 %}Saturday
+                        {% elif schedule.day_of_week == 6 %}Sunday
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {{ schedule.start_time|time:"g:i A" }} - {{ schedule.end_time|time:"g:i A" }}
+                        {% if schedule.break_start_time and schedule.break_end_time %}
+                        <br><small class="text-gray-500">Break: {{ schedule.break_start_time|time:"g:i A" }} - {{ schedule.break_end_time|time:"g:i A" }}</small>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {{ schedule.appointment_duration }} min
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if schedule.is_active %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                            Active
+                        </span>
+                        {% else %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                            Inactive
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div class="flex space-x-2">
+                            <a href="{% url 'scheduling:schedule_detail' schedule.pk %}" 
+                               class="text-indigo-600 hover:text-indigo-900">View</a>
+                            <a href="{% url 'scheduling:schedule_update' schedule.pk %}" 
+                               class="text-blue-600 hover:text-blue-900">Edit</a>
+                            <button onclick="generateDoctorSlots('{{ schedule.doctor.id }}')" 
+                                    class="text-green-600 hover:text-green-900">Generate Slots</button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                        No schedules found. <a href="{% url 'scheduling:schedule_create' %}" class="text-blue-600 hover:text-blue-800">Create one now</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Loading Modal -->
+<div id="loadingModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
+                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            </div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mt-2">Generating Slots</h3>
+            <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500" id="loadingMessage">
+                    Please wait while we generate appointment slots...
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showLoading(message = 'Please wait while we generate appointment slots...') {
+    document.getElementById('loadingMessage').textContent = message;
+    document.getElementById('loadingModal').classList.remove('hidden');
+}
+
+function hideLoading() {
+    document.getElementById('loadingModal').classList.add('hidden');
+}
+
+function generateDoctorSlots(doctorId) {
+    const weekDate = prompt('Enter a date for the week you want to generate slots (YYYY-MM-DD format):');
+    if (!weekDate) return;
+    
+    // Validate date format
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(weekDate)) {
+        alert('Please enter date in YYYY-MM-DD format');
+        return;
+    }
+    
+    if (!confirm(`This will generate appointment slots for the week containing ${weekDate}. Continue?`)) {
+        return;
+    }
+    
+    showLoading(`Generating slots for doctor for the week...`);
+    
+    fetch('/users/api/doctor/generate-slots/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            doctor_id: parseInt(doctorId),
+            selected_date: weekDate,
+            generation_type: 'week',
+            schedule: {
+                start_time: '09:00',
+                end_time: '17:00',
+                lunch_start: '13:00',
+                lunch_end: '14:00',
+                slot_duration: 30
+            },
+            weekdays: [0, 1, 2, 3, 4] // Monday to Friday by default
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            alert(data.message || 'Week slots generated successfully!');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error:', error);
+        alert('Error generating slots. Please try again.');
+    });
+}
+
+function generateAllSlots() {
+    if (!confirm('This will generate appointment slots for all active doctors for the next 30 days. This may take a while. Continue?')) {
+        return;
+    }
+    
+    showLoading('Generating slots for all doctors...');
+    
+    // Get all active doctors from the table
+    const doctorIds = [];
+    document.querySelectorAll('tbody tr').forEach(row => {
+        const generateButton = row.querySelector('button[onclick*="generateDoctorSlots"]');
+        if (generateButton) {
+            const onclick = generateButton.getAttribute('onclick');
+            const match = onclick.match(/generateDoctorSlots\('(\d+)'\)/);
+            if (match) {
+                doctorIds.push(parseInt(match[1]));
+            }
+        }
+    });
+    
+    if (doctorIds.length === 0) {
+        hideLoading();
+        alert('No active doctors found.');
+        return;
+    }
+    
+    let completed = 0;
+    let errors = 0;
+    
+    doctorIds.forEach((doctorId, index) => {
+        setTimeout(() => {
+            fetch('/users/api/doctor/generate-slots/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({
+                    doctor_id: doctorId,
+                    generation_type: 'range',
+                    schedule: {
+                        start_time: '09:00',
+                        end_time: '17:00',
+                        lunch_start: '13:00',
+                        lunch_end: '14:00',
+                        slot_duration: 30
+                    },
+                    weekdays: [0, 1, 2, 3, 4] // Monday to Friday
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                completed++;
+                if (data.error) {
+                    errors++;
+                }
+                
+                document.getElementById('loadingMessage').textContent = 
+                    `Generating slots... ${completed}/${doctorIds.length} doctors completed`;
+                
+                if (completed === doctorIds.length) {
+                    hideLoading();
+                    if (errors > 0) {
+                        alert(`Completed with ${errors} errors. ${completed - errors} doctors processed successfully.`);
+                    } else {
+                        alert(`Successfully generated slots for all ${completed} doctors!`);
+                    }
+                }
+            })
+            .catch(error => {
+                completed++;
+                errors++;
+                console.error('Error for doctor', doctorId, ':', error);
+                
+                if (completed === doctorIds.length) {
+                    hideLoading();
+                    alert(`Completed with ${errors} errors. ${completed - errors} doctors processed successfully.`);
+                }
+            });
+        }, index * 1000); // Delay each request by 1 second to avoid overwhelming the server
+    });
+}
+</script>
+
+{% csrf_token %}
+{% endblock %} 

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Bill #{{ bill.bill_number }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .company-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2563eb;
+        }
+        
+        .bill-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        
+        .info-section {
+            display: table;
+            width: 100%;
+            margin-bottom: 30px;
+        }
+        
+        .info-left, .info-right {
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+        }
+        
+        .info-right {
+            text-align: right;
+        }
+        
+        .section-title {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #2563eb;
+        }
+        
+        .info-line {
+            margin-bottom: 5px;
+        }
+        
+        .status {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+        }
+        
+        .status-paid { background-color: #d1fae5; color: #065f46; }
+        .status-pending { background-color: #fed7e2; color: #92042a; }
+        .status-partial { background-color: #fef3c7; color: #92400e; }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background-color: #f8fafc;
+            font-weight: bold;
+        }
+        
+        .text-right {
+            text-align: right;
+        }
+        
+        .total-section {
+            margin-top: 20px;
+            float: right;
+            width: 300px;
+        }
+        
+        .total-line {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+        }
+        
+        .total-final {
+            border-top: 2px solid #333;
+            font-weight: bold;
+            font-size: 18px;
+            padding-top: 10px;
+            margin-top: 10px;
+        }
+        
+        .payment-history {
+            clear: both;
+            margin-top: 40px;
+        }
+        
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-name">RxDoctor</div>
+        <div>Healthcare Management System</div>
+        <div class="bill-title">BILL #{{ bill.bill_number }}</div>
+    </div>
+
+    <div class="info-section">
+        <div class="info-left">
+            <div class="section-title">Bill To:</div>
+            <div class="info-line"><strong>{{ bill.patient.user.get_full_name }}</strong></div>
+            <div class="info-line">Patient ID: {{ bill.patient.patient_id|default:bill.patient.id }}</div>
+            {% if bill.patient.user.email %}
+            <div class="info-line">{{ bill.patient.user.email }}</div>
+            {% endif %}
+            {% if bill.patient.phone %}
+            <div class="info-line">{{ bill.patient.phone }}</div>
+            {% endif %}
+        </div>
+        
+        <div class="info-right">
+            <div class="info-line"><strong>Bill Date:</strong> {{ bill.bill_date|date:"F d, Y" }}</div>
+            <div class="info-line"><strong>Due Date:</strong> {{ bill.due_date|date:"F d, Y" }}</div>
+            <div class="info-line"><strong>Bill Type:</strong> {{ bill.get_bill_type_display }}</div>
+            <div class="info-line">
+                <strong>Status:</strong> 
+                <span class="status status-{{ bill.status }}">{{ bill.get_status_display }}</span>
+            </div>
+            {% if bill.doctor %}
+            <div class="info-line"><strong>Doctor:</strong> Dr. {{ bill.doctor.user.get_full_name }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="section-title">Bill Items</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Description</th>
+                <th class="text-right">Qty</th>
+                <th class="text-right">Unit Price</th>
+                <th class="text-right">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in bill_items %}
+            <tr>
+                <td>{{ item.item_name }}</td>
+                <td>{{ item.description|default:"-" }}</td>
+                <td class="text-right">{{ item.quantity }}</td>
+                <td class="text-right">₹{{ item.unit_price }}</td>
+                <td class="text-right">₹{{ item.total }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="text-align: center; color: #666;">No items found</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="total-section">
+        <div class="total-line">
+            <span>Subtotal:</span>
+            <span>₹{{ bill.subtotal }}</span>
+        </div>
+        {% if bill.tax > 0 %}
+        <div class="total-line">
+            <span>Tax:</span>
+            <span>₹{{ bill.tax }}</span>
+        </div>
+        {% endif %}
+        {% if bill.discount > 0 %}
+        <div class="total-line">
+            <span>Discount:</span>
+            <span>-₹{{ bill.discount }}</span>
+        </div>
+        {% endif %}
+        <div class="total-line total-final">
+            <span>Total:</span>
+            <span>₹{{ bill.total }}</span>
+        </div>
+        <div class="total-line" style="color: #10b981;">
+            <span>Amount Paid:</span>
+            <span>₹{{ bill.amount_paid }}</span>
+        </div>
+        {% with due_amount=bill.total|floatformat:2 %}
+        {% if bill.status != 'paid' %}
+        <div class="total-line" style="color: #ef4444; font-weight: bold;">
+            <span>Amount Due:</span>
+            <span>₹{{ bill.total|add:0|add:bill.amount_paid|mul:-1|add:bill.total }}</span>
+        </div>
+        {% endif %}
+        {% endwith %}
+    </div>
+
+    {% if payment_history %}
+    <div class="payment-history">
+        <div class="section-title">Payment History</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Payment Method</th>
+                    <th>Reference</th>
+                    <th class="text-right">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for payment in payment_history %}
+                <tr>
+                    <td>{{ payment.payment_date|date:"M d, Y" }}</td>
+                    <td>{{ payment.get_payment_method_display }}</td>
+                    <td>{{ payment.reference_number|default:"-" }}</td>
+                    <td class="text-right">₹{{ payment.amount }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <p>Thank you for choosing RxDoctor for your healthcare needs.</p>
+        <p>For any queries regarding this bill, please contact our billing department.</p>
+        <p class="no-print">
+            <button onclick="window.print()" style="padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                Print Bill
+            </button>
+        </p>
+    </div>
+</body>
+</html> 

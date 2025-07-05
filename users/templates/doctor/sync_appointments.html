@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+
+{% block title %}Sync Appointments{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
+            <h1 class="text-2xl font-bold text-gray-900">Sync Appointments</h1>
+            <p class="text-gray-600 mt-1">Synchronize your existing appointments with the advanced scheduling system</p>
+        </div>
+
+        <div class="px-6 py-6">
+            <!-- Current Status -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-blue-50 p-6 rounded-lg">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-semibold text-gray-900">Legacy System</h3>
+                            <p class="text-2xl font-bold text-blue-600">{{ legacy_count }}</p>
+                            <p class="text-sm text-gray-500">Future appointments</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-green-50 p-6 rounded-lg">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-semibold text-gray-900">Scheduling System</h3>
+                            <p class="text-2xl font-bold text-green-600">{{ scheduled_count }}</p>
+                            <p class="text-sm text-gray-500">Scheduled appointments</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sync Information -->
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-yellow-800">About Synchronization</h3>
+                        <div class="mt-2 text-sm text-yellow-700">
+                            <ul class="list-disc list-inside space-y-1">
+                                <li>This will copy your existing appointments to the advanced scheduling system</li>
+                                <li>Your original appointments will remain unchanged</li>
+                                <li>Only future appointments will be synchronized</li>
+                                <li>You can continue using both systems during the transition</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sync Actions -->
+            <div class="text-center">
+                {% if legacy_count > 0 %}
+                    <button id="syncBtn" 
+                            onclick="syncAppointments()"
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                        <svg class="inline w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        Sync {{ legacy_count }} Appointment{{ legacy_count|pluralize }}
+                    </button>
+                    
+                    <p class="text-sm text-gray-500 mt-2">
+                        This will create copies of your appointments in the scheduling system
+                    </p>
+                {% else %}
+                    <div class="text-gray-500">
+                        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <h3 class="text-lg font-medium text-gray-900">All Caught Up!</h3>
+                        <p class="text-gray-500">No appointments to sync at this time.</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Navigation -->
+            <div class="mt-8 flex justify-between">
+                <a href="{% url 'users:doctor_dashboard' %}" 
+                   class="text-gray-600 hover:text-gray-900 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                    Back to Dashboard
+                </a>
+                
+                <a href="{% url 'users:integrated_scheduling_dashboard' %}" 
+                   class="text-blue-600 hover:text-blue-900 flex items-center">
+                    Integrated Dashboard
+                    <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Spinner Modal -->
+<div id="loadingSpinner" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mt-2">Syncing Appointments</h3>
+            <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500">
+                    Please wait while we sync your appointments...
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showSpinner() {
+    document.getElementById('loadingSpinner').classList.remove('hidden');
+}
+
+function hideSpinner() {
+    document.getElementById('loadingSpinner').classList.add('hidden');
+}
+
+function syncAppointments() {
+    if (!confirm('Are you sure you want to sync your appointments? This will copy all future appointments to the scheduling system.')) {
+        return;
+    }
+    
+    showSpinner();
+    
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch('{% url "users:sync_appointments_to_scheduling" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrftoken
+        }
+    })
+    .then(response => {
+        hideSpinner();
+        if (response.ok) {
+            return response.json();
+        } else {
+            throw new Error('Failed to sync appointments');
+        }
+    })
+    .then(data => {
+        if (data.success) {
+            alert(`Successfully synced ${data.synced_count} appointments!`);
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to sync appointments'));
+        }
+    })
+    .catch(error => {
+        hideSpinner();
+        console.error('Error:', error);
+        alert('Error syncing appointments. Please try again.');
+    });
+}
+</script>
+
+{% csrf_token %}
+{% endblock %} 

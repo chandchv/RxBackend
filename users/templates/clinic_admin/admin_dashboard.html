@@ -193,7 +193,7 @@
 
 <script>
 function changeClinic(clinicId) {
-    fetch(`/api/change-clinic/${clinicId}/`, {
+    fetch(`/users/change-clinic/${clinicId}/`, {
         method: 'POST',
         headers: {
             'X-CSRFToken': '{{ csrf_token }}',

@@ -1,8 +1,19 @@
 import datetime
 from rest_framework import serializers
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from users.models import UserProfile, Patient, Appointment, Prescription, Doctor, PrescriptionItem, Clinic, LabTest, LabTechnician, Lab, LabStaff, Staff, Billing
+
+User = get_user_model()
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'first_name', 'last_name', 'auth_provider', 'is_staff', 'is_superuser']
+        read_only_fields = ['id', 'is_staff', 'is_superuser']
+        extra_kwargs = {
+            'password': {'write_only': True}
+        }
 
 class SignupSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, validators=[validate_password])
@@ -51,6 +62,7 @@ class PatientSerializer(serializers.ModelSerializer):
 class AppointmentSerializer(serializers.ModelSerializer):
     patient_name = serializers.SerializerMethodField()
     doctor_name = serializers.SerializerMethodField()
+    patient = serializers.SerializerMethodField()
     
     class Meta:
         model = Appointment
@@ -61,6 +73,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'patient_name',
             'doctor_name',
             'appointment_date',
+            'appointment_time',
             'status',
             'reason',
             'created_at'
@@ -81,6 +94,22 @@ class AppointmentSerializer(serializers.ModelSerializer):
             return "Unknown Doctor"
         except AttributeError:
             return "Unknown Doctor"
+    
+    def get_patient(self, obj):
+        """Return patient details for React Native app"""
+        try:
+            if obj.patient:
+                return {
+                    'id': obj.patient.id,
+                    'first_name': obj.patient.first_name,
+                    'last_name': obj.patient.last_name,
+                    'email': obj.patient.email,
+                    'phone_number': obj.patient.phone_number
+                }
+            return None
+        except AttributeError:
+            return None
+
     def validate_appointment_date(self, value):
         """
         Validate the appointment date format and ensure it's not in the past

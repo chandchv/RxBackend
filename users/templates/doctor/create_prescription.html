@@ -321,7 +321,7 @@ drugSearchInput.addEventListener('input', debounce(async (e) => {
 
     try {
         // Replace with your actual API endpoint
-        const response = await fetch(`/api/drug-suggestions/?query=${encodeURIComponent(query)}`); 
+        const response = await fetch(`/users/api/drug-suggestions/?query=${encodeURIComponent(query)}`); 
         if (!response.ok) throw new Error('Network response was not ok');
         const suggestions = await response.json();
         

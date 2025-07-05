@@ -1,117 +1,348 @@
 {% extends 'base.html' %}
-
+{% load widget_tweaks %}
 {% block title %}Schedule Appointment{% endblock %}
 
 {% block content %}
 {% if doctor %}
     <div class="max-w-2xl mx-auto px-4 py-8">
         <div class="bg-white shadow-lg rounded-lg overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-200">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
                 <h1 class="text-2xl font-bold text-gray-900">Schedule New Appointment</h1>
-                
             </div>
 
             <div class="px-6 py-4">
-                <form method="POST" class="max-w-lg">
+                <form method="POST" class="max-w-lg space-y-6">
                     {% csrf_token %}
                     <input type="hidden" name="doctor" value="{{ doctor.id }}">
                     
-                    <div class="mb-4">
+                    <div class="mb-6">
                         {{ form.patient.errors }}
-                        <label for="{{ form.patient.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                        <label for="{{ form.patient.id_for_label }}" class="block text-gray-700 text-sm font-semibold mb-2">
                             Select Patient
                         </label>
-                        {{ form.patient }}
+                        {{ form.patient|add_class:"w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }}
                     </div>
                     
-                    <div class="mb-4">
+                    <div class="mb-6">
                         {{ form.appointment_date.errors }}
-                        <label for="{{ form.appointment_date.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                        <label for="{{ form.appointment_date.id_for_label }}" class="block text-gray-700 text-sm font-semibold mb-2">
                             Appointment Date
                         </label>
-                        {{ form.appointment_date }}
+                        {{ form.appointment_date|add_class:"w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }}
                     </div>
                     
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Available Time Slots</label>
-                        <div id="time-slots" class="grid grid-cols-4 gap-2">
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-semibold mb-2">Available Time Slots</label>
+                        <div id="time-slots" class="grid grid-cols-4 gap-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
                             <!-- Slots will be populated here -->
                         </div>
                         {{ form.appointment_time }}
                     </div>
                     
-                    <div class="mb-4">
+                    <div class="mb-6">
                         {{ form.reason.errors }}
-                        <label for="{{ form.reason.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                        <label for="{{ form.reason.id_for_label }}" class="block text-gray-700 text-sm font-semibold mb-2">
                             Reason for Visit
                         </label>
-                        {{ form.reason }}
+                        {{ form.reason|add_class:"w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[100px]" }}
                     </div>
                     
-                    <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                        Schedule Appointment
-                    </button>
+                    <!-- Appointment Type Options -->
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-semibold mb-3">
+                            Appointment Type
+                        </label>
+                        <div class="space-y-2">
+                            <div class="flex items-center">
+                                {{ form.is_emergency }}
+                                <label for="{{ form.is_emergency.id_for_label }}" class="ml-2 text-sm text-red-600 font-medium">
+                                    Emergency Appointment
+                                </label>
+                            </div>
+                            <div class="flex items-center">
+                                {{ form.is_telemedicine }}
+                                <label for="{{ form.is_telemedicine.id_for_label }}" class="ml-2 text-sm text-blue-600 font-medium">
+                                    Telemedicine Appointment
+                                </label>
+                            </div>
+                            <div class="flex items-center">
+                                {{ form.is_walk_in }}
+                                <label for="{{ form.is_walk_in.id_for_label }}" class="ml-2 text-sm text-green-600 font-medium">
+                                    Walk-in Appointment
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-md transition duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                            Schedule Appointment
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
     </div>
 {% else %}
     <div class="max-w-2xl mx-auto px-4 py-8">
-        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-sm" role="alert">
             <strong class="font-bold">Error!</strong>
             <span class="block sm:inline">Doctor profile not found. Please complete your profile setup.</span>
-            <a href="{% url 'users:doctor_profile' %}" class="block mt-2 underline">Go to Profile Setup</a>
+            <a href="{% url 'users:doctor_profile' %}" class="block mt-2 text-red-600 hover:text-red-800 underline">Go to Profile Setup</a>
         </div>
     </div>
 {% endif %}
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const dateInput = document.getElementById('id_appointment_date');
-    const timeInput = document.getElementById('id_appointment_time');
-    const slotsContainer = document.getElementById('time-slots');
-    const doctorId = {{ request.user.doctor.id }};  // Get doctor ID from context
+<!-- Single Date Slot Generation Modal -->
+<div id="singleDateSlotModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">Generate Slots for Date</h3>
+            <div class="mt-4 px-7 py-3">
+                <form id="singleDateSlotForm" class="space-y-4">
+                    {% csrf_token %}
+                    <input type="hidden" id="modalSelectedDate" name="selected_date">
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Working Hours</label>
+                        <div class="grid grid-cols-2 gap-2 mt-1">
+                            <div>
+                                <label class="block text-xs text-gray-500">Start Time</label>
+                                <input type="time" name="start_time" value="09:00" 
+                                       class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500">End Time</label>
+                                <input type="time" name="end_time" value="17:00" 
+                                       class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Lunch Break (Optional)</label>
+                        <div class="grid grid-cols-2 gap-2 mt-1">
+                            <div>
+                                <label class="block text-xs text-gray-500">Lunch Start</label>
+                                <input type="time" name="lunch_start" value="13:00" 
+                                       class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500">Lunch End</label>
+                                <input type="time" name="lunch_end" value="14:00" 
+                                       class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Slot Duration</label>
+                        <select name="slot_duration" class="w-full px-2 py-1 border border-gray-300 rounded text-sm mt-1">
+                            <option value="15">15 minutes</option>
+                            <option value="20">20 minutes</option>
+                            <option value="30" selected>30 minutes</option>
+                            <option value="45">45 minutes</option>
+                            <option value="60">60 minutes</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="items-center px-4 py-3">
+                <button id="generateSingleDateSlotsBtn" type="button" 
+                        class="px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-24 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-300">
+                    Generate
+                </button>
+                <button type="button" onclick="closeSingleDateSlotModal()" 
+                        class="ml-3 px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-24 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
-    dateInput.addEventListener('change', function() {
-        const selectedDate = this.value;
-        if (!selectedDate) return;
+<!-- Loading Spinner Modal -->
+<div id="loadingSpinner" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+            </div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mt-2">Generating Slots</h3>
+            <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500" id="loadingSpinnerMessage">
+                    Please wait while we generate appointment slots...
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Wait for DOM to load
+document.addEventListener('DOMContentLoaded', function() {
+    // Get references to DOM elements
+    var dateInput = document.getElementById('id_appointment_date');
+    var timeInput = document.getElementById('id_appointment_time');
+    var slotsContainer = document.getElementById('time-slots');
+    var doctorId = "{{ doctor.id|default:'0' }}";
+    
+    // Function to load available slots
+    function loadAvailableSlots(date) {
+        if (!date) {
+            slotsContainer.innerHTML = '<p>Please select a date to view available slots</p>';
+            return;
+        }
         
-        slotsContainer.innerHTML = '<p>Loading available slots...</p>';
+        slotsContainer.innerHTML = '<p class="col-span-4 text-center">Loading available slots...</p>';
         
-        fetch(`/api/available-slots/doctor/${doctorId}/${selectedDate}/`)
-            .then(response => response.json())
-            .then(data => {
+        // Build the URL with path parameters instead of query parameters
+        var url = '/users/api/available-slots/doctor/' + doctorId + '/' + date + '/';
+        console.log("Fetching slots from URL:", url);
+        
+        // Make the fetch request
+        fetch(url)
+            .then(function(response) {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(function(data) {
+                console.log("API Response:", data);
                 slotsContainer.innerHTML = '';
+                
                 if (data.slots && data.slots.length > 0) {
-                    data.slots.forEach(slot => {
-                        const button = document.createElement('button');
+                    data.slots.forEach(function(slot) {
+                        var button = document.createElement('button');
                         button.type = 'button';
                         button.className = 'slot-button bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded m-1';
                         button.textContent = slot.time;
-                        button.onclick = function() {
+                        button.setAttribute('data-time', slot.time);
+                        
+                        button.addEventListener('click', function() {
                             // Remove active class from all buttons
-                            document.querySelectorAll('.slot-button').forEach(btn => {
+                            document.querySelectorAll('.slot-button').forEach(function(btn) {
                                 btn.classList.remove('bg-green-500');
                                 btn.classList.add('bg-blue-500');
                             });
+                            
                             // Add active class to clicked button
                             this.classList.remove('bg-blue-500');
                             this.classList.add('bg-green-500');
-                            // Set the time value
-                            timeInput.value = slot.time;
-                        };
+                            
+                            // Set the time value in the hidden input
+                            timeInput.value = this.getAttribute('data-time');
+                            console.log("Selected time:", timeInput.value);
+                        });
+                        
                         slotsContainer.appendChild(button);
                     });
                 } else {
-                    slotsContainer.innerHTML = '<p>No available slots for this date</p>';
+                    slotsContainer.innerHTML = 
+                        '<div class="col-span-4 text-center">' +
+                        '<p class="text-red-500 mb-2">No available slots for this date</p>' +
+                        '<p class="text-sm text-gray-600">Please select a different date or generate slots first</p>' +
+                        '<button onclick="openSingleDateSlotModal(\'' + date + '\')" class="mt-2 inline-block bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded text-sm">Generate Slots for This Date</button>' +
+                        '</div>';
                 }
             })
-            .catch(error => {
-                console.error('Error:', error);
-                slotsContainer.innerHTML = '<p class="text-red-500">Error loading slots</p>';
+            .catch(function(error) {
+                console.error('Error fetching slots:', error);
+                slotsContainer.innerHTML = 
+                    '<div class="col-span-4 text-center">' +
+                    '<p class="text-red-500 mb-2">Error loading slots: ' + error.message + '</p>' +
+                    '<p class="text-sm text-gray-600">Please try again or generate slots first</p>' +
+                    '<button onclick="openSingleDateSlotModal()" class="mt-2 inline-block bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded text-sm">Generate Slots</button>' +
+                    '</div>';
             });
+    }
+    
+    // Listen for date changes
+    dateInput.addEventListener('change', function() {
+        var selectedDate = this.value;
+        loadAvailableSlots(selectedDate);
     });
+    
+    // Load slots if date is already selected
+    if (dateInput.value) {
+        loadAvailableSlots(dateInput.value);
+    }
 });
 
+// Modal functions
+function openSingleDateSlotModal(selectedDate) {
+    const modal = document.getElementById('singleDateSlotModal');
+    const dateInput = document.getElementById('modalSelectedDate');
+    
+    // Use the provided date or get from the form
+    const dateToUse = selectedDate || document.getElementById('id_appointment_date').value;
+    dateInput.value = dateToUse;
+    
+    modal.classList.remove('hidden');
+}
+
+function closeSingleDateSlotModal() {
+    document.getElementById('singleDateSlotModal').classList.add('hidden');
+}
+
+function showSpinner(message = 'Please wait while we generate appointment slots...') {
+    document.getElementById('loadingSpinnerMessage').textContent = message;
+    document.getElementById('loadingSpinner').classList.remove('hidden');
+}
+
+function hideSpinner() {
+    document.getElementById('loadingSpinner').classList.add('hidden');
+}
+
+// Handle single date slot generation
+document.getElementById('generateSingleDateSlotsBtn').addEventListener('click', function() {
+    const form = document.getElementById('singleDateSlotForm');
+    const formData = new FormData(form);
+    
+    if (!formData.get('selected_date')) {
+        alert('Please select a date first.');
+        return;
+    }
+    
+    closeSingleDateSlotModal();
+    showSpinner('Generating appointment slots for the selected date...');
+    
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch('/users/doctor/generate-single-date-slots/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrftoken
+        },
+        body: new URLSearchParams(formData)
+    })
+    .then(response => {
+        hideSpinner();
+        if (response.ok) {
+            return response.json();
+        } else {
+            throw new Error('Failed to generate slots');
+        }
+    })
+    .then(data => {
+        if (data.success) {
+            alert('Slots generated successfully!');
+            // Reload the slots for the current date
+            const currentDate = document.getElementById('id_appointment_date').value;
+            if (currentDate) {
+                loadAvailableSlots(currentDate);
+            }
+        } else {
+            alert('Error: ' + (data.message || 'Failed to generate slots'));
+        }
+    })
+    .catch(error => {
+        hideSpinner();
+        console.error('Error:', error);
+        alert('Error generating slots. Please try again.');
+    });
+});
 </script>
 {% endblock %} 

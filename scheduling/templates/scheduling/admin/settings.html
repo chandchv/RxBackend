@@ -3,172 +3,339 @@
 {% block title %}Scheduling Settings{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="card shadow-sm">
-        <div class="card-header bg-light">
-            <h3 class="mb-0">Scheduling System Settings</h3>
+<div class="min-h-screen bg-gray-50">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Page Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Scheduling System Settings</h1>
+            <p class="mt-2 text-gray-600">Configure your appointment scheduling system preferences and integrations.</p>
         </div>
-        <div class="card-body">
-            <nav>
-                <div class="nav nav-tabs" id="nav-tab" role="tablist">
-                    <button class="nav-link active" id="nav-general-tab" data-bs-toggle="tab" data-bs-target="#nav-general" type="button" role="tab" aria-controls="nav-general" aria-selected="true">General</button>
-                    <button class="nav-link" id="nav-notifications-tab" data-bs-toggle="tab" data-bs-target="#nav-notifications" type="button" role="tab" aria-controls="nav-notifications" aria-selected="false">Notifications</button>
-                    <button class="nav-link" id="nav-integrations-tab" data-bs-toggle="tab" data-bs-target="#nav-integrations" type="button" role="tab" aria-controls="nav-integrations" aria-selected="false">Integrations</button>
-                </div>
-            </nav>
-            <div class="tab-content p-3 border border-top-0 rounded-bottom" id="nav-tabContent">
+
+        <!-- Settings Card -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <!-- Tab Navigation -->
+            <div class="border-b border-gray-200">
+                <nav class="flex" aria-label="Tabs">
+                    <button class="tab-button active w-1/3 py-4 px-6 text-center border-b-2 border-blue-500 text-blue-600 font-medium text-sm focus:outline-none focus:text-blue-800 transition-colors duration-200" 
+                            id="nav-general-tab" 
+                            data-bs-toggle="tab" 
+                            data-bs-target="#nav-general" 
+                            type="button" 
+                            role="tab" 
+                            aria-controls="nav-general" 
+                            aria-selected="true">
+                        <i class="fas fa-cog mr-2"></i>General
+                    </button>
+                    <button class="tab-button w-1/3 py-4 px-6 text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm focus:outline-none transition-colors duration-200" 
+                            id="nav-notifications-tab" 
+                            data-bs-toggle="tab" 
+                            data-bs-target="#nav-notifications" 
+                            type="button" 
+                            role="tab" 
+                            aria-controls="nav-notifications" 
+                            aria-selected="false">
+                        <i class="fas fa-bell mr-2"></i>Notifications
+                    </button>
+                    <button class="tab-button w-1/3 py-4 px-6 text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm focus:outline-none transition-colors duration-200" 
+                            id="nav-integrations-tab" 
+                            data-bs-toggle="tab" 
+                            data-bs-target="#nav-integrations" 
+                            type="button" 
+                            role="tab" 
+                            aria-controls="nav-integrations" 
+                            aria-selected="false">
+                        <i class="fas fa-plug mr-2"></i>Integrations
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="tab-content" id="nav-tabContent">
                 <!-- General Settings -->
-                <div class="tab-pane fade show active" id="nav-general" role="tabpanel" aria-labelledby="nav-general-tab">
-                    <form method="post" class="mt-3">
+                <div class="tab-pane fade show active p-6" id="nav-general" role="tabpanel" aria-labelledby="nav-general-tab">
+                    <form method="post" class="space-y-8">
                         {% csrf_token %}
                         <input type="hidden" name="setting_category" value="general">
                         
-                        <h5 class="mb-3">Appointment Settings</h5>
-                        
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="default_appointment_duration" class="form-label">Default Appointment Duration (minutes)</label>
-                                    <input type="number" class="form-control" id="default_appointment_duration" name="default_appointment_duration" value="30" min="5" max="240">
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label for="min_scheduling_notice" class="form-label">Minimum Scheduling Notice (hours)</label>
-                                    <input type="number" class="form-control" id="min_scheduling_notice" name="min_scheduling_notice" value="24" min="0" max="168">
-                                    <div class="form-text">Minimum time in advance that appointments can be booked</div>
-                                </div>
-                            </div>
+                        <!-- Appointment Settings Section -->
+                        <div class="bg-gray-50 rounded-lg p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+                                <i class="fas fa-calendar-alt text-blue-500 mr-3"></i>
+                                Appointment Settings
+                            </h3>
                             
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="max_days_in_advance" class="form-label">Maximum Days in Advance</label>
-                                    <input type="number" class="form-control" id="max_days_in_advance" name="max_days_in_advance" value="90" min="1" max="365">
-                                    <div class="form-text">How far in advance appointments can be scheduled</div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="space-y-2">
+                                    <label for="default_appointment_duration" class="block text-sm font-medium text-gray-700">
+                                        Default Appointment Duration (minutes)
+                                    </label>
+                                    <input type="number" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                           id="default_appointment_duration" 
+                                           name="default_appointment_duration" 
+                                           value="{{ settings.default_appointment_duration }}" 
+                                           min="5" 
+                                           max="240">
                                 </div>
                                 
-                                <div class="mb-3">
-                                    <label for="buffer_between_appointments" class="form-label">Buffer Between Appointments (minutes)</label>
-                                    <input type="number" class="form-control" id="buffer_between_appointments" name="buffer_between_appointments" value="5" min="0" max="60">
+                                <div class="space-y-2">
+                                    <label for="min_scheduling_notice" class="block text-sm font-medium text-gray-700">
+                                        Minimum Scheduling Notice (hours)
+                                    </label>
+                                    <input type="number" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                           id="min_scheduling_notice" 
+                                           name="min_scheduling_notice" 
+                                           value="{{ settings.min_scheduling_notice }}" 
+                                           min="0" 
+                                           max="168">
+                                    <p class="mt-1 text-xs text-gray-500">Minimum time in advance that appointments can be booked</p>
+                                </div>
+                                
+                                <div class="space-y-2">
+                                    <label for="max_days_in_advance" class="block text-sm font-medium text-gray-700">
+                                        Maximum Days in Advance
+                                    </label>
+                                    <input type="number" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                           id="max_days_in_advance" 
+                                           name="max_days_in_advance" 
+                                           value="{{ settings.max_days_in_advance }}" 
+                                           min="1" 
+                                           max="365">
+                                    <p class="mt-1 text-xs text-gray-500">How far in advance appointments can be scheduled</p>
+                                </div>
+                                
+                                <div class="space-y-2">
+                                    <label for="buffer_between_appointments" class="block text-sm font-medium text-gray-700">
+                                        Buffer Between Appointments (minutes)
+                                    </label>
+                                    <input type="number" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                           id="buffer_between_appointments" 
+                                           name="buffer_between_appointments" 
+                                           value="{{ settings.buffer_between_appointments }}" 
+                                           min="0" 
+                                           max="60">
                                 </div>
                             </div>
                         </div>
                         
-                        <h5 class="mb-3">Working Hours</h5>
-                        
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="default_start_time" class="form-label">Default Start Time</label>
-                                    <input type="time" class="form-control" id="default_start_time" name="default_start_time" value="09:00">
-                                </div>
-                            </div>
+                        <!-- Working Hours Section -->
+                        <div class="bg-gray-50 rounded-lg p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+                                <i class="fas fa-clock text-green-500 mr-3"></i>
+                                Working Hours
+                            </h3>
                             
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="default_end_time" class="form-label">Default End Time</label>
-                                    <input type="time" class="form-control" id="default_end_time" name="default_end_time" value="17:00">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="space-y-2">
+                                    <label for="default_start_time" class="block text-sm font-medium text-gray-700">
+                                        Default Start Time
+                                    </label>
+                                    <input type="time" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                           id="default_start_time" 
+                                           name="default_start_time" 
+                                           value="{{ settings.default_start_time }}">
+                                </div>
+                                
+                                <div class="space-y-2">
+                                    <label for="default_end_time" class="block text-sm font-medium text-gray-700">
+                                        Default End Time
+                                    </label>
+                                    <input type="time" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                           id="default_end_time" 
+                                           name="default_end_time" 
+                                           value="{{ settings.default_end_time }}">
                                 </div>
                             </div>
                         </div>
                         
-                        <div class="mt-4">
-                            <button type="submit" class="btn btn-primary">Save General Settings</button>
+                        <div class="flex justify-end">
+                            <button type="submit" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg shadow-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                                <i class="fas fa-save mr-2"></i>Save General Settings
+                            </button>
                         </div>
                     </form>
                 </div>
                 
                 <!-- Notification Settings -->
-                <div class="tab-pane fade" id="nav-notifications" role="tabpanel" aria-labelledby="nav-notifications-tab">
-                    <form method="post" class="mt-3">
+                <div class="tab-pane fade p-6" id="nav-notifications" role="tabpanel" aria-labelledby="nav-notifications-tab">
+                    <form method="post" class="space-y-8">
                         {% csrf_token %}
                         <input type="hidden" name="setting_category" value="notifications">
                         
-                        <h5 class="mb-3">Email Notifications</h5>
-                        
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="send_confirmation_emails" name="send_confirmation_emails" checked>
-                            <label class="form-check-label" for="send_confirmation_emails">Send appointment confirmation emails</label>
+                        <!-- Email Notifications Section -->
+                        <div class="bg-gray-50 rounded-lg p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+                                <i class="fas fa-envelope text-blue-500 mr-3"></i>
+                                Email Notifications
+                            </h3>
+                            
+                            <div class="space-y-4">
+                                <div class="flex items-center">
+                                    <input type="checkbox" 
+                                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" 
+                                           id="send_confirmation_emails" 
+                                           name="send_confirmation_emails" 
+                                           {% if settings.send_confirmation_emails %}checked{% endif %}>
+                                    <label for="send_confirmation_emails" class="ml-3 text-sm text-gray-700">
+                                        Send appointment confirmation emails
+                                    </label>
+                                </div>
+                                
+                                <div class="flex items-center">
+                                    <input type="checkbox" 
+                                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" 
+                                           id="send_reminder_emails" 
+                                           name="send_reminder_emails" 
+                                           {% if settings.send_reminder_emails %}checked{% endif %}>
+                                    <label for="send_reminder_emails" class="ml-3 text-sm text-gray-700">
+                                        Send appointment reminder emails
+                                    </label>
+                                </div>
+                                
+                                <div class="space-y-2">
+                                    <label for="reminder_hours" class="block text-sm font-medium text-gray-700">
+                                        Send reminders this many hours before appointment
+                                    </label>
+                                    <input type="number" 
+                                           class="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                           id="reminder_hours" 
+                                           name="reminder_hours" 
+                                           value="{{ settings.reminder_hours }}" 
+                                           min="1" 
+                                           max="72">
+                                </div>
+                            </div>
                         </div>
                         
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="send_reminder_emails" name="send_reminder_emails" checked>
-                            <label class="form-check-label" for="send_reminder_emails">Send appointment reminder emails</label>
+                        <!-- SMS Notifications Section -->
+                        <div class="bg-gray-50 rounded-lg p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+                                <i class="fas fa-sms text-green-500 mr-3"></i>
+                                SMS Notifications
+                            </h3>
+                            
+                            <div class="space-y-4">
+                                <div class="flex items-center">
+                                    <input type="checkbox" 
+                                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" 
+                                           id="send_sms_reminders" 
+                                           name="send_sms_reminders"
+                                           {% if settings.send_sms_reminders %}checked{% endif %}>
+                                    <label for="send_sms_reminders" class="ml-3 text-sm text-gray-700">
+                                        Send SMS reminders
+                                    </label>
+                                </div>
+                                
+                                <div class="space-y-2">
+                                    <label for="sms_reminder_hours" class="block text-sm font-medium text-gray-700">
+                                        Send SMS reminders this many hours before appointment
+                                    </label>
+                                    <input type="number" 
+                                           class="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                           id="sms_reminder_hours" 
+                                           name="sms_reminder_hours" 
+                                           value="{{ settings.sms_reminder_hours }}" 
+                                           min="1" 
+                                           max="24">
+                                </div>
+                            </div>
                         </div>
                         
-                        <div class="mb-3">
-                            <label for="reminder_hours" class="form-label">Send reminders this many hours before appointment</label>
-                            <input type="number" class="form-control" id="reminder_hours" name="reminder_hours" value="24" min="1" max="72">
-                        </div>
-                        
-                        <h5 class="mb-3 mt-4">SMS Notifications</h5>
-                        
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="send_sms_reminders" name="send_sms_reminders">
-                            <label class="form-check-label" for="send_sms_reminders">Send SMS reminders</label>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="sms_reminder_hours" class="form-label">Send SMS reminders this many hours before appointment</label>
-                            <input type="number" class="form-control" id="sms_reminder_hours" name="sms_reminder_hours" value="2" min="1" max="24">
-                        </div>
-                        
-                        <div class="mt-4">
-                            <button type="submit" class="btn btn-primary">Save Notification Settings</button>
+                        <div class="flex justify-end">
+                            <button type="submit" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg shadow-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                                <i class="fas fa-save mr-2"></i>Save Notification Settings
+                            </button>
                         </div>
                     </form>
                 </div>
                 
                 <!-- Integration Settings -->
-                <div class="tab-pane fade" id="nav-integrations" role="tabpanel" aria-labelledby="nav-integrations-tab">
-                    <div class="mt-3">
-                        <h5 class="mb-3">Installed Integrations</h5>
-                        
-                        <div class="card mb-3">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
+                <div class="tab-pane fade p-6" id="nav-integrations" role="tabpanel" aria-labelledby="nav-integrations-tab">
+                    <div class="space-y-8">
+                        <!-- Installed Integrations Section -->
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+                                <i class="fas fa-puzzle-piece text-purple-500 mr-3"></i>
+                                Installed Integrations
+                            </h3>
+                            
+                            <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                                <div class="flex justify-between items-start mb-4">
                                     <div>
-                                        <h5 class="mb-1">Django Appointment</h5>
-                                        <p class="mb-0 text-muted">Appointment management system</p>
+                                        <h4 class="text-lg font-medium text-gray-900">Django Appointment</h4>
+                                        <p class="text-gray-600">Appointment management system</p>
                                     </div>
                                     <div>
                                         {% if has_appointment_app %}
-                                            <span class="badge bg-success">Installed</span>
+                                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                <i class="fas fa-check-circle mr-1"></i>Installed
+                                            </span>
                                         {% else %}
-                                            <span class="badge bg-danger">Not Installed</span>
+                                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                <i class="fas fa-times-circle mr-1"></i>Not Installed
+                                            </span>
                                         {% endif %}
                                     </div>
                                 </div>
                                 
                                 {% if has_appointment_app %}
-                                <div class="mt-3">
-                                    <p class="mb-2">Django Appointment is properly integrated with your scheduling system.</p>
-                                    <ul>
-                                        <li>Appointment Types are available for categorization</li>
-                                        <li>Calendar integration is working</li>
-                                        <li>Reminder system is available</li>
+                                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                    <p class="text-green-800 mb-3">Django Appointment is properly integrated with your scheduling system.</p>
+                                    <ul class="text-green-700 text-sm space-y-1">
+                                        <li class="flex items-center">
+                                            <i class="fas fa-check text-green-500 mr-2"></i>
+                                            Appointment Types are available for categorization
+                                        </li>
+                                        <li class="flex items-center">
+                                            <i class="fas fa-check text-green-500 mr-2"></i>
+                                            Calendar integration is working
+                                        </li>
+                                        <li class="flex items-center">
+                                            <i class="fas fa-check text-green-500 mr-2"></i>
+                                            Reminder system is available
+                                        </li>
                                     </ul>
                                 </div>
                                 {% else %}
-                                <div class="mt-3 alert alert-warning">
-                                    <p class="mb-2">Django Appointment is not installed. To install:</p>
-                                    <pre><code>pip install django-appointment</code></pre>
-                                    <p>Then add 'appointment' to your INSTALLED_APPS in settings.py</p>
+                                <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                    <p class="text-amber-800 mb-3">Django Appointment is not installed. To install:</p>
+                                    <div class="bg-gray-900 text-gray-100 p-3 rounded font-mono text-sm mb-3">
+                                        pip install django-appointment
+                                    </div>
+                                    <p class="text-amber-700 text-sm">Then add 'appointment' to your INSTALLED_APPS in settings.py</p>
                                 </div>
                                 {% endif %}
                             </div>
                         </div>
                         
-                        <h5 class="mb-3 mt-4">External Calendar Integration</h5>
-                        
-                        <div class="card mb-3">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
+                        <!-- External Calendar Integration Section -->
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+                                <i class="fas fa-calendar-plus text-blue-500 mr-3"></i>
+                                External Calendar Integration
+                            </h3>
+                            
+                            <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                                <div class="flex justify-between items-center">
                                     <div>
-                                        <h5 class="mb-1">Google Calendar</h5>
-                                        <p class="mb-0 text-muted">Sync appointments with Google Calendar</p>
+                                        <h4 class="text-lg font-medium text-gray-900 flex items-center">
+                                            <i class="fab fa-google text-red-500 mr-2"></i>
+                                            Google Calendar
+                                        </h4>
+                                        <p class="text-gray-600">Sync appointments with Google Calendar</p>
                                     </div>
                                     <div>
-                                        <button type="button" class="btn btn-outline-primary">Connect</button>
+                                        <button type="button" 
+                                                class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 font-medium py-2 px-4 rounded-lg shadow-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                                            <i class="fas fa-link mr-2"></i>Connect
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -179,4 +346,64 @@
         </div>
     </div>
 </div>
+
+<style>
+    .tab-button {
+        transition: all 0.2s ease-in-out;
+    }
+    
+    .tab-button.active {
+        border-color: #3B82F6 !important;
+        color: #2563EB !important;
+    }
+    
+    .tab-button:not(.active):hover {
+        border-color: #D1D5DB !important;
+        color: #374151 !important;
+    }
+    
+    .tab-pane {
+        display: none;
+    }
+    
+    .tab-pane.show.active {
+        display: block;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Tab switching functionality
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const target = this.getAttribute('data-bs-target');
+            
+            // Remove active state from all buttons and panes
+            tabButtons.forEach(btn => {
+                btn.classList.remove('active');
+                btn.classList.add('border-transparent', 'text-gray-500');
+                btn.classList.remove('border-blue-500', 'text-blue-600');
+            });
+            
+            tabPanes.forEach(pane => {
+                pane.classList.remove('show', 'active');
+            });
+            
+            // Add active state to clicked button
+            this.classList.add('active');
+            this.classList.remove('border-transparent', 'text-gray-500');
+            this.classList.add('border-blue-500', 'text-blue-600');
+            
+            // Show target pane
+            const targetPane = document.querySelector(target);
+            if (targetPane) {
+                targetPane.classList.add('show', 'active');
+            }
+        });
+    });
+});
+</script>
 {% endblock %} 

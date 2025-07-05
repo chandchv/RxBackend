@@ -1,0 +1,240 @@
+{% extends 'base.html' %}
+
+{% block title %}Bill Detail - {{ bill.bill_number }}{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Bill {{ bill.bill_number }}</h1>
+                <p class="text-gray-600">{{ bill.patient.get_full_name }}</p>
+                <p class="text-gray-600">{{ bill.bill_date|date:"M d, Y" }}</p>
+            </div>
+            <div class="flex space-x-3">
+                <a href="{% url 'billing:bill_print' bill.id %}" 
+                   class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <i class="fas fa-print mr-2"></i>Print Bill
+                </a>
+                {% if bill.status == 'pending' or bill.status == 'partial' %}
+                <a href="{% url 'billing:staff_record_payment' bill.id %}" 
+                   class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <i class="fas fa-money-bill mr-2"></i>Record Payment
+                </a>
+                {% endif %}
+                <a href="{% url 'billing:doctor_billing_summary' %}" 
+                   class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <i class="fas fa-arrow-left mr-2"></i>Back to Summary
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Bill Details -->
+        <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">Bill Information</h2>
+            </div>
+            <div class="p-6">
+                <dl class="space-y-4">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Patient</dt>
+                        <dd class="text-sm text-gray-900">{{ bill.patient.get_full_name }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Phone</dt>
+                        <dd class="text-sm text-gray-900">{{ bill.patient.phone_number }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Doctor</dt>
+                        <dd class="text-sm text-gray-900">Dr. {{ bill.doctor.user.get_full_name }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Bill Date</dt>
+                        <dd class="text-sm text-gray-900">{{ bill.bill_date|date:"M d, Y" }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Due Date</dt>
+                        <dd class="text-sm text-gray-900">{{ bill.due_date|date:"M d, Y" }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Status</dt>
+                        <dd>
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                {% if bill.status == 'completed' %}bg-green-100 text-green-800
+                                {% elif bill.status == 'pending' %}bg-red-100 text-red-800
+                                {% elif bill.status == 'partial' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ bill.get_status_display }}
+                            </span>
+                        </dd>
+                    </div>
+                    {% if bill.notes %}
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Notes</dt>
+                        <dd class="text-sm text-gray-900">{{ bill.notes }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+
+        <!-- Payment Summary -->
+        <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">Payment Summary</h2>
+            </div>
+            <div class="p-6">
+                <dl class="space-y-4">
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Subtotal</dt>
+                        <dd class="text-sm text-gray-900">₹{{ bill.subtotal|floatformat:2 }}</dd>
+                    </div>
+                    {% if bill.tax > 0 %}
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Tax ({{ bill.tax_percentage }}%)</dt>
+                        <dd class="text-sm text-gray-900">₹{{ bill.tax|floatformat:2 }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if bill.discount > 0 %}
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Discount</dt>
+                        <dd class="text-sm text-red-600">-₹{{ bill.discount|floatformat:2 }}</dd>
+                    </div>
+                    {% endif %}
+                    <div class="flex justify-between border-t pt-4">
+                        <dt class="text-base font-medium text-gray-900">Total Amount</dt>
+                        <dd class="text-base font-bold text-gray-900">₹{{ bill.total|floatformat:2 }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Amount Paid</dt>
+                        <dd class="text-sm text-green-600">₹{{ bill.amount_paid|floatformat:2 }}</dd>
+                    </div>
+                    <div class="flex justify-between border-t pt-4">
+                        <dt class="text-base font-medium text-gray-900">Due Amount</dt>
+                        <dd class="text-base font-bold text-red-600">₹{{ due_amount|floatformat:2 }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bill Items -->
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden mt-6">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Bill Items</h2>
+        </div>
+        
+        {% if bill_items %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Item
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Description
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Quantity
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Unit Price
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Total
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for item in bill_items %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {{ item.item_name }}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-900">
+                            {{ item.description|default:"-" }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ item.quantity }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            ₹{{ item.unit_price|floatformat:2 }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            ₹{{ item.total|floatformat:2 }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-6 py-8 text-center">
+            <p class="text-gray-500">No items found for this bill.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Payment History -->
+    {% if payment_history %}
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden mt-6">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Payment History</h2>
+        </div>
+        
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Date
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Amount
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Method
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Receipt
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Notes
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for payment in payment_history %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ payment.payment_date|date:"M d, Y" }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            ₹{{ payment.amount|floatformat:2 }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ payment.get_payment_method_display }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ payment.receipt_number|default:"-" }}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-900">
+                            {{ payment.notes|default:"-" }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %} 

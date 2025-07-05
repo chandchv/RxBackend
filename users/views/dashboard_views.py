@@ -1,7 +1,8 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
-from ..models import Doctor, Patient, Appointment, Staff, ActivityLog, LabTest
+from django.contrib.auth.models import User
+from ..models import Doctor, Patient, Appointment, Staff, ActivityLog, LabTest, ClinicAdmin
 from datetime import datetime, timedelta
 from django.contrib import messages
 import logging
@@ -44,7 +45,8 @@ def doctor_dashboard(request):
         }
         return render(request, 'doctor/dashboard.html', context)
     except Doctor.DoesNotExist:
-        return redirect('users:dashboard')
+        messages.error(request, 'Doctor profile not found. Please contact your administrator.')
+        return redirect('users:login')
 
 
 
@@ -69,55 +71,67 @@ def admin_dashboard(request):
 @login_required
 def dashboard_redirect(request):
     """Redirects users to their appropriate dashboard based on their role"""
-    logger.info(f"User {request.user.username} accessing dashboard redirect")
+    # Get the user from the request
+    user = request.user
+    
+    # Log user information
+    logger.info(f"User {getattr(user, 'username', user.email)} accessing dashboard redirect")
     
     # First check if user is authenticated
-    if not request.user.is_authenticated:
+    if not user.is_authenticated:
         logger.warning("Unauthenticated user attempting to access dashboard")
-        return redirect('login')
+        return redirect('users:login')
         
     # Check if user is a superuser
-    if request.user.is_superuser:
-        logger.info(f"Superuser {request.user.username} redirecting to superuser dashboard")
+    if user.is_superuser:
+        logger.info(f"Superuser {user.username or user.email} redirecting to superuser dashboard")
         return redirect('users:superuser_dashboard')
         
     # Check if user is a staff member
-    if hasattr(request.user, 'staff'):
-        logger.info(f"Staff user {request.user.username} redirecting to staff dashboard")
-        return redirect('users:staff_dashboard')
-        
+    try:
+        staff = Staff.objects.filter(user=user).first()
+        if staff:
+            logger.info(f"Staff user {user.username or user.email} redirecting to staff dashboard")
+            return redirect('users:staff_dashboard')
+    except Exception as e:
+        logger.error(f"Error checking staff status: {str(e)}")
+    
     # Check if user is a doctor
     try:
-        doctor = Doctor.objects.get(user=request.user)
-        logger.info(f"Doctor {doctor.name} redirecting to doctor dashboard")
-        return redirect('users:doctor_dashboard')
-    except Doctor.DoesNotExist:
-        logger.debug(f"User {request.user.username} is not a doctor")
+        # Use filter and first instead of get to avoid exceptions
+        doctor = Doctor.objects.filter(user=user).first()
+        if doctor and doctor.verified:  # Only redirect if doctor is verified
+            logger.info(f"Doctor {doctor.name} redirecting to doctor dashboard")
+            return redirect('users:doctor_dashboard')
+        elif doctor and not doctor.verified:
+            logger.warning(f"Unverified doctor {doctor.name} attempting to access dashboard")
+            messages.warning(request, 'Your doctor profile is pending verification. Please contact your administrator.')
+            return redirect('users:login')
+    except Exception as e:
+        logger.error(f"Error checking doctor status: {str(e)}")
     
     # Check if user is a patient
     try:
-        patient = Patient.objects.get(user=request.user)
-        logger.info(f"Patient {patient.get_full_name()} redirecting to patient dashboard")
-        return redirect('users:patient_dashboard')
-    except Patient.DoesNotExist:
-        logger.warning(f"User {request.user.username} has no associated patient profile")
+        # Use filter and first instead of get to avoid exceptions
+        patient = Patient.objects.filter(user=user).first()
+        if patient:
+            logger.info(f"Patient redirecting to patient dashboard")
+            return redirect('users:patient_dashboard')
+    except Exception as e:
+        logger.error(f"Error checking patient status: {str(e)}")
     
     # Check if user is a clinic admin
-    if hasattr(request.user, 'clinicadmin'):
-        logger.info(f"Clinic admin {request.user.username} redirecting to clinic admin dashboard")
-        return redirect('users:clinic_admin_dashboard')
-    
-    # Check if user is a lab user
-    if hasattr(request.user, 'lab_profile'):
-        logger.info(f"Lab user {request.user.username} redirecting to lab dashboard")
-        if request.user.lab_profile.is_approved:
-            return redirect('labs:lab_dashboard')
-        else:
-            messages.error(request, 'Your lab account is not yet approved.')
+    try:
+        clinic_admin = ClinicAdmin.objects.filter(user=user).first()
+        if clinic_admin:
+            logger.info(f"Clinic admin {user.username or user.email} redirecting to clinic admin dashboard")
+            return redirect('users:clinic_admin_dashboard')
+    except Exception as e:
+        logger.error(f"Error checking clinic admin status: {str(e)}")
     
     # If no role is found, redirect to a default page
-    logger.warning(f"No role found for user {request.user.username}")
-    messages.warning(request, 'No user profile found. Please contact support.')
+    logger.warning(f"No role found for user {user}")
+    messages.warning(request, 'No user profile found. Please complete your profile.')
     return redirect('users:profile_setup')
 
 # Add a new view for profile setup
@@ -125,14 +139,20 @@ def profile_setup(request):
     if request.method == 'POST':
         # Handle profile creation
         try:
+            # Validate date format
+            date_of_birth = request.POST.get('date_of_birth')
+            if not date_of_birth:
+                messages.error(request, 'Date of birth is required')
+                return render(request, 'patient/profile_setup.html')
+                
             patient = Patient.objects.create(
                 user=request.user,
-                first_name=request.POST.get('first_name'),
-                last_name=request.POST.get('last_name'),
-                date_of_birth=request.POST.get('date_of_birth'),
+                first_name=request.POST.get('first_name', request.user.first_name),
+                last_name=request.POST.get('last_name', request.user.last_name),
+                date_of_birth=date_of_birth,
                 gender=request.POST.get('gender'),
                 phone_number=request.POST.get('phone_number'),
-                email=request.POST.get('email'),
+                email=request.POST.get('email', request.user.email),
                 address=request.POST.get('address'),
                 pincode=request.POST.get('pincode')
             )

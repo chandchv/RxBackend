@@ -109,61 +109,62 @@ class Hospital(TimeStampedModel):
 
 # --- Custom User Model ---
 
-class User(AbstractUser):
-    """
-    Custom User model extending Django's base user.
-    Includes role for RBAC and optional hospital affiliation.
-    Password management and standard fields (first_name, last_name, email)
-    are handled by AbstractUser.
-    """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='patient', db_index=True)
-    # Affiliation for non-patient users (Doctors, Admins, Staff)
-    hospital = models.ForeignKey(
-        Hospital,
-        on_delete=models.PROTECT, # Prevent deleting hospital if users are linked
-        null=True, blank=True, # Allow null for patients and superusers
-        related_name='staff_members',
-        help_text="Hospital affiliation for staff roles (Doctor, Admin, etc.)"
-    )
-    
-    # Override groups and user_permissions with custom related_names
-    groups = models.ManyToManyField(
-        'auth.Group',
-        verbose_name='groups',
-        blank=True,
-        help_text='The groups this user belongs to.',
-        related_name='custom_user_set',
-        related_query_name='custom_user'
-    )
-    user_permissions = models.ManyToManyField(
-        'auth.Permission',
-        verbose_name='user permissions',
-        blank=True,
-        help_text='Specific permissions for this user.',
-        related_name='custom_user_set',
-        related_query_name='custom_user'
-    )
-
-    class Meta:
-        verbose_name = "User Account"
-        verbose_name_plural = "User Accounts"
-        ordering = ['last_name', 'first_name']
-
-    def __str__(self):
-        return f"{self.get_full_name()} ({self.email})"
-
-    @property
-    def is_patient(self):
-        return self.role == 'patient'
-
-    @property
-    def is_doctor(self):
-        return self.role == 'doctor'
-
-    @property
-    def is_admin(self):
-        return self.role == 'admin' or self.is_superuser
+# Custom User model commented out - reverted to Django's built-in User model
+# class CustomUser(AbstractUser):
+#     """
+#     Custom User model extending Django's base user.
+#     Includes role for RBAC and optional hospital affiliation.
+#     Password management and standard fields (first_name, last_name, email)
+#     are handled by AbstractUser.
+#     """
+#     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+#     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='patient', db_index=True)
+#     # Affiliation for non-patient users (Doctors, Admins, Staff)
+#     hospital = models.ForeignKey(
+#         Hospital,
+#         on_delete=models.PROTECT, # Prevent deleting hospital if users are linked
+#         null=True, blank=True, # Allow null for patients and superusers
+#         related_name='staff_members',
+#         help_text="Hospital affiliation for staff roles (Doctor, Admin, etc.)"
+#     )
+#     
+#     # Override groups and user_permissions with custom related_names
+#     groups = models.ManyToManyField(
+#         'auth.Group',
+#         verbose_name='groups',
+#         blank=True,
+#         help_text='The groups this user belongs to.',
+#         related_name='custom_user_set',
+#         related_query_name='custom_user'
+#     )
+#     user_permissions = models.ManyToManyField(
+#         'auth.Permission',
+#         verbose_name='user permissions',
+#         blank=True,
+#         help_text='Specific permissions for this user.',
+#         related_name='custom_user_set',
+#         related_query_name='custom_user'
+#     )
+# 
+#     class Meta:
+#         verbose_name = "User Account"
+#         verbose_name_plural = "User Accounts"
+#         ordering = ['last_name', 'first_name']
+# 
+#     def __str__(self):
+#         return f"{self.get_full_name()} ({self.email})"
+# 
+#     @property
+#     def is_patient(self):
+#         return self.role == 'patient'
+# 
+#     @property
+#     def is_doctor(self):
+#         return self.role == 'doctor'
+# 
+#     @property
+#     def is_admin(self):
+#         return self.role == 'admin' or self.is_superuser
 
 # --- Profile Models (linked One-to-One with User) ---
 
