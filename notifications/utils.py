@@ -36,7 +36,7 @@ def create_notification(recipient=None, message=None, notification_type=None, se
         object_id = None
         if related_object:
             content_type = ContentType.objects.get_for_model(related_object)
-            object_id = related_object.id
+            object_id = str(related_object.id)  # Convert to string to support UUIDs
             logger.debug(f"Created notification with related object: {content_type.model} #{object_id}")
 
         # Create the notification

@@ -109,11 +109,13 @@
 
 /* Navigation Styles */
 .sidebar-nav {
-    padding: 1.5rem 1rem;
-    height: calc(100vh - 200px);
+    padding: 1.5rem 1rem 4rem 1rem; /* Added extra bottom padding for accessibility */
+    height: calc(100vh - 280px);
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+    position: relative;
+    margin-bottom: 0; /* Ensure no margin conflicts */
 }
 
 .sidebar-nav::-webkit-scrollbar {
@@ -127,6 +129,10 @@
 .sidebar-nav::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.2);
     border-radius: 2px;
+}
+
+.sidebar-nav .space-y-2 {
+    padding-bottom: 2rem; /* Extra space at bottom for last items */
 }
 
 /* Menu Items */
@@ -248,20 +254,20 @@
 }
 
 /* Submenu Styles */
-.submenu {
+    .submenu {
     margin-left: 1rem;
     margin-top: 0.5rem;
     border-left: 2px solid rgba(255, 255, 255, 0.1);
     padding-left: 1rem;
     transition: var(--transition-smooth);
-    max-height: 0;
-    opacity: 0;
-    overflow: hidden;
-}
-
-.submenu:not(.hidden) {
-    max-height: 1000px;
-    opacity: 1;
+        max-height: 0;
+        opacity: 0;
+        overflow: hidden;
+    }
+    
+    .submenu:not(.hidden) {
+        max-height: 1000px;
+        opacity: 1;
     animation: slideDown 0.3s ease-out;
 }
 
@@ -319,6 +325,7 @@
     border-top: 1px solid var(--sidebar-border);
     background: rgba(255, 255, 255, 0.03);
     backdrop-filter: blur(10px);
+    z-index: 10;
 }
 
 .footer-actions {
@@ -415,10 +422,16 @@
     <div class="sidebar-profile">
         <div class="flex items-center">
             <div class="flex-shrink-0">
-                <img class="profile-avatar" src="{% static 'images/default-profile.png' %}" alt="User profile">
+                {% if request.user.doctor and request.user.doctor.profile_picture %}
+                    <img class="profile-avatar" src="{{ request.user.doctor.profile_picture.url }}" alt="User profile">
+                {% else %}
+                    <div class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg border-3 border-white/20">
+                        {{ request.user.get_full_name|default:request.user.username|make_list|first|upper }}
+            </div>
+                {% endif %}
             </div>
             <div class="ml-4">
-                <p class="profile-name">{{ request.user.get_full_name }}</p>
+                <p class="profile-name">{{ request.user.get_full_name|default:request.user.username }}</p>
                 <p class="profile-role">
                     {% if request.user.is_superuser %}
                         Administrator
@@ -445,10 +458,10 @@
             <div class="nav-item">
                 <a href="{% url 'users:dashboard' %}" class="nav-link">
                     <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                    </svg>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
                     <span>Dashboard</span>
-                </a>
+            </a>
             </div>
 
             <!-- Users Management (Admin & Staff) -->
@@ -540,16 +553,16 @@
                     <a href="{% url 'users:patients_list' %}" class="nav-link">
                         <span>All Patients</span>
                     </a>
-                    <a href="#" class="nav-link">
+                    <a href="{% url 'users:patients_list' %}?filter=today" class="nav-link">
                         <span>Today's Patients</span>
                     </a>
-                    <a href="#" class="nav-link">
+                    <a href="{% url 'users:patients_list' %}?filter=scheduled" class="nav-link">
                         <span>Scheduled Patients</span>
                     </a>
-                    <a href="#" class="nav-link">
+                    <a href="{% url 'users:create_patient_doctor' %}" class="nav-link">
                         <span>Add New Patient</span>
                     </a>
-                    <a href="#" class="nav-link">
+                    <a href="{% url 'users:patients_list' %}?filter=history" class="nav-link">
                         <span>Patient History</span>
                     </a>
                 </div>
@@ -571,18 +584,12 @@
                     </svg>
                 </button>
                 <div class="submenu hidden">
-                    <a href="#" class="nav-link">
-                        <span>Primary Physician</span>
-                    </a>
-                    <a href="#" class="nav-link">
+                    <a href="#" class="nav-link"><span>Primary Physician</span> <!-- TODO: Add real URL --></a>
+                    <a href="{% url 'users:doctors_list' %}" class="nav-link">
                         <span>All Doctors</span>
                     </a>
-                    <a href="#" class="nav-link">
-                        <span>Specialists</span>
-                    </a>
-                    <a href="#" class="nav-link">
-                        <span>Find New Doctor</span>
-                    </a>
+                    <a href="#" class="nav-link"><span>Specialists</span> <!-- TODO: Add real URL --></a>
+                    <a href="#" class="nav-link"><span>Find New Doctor</span> <!-- TODO: Add real URL --></a>
                 </div>
             </div>
             {% endif %}
@@ -606,26 +613,24 @@
                     <a href="{% url 'users:patient_prescriptions' %}" class="nav-link">
                         <span>All Prescriptions</span>
                     </a>
-                    <a href="{% url 'users:patient_prescriptions' %}" class="nav-link">
+                    <a href="{% url 'users:patient_prescriptions' %}?filter=active" class="nav-link">
                         <span>Active Prescriptions</span>
                     </a>
-                    <a href="{% url 'users:patient_prescriptions' %}" class="nav-link">
+                    <a href="{% url 'users:patient_prescriptions' %}?filter=history" class="nav-link">
                         <span>Prescription History</span>
                     </a>
                     {% endif %}
                     {% if request.user.doctor %}
-                    <a href="#" class="nav-link">
-                        <span>Create Prescription</span>
-                    </a>
+                    <a href="#" class="nav-link"><span>Create Prescription</span> <!-- TODO: Add real URL --></a>
                     {% endif %}
                     {% if request.user.is_staff or request.user.is_superuser %}
                     <a href="{% url 'users:prescriptions' %}" class="nav-link">
                         <span>All Prescriptions</span>
                     </a>
-                    <a href="#" class="nav-link">
+                    <a href="{% url 'users:prescriptions' %}?filter=active" class="nav-link">
                         <span>Active Prescriptions</span>
                     </a>
-                    <a href="#" class="nav-link">
+                    <a href="{% url 'users:prescriptions' %}?filter=history" class="nav-link">
                         <span>Prescription History</span>
                     </a>
                     {% endif %}
@@ -652,19 +657,13 @@
                         <span>Health Records</span>
                     </a>
                     {% if request.user.doctor %}
-                    <a href="#" class="nav-link">
-                        <span>Create Record</span>
-                    </a>
-                    <a href="#" class="nav-link">
-                        <span>Update Record</span>
-                    </a>
+                    <a href="#" class="nav-link"><span>Create Record</span> <!-- TODO: Add real URL --></a>
+                    <a href="#" class="nav-link"><span>Update Record</span> <!-- TODO: Add real URL --></a>
                     {% endif %}
-                    <a href="#" class="nav-link">
+                    <a href="{% url 'users:patient_medical_history' %}" class="nav-link">
                         <span>Medical History</span>
                     </a>
-                    <a href="#" class="nav-link">
-                        <span>Allergies & Conditions</span>
-                    </a>
+                    <a href="#" class="nav-link"><span>Allergies & Conditions</span> <!-- TODO: Add real URL --></a>
                 </div>
             </div>
             {% endif %}
@@ -847,18 +846,10 @@
                     <a href="{% url 'pharmacy:dashboard' %}" class="nav-link">
                         <span>Dashboard</span>
                     </a>
-                    <a href="#" class="nav-link">
-                        <span>Inventory</span>
-                    </a>
-                    <a href="#" class="nav-link">
-                        <span>Pending Orders</span>
-                    </a>
-                    <a href="#" class="nav-link">
-                        <span>Dispensed Medications</span>
-                    </a>
-                    <a href="#" class="nav-link">
-                        <span>Order History</span>
-                    </a>
+                    <a href="#" class="nav-link"><span>Inventory</span> <!-- TODO: Add real URL --></a>
+                    <a href="#" class="nav-link"><span>Pending Orders</span> <!-- TODO: Add real URL --></a>
+                    <a href="#" class="nav-link"><span>Dispensed Medications</span> <!-- TODO: Add real URL --></a>
+                    <a href="#" class="nav-link"><span>Order History</span> <!-- TODO: Add real URL --></a>
                 </div>
             </div>
             {% endif %}
@@ -970,18 +961,10 @@
                     <a href="{% url 'users:clinic_admin_dashboard' %}" class="nav-link">
                         <span>Clinic Settings</span>
                     </a>
-                    <a href="#" class="nav-link">
-                        <span>System Configuration</span>
-                    </a>
-                    <a href="#" class="nav-link">
-                        <span>User Permissions</span>
-                    </a>
-                    <a href="#" class="nav-link">
-                        <span>Email Templates</span>
-                    </a>
-                    <a href="#" class="nav-link">
-                        <span>Backup & Restore</span>
-                    </a>
+                    <a href="#" class="nav-link"><span>System Configuration</span> <!-- TODO: Add real URL --></a>
+                    <a href="#" class="nav-link"><span>User Permissions</span> <!-- TODO: Add real URL --></a>
+                    <a href="#" class="nav-link"><span>Email Templates</span> <!-- TODO: Add real URL --></a>
+                    <a href="#" class="nav-link"><span>Backup & Restore</span> <!-- TODO: Add real URL --></a>
                 </div>
             </div>
             {% endif %}
@@ -1077,11 +1060,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function closeMobileMenu() {
-        sidebar.classList.add('-translate-x-full');
-        sidebar.classList.remove('active');
-        backdrop.classList.add('hidden');
-        menuOpenIcon.classList.remove('hidden');
-        menuCloseIcon.classList.add('hidden');
+            sidebar.classList.add('-translate-x-full');
+            sidebar.classList.remove('active');
+            backdrop.classList.add('hidden');
+            menuOpenIcon.classList.remove('hidden');
+            menuCloseIcon.classList.add('hidden');
         document.body.style.overflow = ''; // Restore scrolling
     }
     

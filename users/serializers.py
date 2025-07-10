@@ -52,11 +52,15 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class PatientSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
+    age = serializers.SerializerMethodField()
     
     class Meta:
         model = Patient
         fields = ['id', 'patient_id', 'first_name', 'last_name', 'date_of_birth', 
-                  'gender','blood_group', 'phone_number', 'email', 'address','pincode', 'clinic', 'created_at', 'updated_at']
+                  'gender','blood_group', 'phone_number', 'email', 'address','pincode', 'clinic', 'created_at', 'updated_at', 'age']
+    
+    def get_age(self, obj):
+        return obj.get_age()
 
 
 class AppointmentSerializer(serializers.ModelSerializer):

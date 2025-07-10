@@ -232,7 +232,7 @@ function getCookie(name) {
 // Handle clinic filter change
 document.getElementById('clinic_filter')?.addEventListener('change', function(e) {
     const clinicId = e.target.value;
-    fetch(`/users/clinics/${clinicId}/change/`, {
+    fetch(`{% url 'users:change_clinic' 0 %}`.replace('0', clinicId), {
         method: 'POST',
         headers: {
             'X-CSRFToken': getCookie('csrftoken'),

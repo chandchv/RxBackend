@@ -1326,3 +1326,38 @@ def appointment_actions_api(request, appointment_id):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def patient_vitals_api(request, patient_id):
+    """API endpoint for patient vitals (placeholder)"""
+    try:
+        doctor = get_object_or_404(Doctor, user=request.user)
+        patient = get_object_or_404(Patient, id=patient_id)
+        has_appointment = Appointment.objects.filter(doctor=doctor, patient=patient).exists()
+        if not has_appointment:
+            return Response({'error': 'You do not have access to this patient'}, status=status.HTTP_403_FORBIDDEN)
+        if request.method == 'GET':
+            return Response({'vitals': []})
+        elif request.method == 'POST':
+            return Response({'success': True, 'message': 'Vitals saved successfully'})
+    except Doctor.DoesNotExist:
+        return Response({'error': 'Doctor profile not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Patient.DoesNotExist:
+        return Response({'error': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error in patient_vitals_api: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def test_results_api(request, test_id):
+    """API endpoint for test results (placeholder)"""
+    try:
+        doctor = get_object_or_404(Doctor, user=request.user)
+        return Response({'test': {'id': test_id, 'name': 'Test Result', 'status': 'pending', 'result': None}})
+    except Doctor.DoesNotExist:
+        return Response({'error': 'Doctor profile not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error in test_results_api: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

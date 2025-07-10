@@ -20,7 +20,7 @@ class Notification(models.Model):
     
     # For linking to any object (like a prescription, appointment, etc.)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
-    object_id = models.PositiveIntegerField(null=True, blank=True)
+    object_id = models.CharField(max_length=255, null=True, blank=True)  # Changed to CharField to support UUIDs
     content_object = GenericForeignKey('content_type', 'object_id')
     
     # Action URL for direct navigation from notification

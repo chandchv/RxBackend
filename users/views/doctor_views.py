@@ -1524,21 +1524,27 @@ def api_patient_details(request, patient_id):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def api_patient_prescriptions(request, patient_id):
+def api_patient_prescriptions(request, patient_id, prescription_id):
     try:
         doctor = Doctor.objects.get(user=request.user)
         patient = Patient.objects.get(id=patient_id)
-        
-        if not Appointment.objects.filter(doctor=doctor, patient=patient).exists():
+        prescription = Prescription.objects.get(id=prescription_id, patient=patient)
+        if not Appointment.objects.filter(doctor=doctor, patient=patient, prescription=prescription).exists():
             return Response({'error': 'Unauthorized access'}, status=403)
-        
-        prescriptions = Prescription.objects.filter(patient=patient)
+        data = {
+            'id': prescription.id,
+            'patient_id': patient.id,
+            'doctor_id': doctor.id,
+            'prescription_date': prescription.created_at.strftime('%Y-%m-%d'),
+            'prescription_items': []
+        }
+        prescriptions = PrescriptionItem.objects.filter(prescription=prescription)
         data = [{
             'id': p.id,
-            'medication': p.medication,
+            'medication': p.medicine,
             'dosage': p.dosage,
             'duration': p.duration,
-            'date_prescribed': p.created.strftime('%Y-%m-%d'),
+            'date_prescribed': p.created_at.strftime('%Y-%m-%d'),
             'notes': p.notes or ''
         } for p in prescriptions]
         return Response(data)

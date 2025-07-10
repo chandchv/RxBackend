@@ -7,16 +7,17 @@
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 <style>
     /* Dashboard Calendar Styling */
-    .dashboard-calendar-container {
+        .dashboard-calendar-container {
         height: 500px;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        background-color: white;
-    }
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background-color: white;
+        }
 
     /* Calendar styling - matches scheduling app */
     .fc-event {
         cursor: pointer;
+        position: relative;
     }
     
     .fc-daygrid-day.holiday {
@@ -24,11 +25,19 @@
     }
     
     .fc-event-title {
-        white-space: normal;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 0.75rem;
+    }
+    
+    .fc-event-time {
+        font-weight: bold;
+        font-size: 0.7rem;
     }
     
     #calendar {
-        height: 480px;
+        height: 450px;
     }
     
     @media (max-width: 768px) {
@@ -49,8 +58,8 @@
 
     /* Event styling */
     .dashboard-calendar .fc-view-harness {
-        min-height: 480px;
-        height: 480px;
+        min-height: 450px;
+        height: 450px;
     }
 
     .dashboard-calendar .fc-toolbar {
@@ -91,6 +100,72 @@
         background-color: #f9fafb;
         cursor: pointer;
     }
+
+    /* Tooltip Styles - Same as scheduling calendar */
+    .appointment-tooltip {
+        position: absolute;
+        z-index: 1000;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        min-width: 250px;
+        max-width: 300px;
+        font-size: 0.875rem;
+        line-height: 1.4;
+        pointer-events: none;
+        opacity: 0;
+        transform: translateY(-5px);
+        transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    
+    .appointment-tooltip.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    
+    .appointment-tooltip h6 {
+        margin: 0 0 8px 0;
+        font-weight: 600;
+        color: #1f2937;
+        border-bottom: 1px solid #e5e7eb;
+        padding-bottom: 4px;
+    }
+    
+    .appointment-tooltip .detail-row {
+        margin-bottom: 4px;
+        display: flex;
+    }
+    
+    .appointment-tooltip .detail-label {
+        font-weight: 500;
+        color: #6b7280;
+        min-width: 60px;
+        margin-right: 8px;
+    }
+    
+    .appointment-tooltip .detail-value {
+        color: #1f2937;
+        flex: 1;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: white;
+    }
+    
+    .status-scheduled { background-color: #3b82f6; }
+    .status-confirmed { background-color: #10b981; }
+    .status-completed { background-color: #6b7280; }
+    .status-cancelled { background-color: #ef4444; }
+    .status-no_show { background-color: #f59e0b; }
+    .status-rescheduled { background-color: #60a5fa; }
+    .status-in_progress { background-color: #f59e0b; }
 </style>
 {% endblock %}
 
@@ -211,8 +286,8 @@
                                     <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                     </svg>
-                                </div>
-                            </div>
+                </div>
+            </div>
                             <div class="ml-5 w-0 flex-1">
                                 <dl>
                                     <dt class="text-sm font-medium text-gray-500 truncate">Pending Appointments</dt>
@@ -342,34 +417,34 @@
                                         <div class="flex-shrink-0 h-12 w-12">
                                             <div class="h-12 w-12 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center text-white font-medium">
                                                 {{ appointment.patient.first_name|first }}{{ appointment.patient.last_name|first }}
-                                            </div>
                                         </div>
+                                    </div>
                                         <div class="ml-4 flex-1">
                                             <div class="flex items-center justify-between">
                                                 <div>
                                                     <p class="text-sm font-semibold text-gray-900">
-                                                        {{ appointment.patient.get_full_name }}
-                                                    </p>
+                                            {{ appointment.patient.get_full_name }}
+                                        </p>
                                                     <p class="text-sm text-gray-500 flex items-center">
                                                         <i class="fas fa-clock mr-1"></i>
-                                                        {{ appointment.appointment_time|time:"g:i A" }}
+                                            {{ appointment.appointment_time|time:"g:i A" }}
                                                         {% if appointment.reason %}
                                                             <span class="ml-2 text-xs text-gray-400">• {{ appointment.reason|truncatechars:30 }}</span>
                                                         {% endif %}
-                                                    </p>
-                                                </div>
+                                        </p>
+                                    </div>
                                                 <div class="flex items-center space-x-3">
                                                     <!-- Status Badge -->
                                                     <span class="appointment-status px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                                        {% if appointment.status == 'scheduled' %}bg-green-100 text-green-800
+                                        {% if appointment.status == 'scheduled' %}bg-green-100 text-green-800
                                                         {% elif appointment.status == 'in_progress' %}bg-yellow-100 text-yellow-800
-                                                        {% elif appointment.status == 'completed' %}bg-blue-100 text-blue-800
+                                        {% elif appointment.status == 'completed' %}bg-blue-100 text-blue-800
                                                         {% elif appointment.status == 'no_show' %}bg-red-100 text-red-800
                                                         {% elif appointment.status == 'cancelled' %}bg-gray-100 text-gray-800
                                                         {% else %}bg-gray-100 text-gray-800{% endif %}">
                                                         {% if appointment.status == 'in_progress' %}In Progress
                                                         {% else %}{{ appointment.status|title }}{% endif %}
-                                                    </span>
+                                    </span>
                                                     
                                                     <!-- Action Buttons -->
                                                     <div class="appointment-actions flex items-center space-x-1">
@@ -685,6 +760,7 @@ function hideLoading() {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded, initializing calendar...');
     var calendarEl = document.getElementById('calendar');
+    let tooltip = null;
     
     if (calendarEl) {
         console.log('Calendar element found:', calendarEl);
@@ -695,15 +771,69 @@ document.addEventListener('DOMContentLoaded', function() {
                 center: 'title',
                 right: 'dayGridMonth,timeGridWeek,timeGridDay'
             },
-            events: '{% url "scheduling:get_calendar_appointments" %}',
-            eventClick: function(info) {
-                console.log('Event clicked:', info.event);
-                window.location.href = info.event.url;
-            },
             eventTimeFormat: {
                 hour: 'numeric',
                 minute: '2-digit',
                 meridiem: 'short'
+            },
+            eventDisplay: 'block',
+            eventDidMount: function(info) {
+                // Show only time in the event
+                const timeEl = info.el.querySelector('.fc-event-time');
+                const titleEl = info.el.querySelector('.fc-event-title');
+                
+                if (timeEl && titleEl) {
+                    titleEl.textContent = timeEl.textContent; // Show only time
+                    timeEl.style.display = 'none'; // Hide the separate time element
+                }
+                
+                // Add hover events
+                info.el.addEventListener('mouseenter', function(e) {
+                    showTooltip(e, info.event);
+                });
+                
+                info.el.addEventListener('mouseleave', function() {
+                    hideTooltip();
+                });
+                
+                info.el.addEventListener('mousemove', function(e) {
+                    if (tooltip && tooltip.classList.contains('show')) {
+                        updateTooltipPosition(e);
+                    }
+                });
+            },
+            events: function(info, successCallback, failureCallback) {
+                // Fetch events from API
+                fetch('{% url "scheduling:get_calendar_appointments" %}?' + new URLSearchParams({
+                    start: info.startStr,
+                    end: info.endStr
+                }))
+                .then(response => response.json())
+                .then(data => {
+                    // Process events to show only time
+                    const processedEvents = data.map(event => ({
+                        ...event,
+                        title: event.start ? new Date(event.start).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                        }) : event.title
+                    }));
+                    successCallback(processedEvents);
+                })
+                .catch(error => {
+                    console.error('Error loading events:', error);
+                    failureCallback(new Error('Could not load appointments'));
+                });
+            },
+            eventClick: function(info) {
+                // Navigate directly to appointment details
+                console.log('Event clicked:', info.event);
+                hideTooltip(); // Hide tooltip when clicking
+                
+                if (info.event.url) {
+                    window.location.href = info.event.url;
+                }
             },
             businessHours: {
                 daysOfWeek: [1, 2, 3, 4, 5], // Monday - Friday
@@ -713,11 +843,101 @@ document.addEventListener('DOMContentLoaded', function() {
             height: 450,
             loading: function(bool) {
                 console.log('Calendar loading:', bool);
-            },
-            eventDidMount: function(info) {
-                console.log('Event mounted:', info.event.title);
             }
         });
+        
+        // Tooltip functions
+        function createTooltip() {
+            if (!tooltip) {
+                tooltip = document.createElement('div');
+                tooltip.className = 'appointment-tooltip';
+                document.body.appendChild(tooltip);
+            }
+            return tooltip;
+        }
+        
+        function showTooltip(event, eventObj) {
+            const tooltip = createTooltip();
+            const props = eventObj.extendedProps;
+            
+            // Format the tooltip content
+            const startTime = eventObj.start ? eventObj.start.toLocaleString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            }) : 'No time set';
+            
+            const statusClass = `status-${(props.status || 'scheduled').toLowerCase().replace(' ', '_')}`;
+            
+            tooltip.innerHTML = `
+                <h6>${props.patient || 'Unknown Patient'}</h6>
+                <div class="detail-row">
+                    <span class="detail-label">Doctor:</span>
+                    <span class="detail-value">${props.doctor || 'Not assigned'}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Time:</span>
+                    <span class="detail-value">${startTime}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Status:</span>
+                    <span class="detail-value">
+                        <span class="status-badge ${statusClass}">${props.status || 'Scheduled'}</span>
+                    </span>
+                </div>
+                ${props.reason ? `
+                <div class="detail-row">
+                    <span class="detail-label">Reason:</span>
+                    <span class="detail-value">${props.reason}</span>
+                </div>
+                ` : ''}
+                <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb; font-size: 0.75rem; color: #6b7280;">
+                    Click for full details
+                </div>
+            `;
+            
+            updateTooltipPosition(event);
+            
+            // Show tooltip with animation
+            setTimeout(() => {
+                tooltip.classList.add('show');
+            }, 10);
+        }
+        
+        function updateTooltipPosition(event) {
+            if (!tooltip) return;
+            
+            const tooltipRect = tooltip.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            let left = event.pageX + 10;
+            let top = event.pageY - tooltipRect.height - 10;
+            
+            // Adjust if tooltip goes off screen
+            if (left + tooltipRect.width > viewportWidth) {
+                left = event.pageX - tooltipRect.width - 10;
+            }
+            
+            if (top < 0) {
+                top = event.pageY + 10;
+            }
+            
+            tooltip.style.left = `${left}px`;
+            tooltip.style.top = `${top}px`;
+        }
+        
+        function hideTooltip() {
+            if (tooltip) {
+                tooltip.classList.remove('show');
+            }
+        }
+        
+        // Hide tooltip when scrolling
+        document.addEventListener('scroll', hideTooltip);
         
         console.log('Rendering calendar...');
         calendar.render();
@@ -754,7 +974,7 @@ document.getElementById('weekSlotGenerationForm').addEventListener('submit', fun
     if (selectedDays.length === 0) {
         alert('Please select at least one day of the week.');
         return;
-    }
+    } 
     
     if (!formData.get('selected_date')) {
         alert('Please select a date for the week.');

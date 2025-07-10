@@ -16,7 +16,7 @@
                     <p>Reg. No: {{ doctor.license_number }}</p> {# Assuming doctor model has license_number #}
                 </div>
                 <div class="text-right">
-                    <h2 class="text-xl text-blue-600">{{ doctor.clinic.name }}</h2>
+                    <h2 class="text-xl text-blue-600">{{ doctor.clinic.name }}</h2> 
                     <p>{{ doctor.clinic.address }}</p>
                     <p>Ph: {{ doctor.clinic.phone_number }}</p>
                 </div>
@@ -102,8 +102,14 @@
                 <div class="medicine-search mb-4">
                     <label for="drug-search" class="block text-sm font-medium text-gray-700 mb-1">Search & Add Medicine</label>
                     <div class="relative">
-                        <input type="text" id="drug-search" placeholder="Search medicines by name or salt..." class="form-input w-full">
+                        <input type="text" id="drug-search" placeholder="Search medicines by name or salt... (or type any medicine name to add)" class="form-input w-full">
                         <ul id="suggestions-list" class="absolute w-full max-h-60 overflow-y-auto list-none p-0 m-0 border border-t-0 border-gray-300 bg-white shadow-lg z-10 hidden"></ul>
+                        <div id="add-custom-medicine" class="absolute w-full mt-1 p-2 bg-blue-50 border border-blue-200 rounded-md hidden">
+                            <p class="text-sm text-blue-700 mb-2">Medicine not found? Add it directly:</p>
+                            <button type="button" id="add-custom-btn" class="w-full text-left px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                                Add "<span id="custom-medicine-name"></span>" to prescription
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -176,9 +182,10 @@
                             </select>
                         </div>
                          <div>
-                            <label for="add-lab-select" class="block text-sm font-medium text-gray-700">Select Lab</label>
+                            <label for="add-lab-select" class="block text-sm font-medium text-gray-700">Select Lab (Optional)</label>
                              <select id="add-lab-select" class="form-select w-full mt-1">
-                                <option value="">--- Select Lab ---</option>
+                                <option value="">--- Select Lab (Optional) ---</option>
+                                <option value="external">External Lab (Not Associated)</option>
                                 {# Options populated by JS #}
                             </select>
                         </div>
@@ -187,9 +194,14 @@
                              <textarea id="add-test-description" rows="1" class="form-textarea w-full mt-1"></textarea>
                          </div>
                     </div>
-                     <button type="button" id="add-lab-test-btn" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        Add Test to List
-                    </button>
+                     <div class="flex space-x-2">
+                         <button type="button" id="add-lab-test-btn" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            Add Test to List
+                         </button>
+                         <button type="button" id="add-external-test-btn" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            Add as External Test
+                         </button>
+                     </div>
                 </div>
                
                 <div class="mt-4">
@@ -255,6 +267,16 @@
                      {% if prescription_form.follow_up_date.errors %}
                         <p class="text-red-500 text-xs mt-1">{{ prescription_form.follow_up_date.errors|first }}</p>
                     {% endif %}
+                    
+                    <!-- Follow-up Time Slot Selection -->
+                    <div id="followup-time-selection" class="mt-2 hidden">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Select Time Slot</label>
+                        <div id="followup-time-slots" class="grid grid-cols-4 gap-2">
+                            <!-- Time slots will be populated by JavaScript -->
+                        </div>
+                        <p class="text-sm text-gray-500 mt-1">Select a time slot for the follow-up appointment</p>
+                        <input type="hidden" id="selected-followup-time" name="selected_followup_time" value="">
+                    </div>
                 </div>
             </div>
 
@@ -285,11 +307,17 @@ const itemFormTemplate = document.getElementById('item-form-template');
 const itemFormsetPrefix = '{{ item_formset.prefix }}'; // e.g., 'items'
 const noMedicinesMessage = document.getElementById('no-medicines-message');
 
+// Custom medicine elements
+const addCustomMedicine = document.getElementById('add-custom-medicine');
+const addCustomBtn = document.getElementById('add-custom-btn');
+const customMedicineName = document.getElementById('custom-medicine-name');
+
 const addTestNameInput = document.getElementById('add-test-name');
 const addCollectionTypeSelect = document.getElementById('add-collection-type');
 const addLabSelect = document.getElementById('add-lab-select');
 const addTestDescriptionTextarea = document.getElementById('add-test-description');
 const addLabTestButton = document.getElementById('add-lab-test-btn');
+const addExternalTestButton = document.getElementById('add-external-test-btn');
 const labTestsTbody = document.getElementById('lab-tests-tbody');
 const labFormTemplate = document.getElementById('lab-form-template');
 const labFormsetPrefix = '{{ lab_formset.prefix }}'; // e.g., 'labs'
@@ -316,6 +344,7 @@ drugSearchInput.addEventListener('input', debounce(async (e) => {
     if (query.length < 2) {
         suggestionsList.innerHTML = '';
         suggestionsList.classList.add('hidden');
+        addCustomMedicine.classList.add('hidden');
         return;
     }
 
@@ -325,26 +354,38 @@ drugSearchInput.addEventListener('input', debounce(async (e) => {
         if (!response.ok) throw new Error('Network response was not ok');
         const suggestions = await response.json();
         
-        suggestionsList.innerHTML = suggestions.map(drug => `
-            <li class="px-4 py-2 cursor-pointer hover:bg-gray-100" 
-                onclick="addMedicineToPrescription('${drug.product_name.replace(/'/g, "\'")}')"> 
-                <strong>${drug.product_name}</strong>
-                ${drug.salt_composition ? `<br><small class="text-gray-600">${drug.salt_composition}</small>` : ''}
-                ${drug.product_manufactured ? `<br><small class="text-gray-500">Mfr: ${drug.product_manufactured}</small>` : ''}
-            </li>
-        `).join('');
-        suggestionsList.classList.remove('hidden');
+        if (suggestions && suggestions.length > 0) {
+            suggestionsList.innerHTML = suggestions.map(drug => `
+                <li class="px-4 py-2 cursor-pointer hover:bg-gray-100" 
+                    onclick="addMedicineToPrescription('${drug.product_name.replace(/'/g, "\'")}')"> 
+                    <strong>${drug.product_name}</strong>
+                    ${drug.salt_composition ? `<br><small class="text-gray-600">${drug.salt_composition}</small>` : ''}
+                    ${drug.product_manufactured ? `<br><small class="text-gray-500">Mfr: ${drug.product_manufactured}</small>` : ''}
+                </li>
+            `).join('');
+            suggestionsList.classList.remove('hidden');
+            addCustomMedicine.classList.add('hidden');
+        } else {
+            // No suggestions found, show custom medicine option
+            suggestionsList.classList.add('hidden');
+            if (customMedicineName) {
+                customMedicineName.textContent = query;
+            }
+            addCustomMedicine.classList.remove('hidden');
+        }
     } catch (error) {
         console.error('Error fetching suggestions:', error);
         suggestionsList.innerHTML = '<li class="px-4 py-2 text-red-500">Error loading suggestions.</li>';
         suggestionsList.classList.remove('hidden');
+        addCustomMedicine.classList.add('hidden');
     }
 }, 300));
 
 // Hide suggestions when clicking outside
 document.addEventListener('click', function(event) {
-    if (!drugSearchInput.contains(event.target) && !suggestionsList.contains(event.target)) {
+    if (!drugSearchInput.contains(event.target) && !suggestionsList.contains(event.target) && !addCustomMedicine.contains(event.target)) {
         suggestionsList.classList.add('hidden');
+        addCustomMedicine.classList.add('hidden');
     }
 });
 
@@ -407,11 +448,24 @@ function addMedicineToPrescription(productName) {
     suggestionsList.classList.add('hidden');
 }
 
+// --- Custom Medicine Handling ---
+
+// Add custom medicine button handler
+if (addCustomBtn) {
+    addCustomBtn.addEventListener('click', function() {
+        const medicineName = drugSearchInput.value.trim();
+        if (medicineName) {
+            addMedicineToPrescription(medicineName);
+        }
+    });
+}
+
 // --- Lab Test Handling ---
 
 // Populate Lab Select Dropdown
 function populateLabSelect() {
-    addLabSelect.innerHTML = '<option value="">--- Select Lab ---</option>'; // Reset
+    addLabSelect.innerHTML = '<option value="">--- Select Lab (Optional) ---</option>'; // Reset
+    addLabSelect.innerHTML += '<option value="external">External Lab (Not Associated)</option>';
     availableLabs.forEach(lab => {
         const option = document.createElement('option');
         // Store combined type-id in the value
@@ -427,7 +481,7 @@ if (addLabTestButton) {
         const testName = addTestNameInput.value.trim();
         const collectionType = addCollectionTypeSelect.value;
         const description = addTestDescriptionTextarea.value.trim();
-        const selectedLabValue = addLabSelect.value; // e.g., "internal-5"
+        const selectedLabValue = addLabSelect.value; // e.g., "internal-5" or "external"
         const selectedLabOption = addLabSelect.options[addLabSelect.selectedIndex];
         const selectedLabName = selectedLabOption ? selectedLabOption.textContent : 'N/A';
 
@@ -436,10 +490,23 @@ if (addLabTestButton) {
             addTestNameInput.focus();
             return;
         }
-        if (!selectedLabValue) {
-            alert('Please select a lab.');
-            addLabSelect.focus();
-            return;
+
+        // Check if lab is selected and show warning for unavailable tests
+        if (selectedLabValue && selectedLabValue !== 'external') {
+            // Check if test is available at selected lab (you can implement this check)
+            const isTestAvailable = checkTestAvailability(testName, selectedLabValue);
+            if (!isTestAvailable) {
+                const shouldContinue = confirm(
+                    `The test "${testName}" may not be available at the selected lab.\n\n` +
+                    `Would you like to:\n` +
+                    `1. Continue adding this test (patient may need to visit external lab)\n` +
+                    `2. Cancel and select a different lab\n\n` +
+                    `Note: Patient can get this test done at any external lab not associated with the clinic.`
+                );
+                if (!shouldContinue) {
+                    return;
+                }
+            }
         }
 
         const totalFormsInput = document.getElementById(`id_${labFormsetPrefix}-TOTAL_FORMS`);
@@ -520,6 +587,123 @@ if (addLabTestButton) {
         addLabSelect.value = '';
         // addCollectionTypeSelect.value = ''; // Reset if needed
     });
+}
+
+// Add External Test Form to Formset
+if (addExternalTestButton) {
+    addExternalTestButton.addEventListener('click', function() {
+        const testName = addTestNameInput.value.trim();
+        const collectionType = addCollectionTypeSelect.value;
+        const description = addTestDescriptionTextarea.value.trim();
+
+        if (!testName) {
+            alert('Please enter a test name.');
+            addTestNameInput.focus();
+            return;
+        }
+
+        // Show confirmation for external test
+        const shouldAddExternal = confirm(
+            `Add "${testName}" as an external test?\n\n` +
+            `This test will be marked for external lab processing.\n` +
+            `Patient will need to visit an external lab not associated with the clinic.`
+        );
+
+        if (!shouldAddExternal) {
+            return;
+        }
+
+        const totalFormsInput = document.getElementById(`id_${labFormsetPrefix}-TOTAL_FORMS`);
+        if (!totalFormsInput) {
+            console.error("Management form TOTAL_FORMS input not found for labs!");
+            return;
+        }
+        const currentTotalForms = parseInt(totalFormsInput.value, 10);
+        const newFormIndex = currentTotalForms;
+
+        // Clone the template row
+        const templateRow = document.getElementById('lab-form-template');
+        if (!templateRow) {
+            console.error("Lab form template TR not found!");
+            return;
+        }
+        const newRow = templateRow.cloneNode(true);
+        newRow.id = `lab-${newFormIndex}`;
+        newRow.classList.remove('hidden');
+        
+        // Update IDs and names in the cloned row
+        newRow.innerHTML = newRow.innerHTML.replace(/__prefix__/g, newFormIndex);
+
+        // Find and populate fields within the new row
+        const testNameInput = newRow.querySelector(`input[id^="id_${labFormsetPrefix}-"][id$="-test_name"]`);
+        const labIdInput = newRow.querySelector(`input[id^="id_${labFormsetPrefix}-"][id$="-lab_id"]`);
+        const collectionTypeSelect = newRow.querySelector(`select[id^="id_${labFormsetPrefix}-"][id$="-collection_type"]`);
+        const descriptionTextarea = newRow.querySelector(`textarea[id^="id_${labFormsetPrefix}-"][id$="-description"]`);
+        
+        // Find display cells
+        const testNameDisplay = newRow.querySelector('.form-display-test-name');
+        const labNameDisplay = newRow.querySelector('.form-display-lab-name');
+        
+        // Populate hidden inputs
+        if (testNameInput) {
+             testNameInput.value = testName;
+             testNameInput.name = `${labFormsetPrefix}-${newFormIndex}-test_name`;
+        } else console.warn('Lab test_name input not found');
+        if (labIdInput) {
+             labIdInput.value = 'external';
+             labIdInput.name = `${labFormsetPrefix}-${newFormIndex}-lab_id`;
+        } else console.warn('Lab lab_id input not found');
+        
+        // Set visible select/textarea values
+        if (collectionTypeSelect) {
+            collectionTypeSelect.value = collectionType;
+            collectionTypeSelect.name = `${labFormsetPrefix}-${newFormIndex}-collection_type`;
+        } else console.warn('Lab collection_type select not found');
+        if (descriptionTextarea) {
+            descriptionTextarea.value = description;
+            descriptionTextarea.name = `${labFormsetPrefix}-${newFormIndex}-description`;
+        } else console.warn('Lab description textarea not found');
+
+        // Populate display cells 
+        if(testNameDisplay) testNameDisplay.textContent = testName;
+        if(labNameDisplay) labNameDisplay.textContent = 'External Lab (Not Associated)';
+       
+        // Add remove button listener
+        const removeButton = newRow.querySelector('.remove-lab-btn');
+        if (removeButton) {
+             removeButton.addEventListener('click', function() {
+                 removeFormsetForm(this, labFormsetPrefix);
+            });
+        } else console.warn('Remove button not found in lab row');
+
+        // Append the populated row to the table body
+        labTestsTbody.appendChild(newRow);
+
+        // Update TOTAL_FORMS
+        totalFormsInput.value = currentTotalForms + 1;
+
+        // Hide "No labs added" message
+         noLabsMessage.classList.add('hidden');
+
+        // Clear the add form
+        addTestNameInput.value = '';
+        addTestDescriptionTextarea.value = '';
+        addLabSelect.value = '';
+    });
+}
+
+// Check test availability at selected lab
+function checkTestAvailability(testName, labValue) {
+    // This is a placeholder function - you can implement actual test availability checking
+    // For now, we'll assume tests are available to avoid blocking the flow
+    // You can integrate with your backend API to check actual test availability
+    
+    // Example implementation:
+    // const labId = labValue.split('-')[1]; // Extract lab ID from "type-id" format
+    // Make API call to check if test is available at this lab
+    // return true/false based on API response
+    
+    return true; // Placeholder - always return true for now
 }
 
 // --- General Formset Handling ---
@@ -629,6 +813,68 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 500)); // 500ms debounce
     }
 
+    // --- Follow-up Appointment Handling ---
+    const followupDateInput = document.getElementById('{{ prescription_form.follow_up_date.id_for_label }}');
+    const followupTimeSelection = document.getElementById('followup-time-selection');
+    const followupTimeSlots = document.getElementById('followup-time-slots');
+    const selectedFollowupTimeInput = document.getElementById('selected-followup-time');
+    let selectedFollowupTime = null;
+
+    if (followupDateInput) {
+        followupDateInput.addEventListener('change', async function() {
+            const selectedDate = this.value;
+            if (selectedDate) {
+                // Show time slot selection
+                followupTimeSelection.classList.remove('hidden');
+                followupTimeSlots.innerHTML = '<p class="text-gray-500">Loading available slots...</p>';
+                
+                try {
+                    // Fetch available slots for the selected date
+                    const response = await fetch(`/users/api/available-slots/doctor/{{ doctor.id }}/${selectedDate}/`);
+                    const data = await response.json();
+                    
+                    if (data.slots && data.slots.length > 0) {
+                        followupTimeSlots.innerHTML = data.slots.map(slot => `
+                            <button type="button" 
+                                    class="time-slot-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm transition-colors"
+                                    data-time="${slot.time}">
+                                ${slot.time}
+                            </button>
+                        `).join('');
+                        
+                        // Add click handlers to time slot buttons
+                        followupTimeSlots.querySelectorAll('.time-slot-btn').forEach(btn => {
+                            btn.addEventListener('click', function() {
+                                // Remove selection from all buttons
+                                followupTimeSlots.querySelectorAll('.time-slot-btn').forEach(b => {
+                                    b.classList.remove('bg-green-500', 'hover:bg-green-600');
+                                    b.classList.add('bg-blue-500', 'hover:bg-blue-600');
+                                });
+                                
+                                // Select this button
+                                this.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                                this.classList.add('bg-green-500', 'hover:bg-green-600');
+                                
+                                selectedFollowupTime = this.dataset.time;
+                                selectedFollowupTimeInput.value = selectedFollowupTime;
+                            });
+                        });
+                    } else {
+                        followupTimeSlots.innerHTML = '<p class="text-red-500">No available slots for this date. Please select a different date.</p>';
+                    }
+                } catch (error) {
+                    console.error('Error fetching follow-up slots:', error);
+                    followupTimeSlots.innerHTML = '<p class="text-red-500">Error loading available slots.</p>';
+                }
+            } else {
+                // Hide time slot selection if no date selected
+                followupTimeSelection.classList.add('hidden');
+                selectedFollowupTime = null;
+                selectedFollowupTimeInput.value = '';
+            }
+        });
+    }
+
 });
 
 </script>
@@ -673,6 +919,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
      #prescription-medicines-tbody input[type="number"] {
         max-width: 80px;
+    }
+
+    /* Custom Medicine Option Styles */
+    #add-custom-medicine {
+        z-index: 20;
+    }
+    
+    #add-custom-btn:hover {
+        background-color: #1d4ed8;
     }
 
 </style>

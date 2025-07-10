@@ -1,20 +1,24 @@
 from pathlib import Path
 import os
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env file
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "REMOVED"
+SECRET_KEY = os.getenv('SECRET_KEY', "django-insecure-m*t^t0-&@p!zyb5=9g6!x$z@%tz)8i*e_9o@p!-+4&%k6l=3@h")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
 
 # Application definition
 
@@ -90,22 +94,14 @@ WSGI_APPLICATION = "RxBackend.wsgi.application"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 DATABASES = {
-   'default': {
-       'ENGINE': 'django.db.backends.postgresql',
-       'NAME': 'rxdoctor',
-       'USER': 'postgres',
-       'PASSWORD': 'admin',
-       'HOST': 'localhost',
-       'PORT': '5432',
-   },
-#    'default': {
-#        'ENGINE': 'django.db.backends.postgresql',
-#        'NAME': 'rxdoctor',
-#        'USER': 'REMOVED ',
-#        'PASSWORD': 'REMOVED',
-#        'HOST': 'REMOVED',
-#        'PORT': 'REMOVED',
-#    }
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DB_NAME', 'rxdoctor'),
+        'USER': os.getenv('DB_USER', 'postgres'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'admin'),
+        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'PORT': os.getenv('DB_PORT', '5432'),
+    }
 }
 
 # Add the new PostgreSQL configuration

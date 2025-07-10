@@ -841,14 +841,14 @@ class AppointmentSlot(TimeStampedModel):
     start_time = models.TimeField()
     end_time = models.TimeField()
     is_booked = models.BooleanField(default=False)
-    appointment = models.OneToOneField(
-        'Appointment', 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        related_name='slot'
-    )
-    created_at = models.DateTimeField(default=timezone.now, editable=False)
+    # Remove the appointment foreign key due to data type mismatch
+    # appointment = models.OneToOneField(
+    #     'Appointment', 
+    #     on_delete=models.SET_NULL, 
+    #     null=True, 
+    #     blank=True,
+    #     related_name='slot'
+    # )
 
     class Meta:
         unique_together = ['doctor', 'date', 'start_time']
@@ -865,19 +865,6 @@ class AppointmentSlot(TimeStampedModel):
             raise ValidationError("End time must be after start time")
         if self.date < timezone.now().date():
             raise ValidationError("Cannot create slots for past dates")
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    def __str__(self):
-        return f"Bill #{self.id} - {self.patient.get_full_name()}"
-    
-    def calculate_total(self):
-        """Calculate total bill amount including tax and discount"""
-        self.subtotal = sum(item.total for item in self.items.all())
-        self.tax = self.subtotal * Decimal('0.18')  # 18% tax
-        self.total = self.subtotal + self.tax - self.discount
-        self.save()
 
 class BillItem(models.Model):
     bill = models.ForeignKey(Bill, on_delete=models.CASCADE, related_name='items')

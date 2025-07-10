@@ -1,5 +1,10 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+    TokenVerifyView,
+)
 
 from .views import create_prescription_view
 from .views.drugs_views import drug_suggestions
@@ -157,6 +162,10 @@ app_name = 'users'
 
 # API URLs
 api_urlpatterns = [
+    # JWT Token endpoints
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
     
     path('appointments/', AppointmentView.as_view(), name='appointments_api'),
     path('appointments/list/', AppointmentListView.as_view(), name='appointments_list_api'),
@@ -408,17 +417,20 @@ urlpatterns = [
     path('api/doctor/patients/', api_views.doctor_patients, name='doctor_patients'),
     path('api/doctor/generate-slots/', doctor_views.generate_slots_api, name='generate_slots_api'),
     path('api/doctor/appointments/create/', doctor_views.api_create_appointment, name='api_create_appointment'),
-    path('api/doctor/patients/<int:patient_id>/', doctor_views.api_patient_details, name='api_patient_details'),
-    path('api/doctor/patients/<int:patient_id>/prescriptions/', doctor_views.api_patient_prescriptions, name='api_patient_prescriptions'),
-    path('api/doctor/patients/<int:patient_id>/appointments/', doctor_views.api_patient_appointments, name='api_patient_appointments'),
+
+    
+    path('api/doctor/patient/<int:patient_id>/', doctor_views.api_patient_details, name='api_patient_details'),
+    path('api/doctor/patient/<int:patient_id>/prescriptions/', doctor_views.api_patient_prescriptions, name='api_patient_prescriptions'),
+    path('api/doctor/patient/<int:patient_id>/appointments/', doctor_views.api_patient_appointments, name='api_patient_appointments'),
     path('api/doctor/patients/<int:patient_id>/medical-history/', doctor_views.api_patient_medical_history, name='api_patient_medical_history'),
     path('api/doctor/patient/<int:patient_id>/', doctor_views.get_patient_details, name='get_patient_details'),
+
     path('api/doctor/appointments/<uuid:appointment_id>/', doctor_views.api_appointment_detail, name='api_appointment_detail'),
     path('api/doctor/prescriptions/<int:pk>/api/', prescription_views.prescription_detail_api, name='prescription_detail_api'),
     path('api/doctor/prescriptions/create/', doctor_views.create_prescription_api, name='create_prescription_api'),
     path('api/doctor/create-patient/', doctor_views.create_patient_api, name='create_patient_api'),
     path('api/doctor/profile/', doctor_views.doctor_profile_api, name='doctor_profile_api'),
-    path('api/doctor/available-slots/', doctor_views.get_available_slots_doctor, name='get_available_slots_doctor'),
+    path('api/doctor/available-slots/<int:doctor_id>/<str:date>/', doctor_views.get_available_slots_doctor, name='get_available_slots_doctor'),
     path('api/doctor/day-status/<str:date>/', doctor_views.doctor_day_status, name='doctor_day_status'),
     path('api/doctor/dashboard/calendar-events/', doctor_views.doctor_dashboard_calendar_events, name='doctor_dashboard_calendar_events'),
     path('api/doctor/appointments/list/', doctor_views.doctor_appointments_api, name='doctor_appointments_api'),
@@ -482,6 +494,22 @@ urlpatterns = [
     path('users/patient/<int:patient_id>/', api_views.patient_detail_api, name='patient_detail_api'),
     path('users/patient/<int:patient_id>/records/', api_views.patient_records_api, name='patient_records_api'),
     path('users/doctor/appointments/<uuid:appointment_id>/actions/', api_views.appointment_actions_api, name='appointment_actions_api'),
+    
+    # React Native specific API endpoints
+    path('api/doctor/appointments/list/', doctor_views.doctor_appointments_api, name='rn_doctor_appointments_api'),
+    path('api/doctor/patients/', api_views.doctor_patients_api, name='rn_doctor_patients_api'),
+    path('api/doctor/dashboard/', api_views.doctor_dashboard_api, name='rn_doctor_dashboard_api'),
+    
+    # Additional endpoints for React Native compatibility
+    path('api/doctor/appointments/<uuid:appointment_id>/', doctor_views.api_appointment_detail, name='api_appointment_detail'),
+    path('api/doctor/appointments/<uuid:appointment_id>/update-status/', appointment_views.update_appointment_status_api, name='update_appointment_status_api'),
+    path('api/doctor/prescriptions/patient/<int:patient_id>/', doctor_views.patient_prescriptions_api, name='patient_prescriptions_api'),
+    
+    # Patient-related API endpoints
+    path('api/patient/<int:patient_id>/vitals/', api_views.patient_vitals_api, name='patient_vitals_api'),
+    path('api/patient/<int:patient_id>/records/', api_views.patient_records_api, name='patient_records_api'),
+    path('api/test-results/<int:test_id>/', api_views.test_results_api, name='test_results_api'),
+    #path('api/prescriptions/<int:prescription_id>/', api_views.prescription_detail_api, name='prescription_detail_api'),
 ]
 
 # Register the router URLs

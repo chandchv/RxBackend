@@ -1,6 +1,7 @@
 import json
 import logging
 from typing import Optional, Dict, Any, Tuple, List
+from datetime import datetime
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -14,13 +15,14 @@ from django.core.exceptions import ValidationError, ObjectDoesNotExist
 
 # Assuming these are your models and forms/formsets
 from ..models import Prescription, Doctor, Patient, PrescriptionItem, PatientVitals, Lab, LabTest, LabTestPrescription
-from labs.models import LabProfile, ExternalLabTestOffering
+from labs.models import LabProfile, ExternalLabTestOffering, TestDefinition
 from users.models import User
 from ..forms import (
     VitalsForm, PrescriptionForm, BasePrescriptionItemFormSet, BaseLabTestFormSet
 )
 # Assuming you have a notification utility function
 from notifications.utils import User, create_notification # Adjust import path
+from users.models import Appointment, AppointmentSlot # Added for follow-up appointment
 
 # --- Constants ---
 VITALS_FORM_PREFIX = 'vitals'
@@ -119,26 +121,30 @@ def _process_and_save_lab_tests(
                  continue # Skip this form if essential data is missing
 
             # --- Parse Lab ID ---
-            try:
-                # Handle potential duplicate prefixes
-                parts = combined_lab_id.split('-')
-                if len(parts) >= 2:
-                    lab_type = parts[0]  # Take first part as type
-                    lab_pk_str = parts[-1]  # Take last part as ID
-                    if lab_type not in [LAB_TYPE_INTERNAL, LAB_TYPE_EXTERNAL]:
-                        raise ValueError(f"Invalid lab type '{lab_type}'")
-                    lab_pk = int(lab_pk_str)
-                else:
-                    raise ValueError(f"Invalid lab identifier format: {combined_lab_id}")
-            except (ValueError, TypeError) as e:
-                msg = f"Invalid lab identifier format ('{combined_lab_id}') for test '{test_name}'. Please re-select the lab."
-                messages.error(request, msg)
-                logger.error(f"{msg} Error: {e}")
-                raise ValueError("Invalid lab identifier format.") from e # Critical error, rollback
+            lab_type = None
+            lab_pk = None
+            
+            if combined_lab_id and combined_lab_id != 'external':
+                try:
+                    # Handle potential duplicate prefixes
+                    parts = combined_lab_id.split('-')
+                    if len(parts) >= 2:
+                        lab_type = parts[0]  # Take first part as type
+                        lab_pk_str = parts[-1]  # Take last part as ID
+                        if lab_type not in [LAB_TYPE_INTERNAL, LAB_TYPE_EXTERNAL]:
+                            raise ValueError(f"Invalid lab type '{lab_type}'")
+                        lab_pk = int(lab_pk_str)
+                    else:
+                        raise ValueError(f"Invalid lab identifier format: {combined_lab_id}")
+                except (ValueError, TypeError) as e:
+                    msg = f"Invalid lab identifier format ('{combined_lab_id}') for test '{test_name}'. Please re-select the lab."
+                    messages.error(request, msg)
+                    logger.error(f"{msg} Error: {e}")
+                    raise ValueError("Invalid lab identifier format.") from e # Critical error, rollback
 
             # --- Get Lab and Test Definition ---
             test_definition = None
-            lab_display_name = "Unknown Lab"
+            lab_display_name = "External Lab (Not Associated)"
             lab_obj_for_notification = None # Store the Lab or LabProfile object
 
             try:
@@ -148,7 +154,9 @@ def _process_and_save_lab_tests(
                     lab_obj_for_notification = lab
                     test_definition = lab.test_definitions.filter(name=test_name).first()
                     if not test_definition:
-                        raise ObjectDoesNotExist(f"Internal Lab '{lab.name}' (ID: {lab_pk}) does not offer test: '{test_name}'.")
+                        # Instead of raising an error, create a generic test definition
+                        test_definition, created = TestDefinition.objects.get_or_create(name=test_name)
+                        logger.warning(f"Test '{test_name}' not found in internal lab '{lab.name}'. Created generic test definition.")
 
                 elif lab_type == LAB_TYPE_EXTERNAL:
                     lab_profile = get_object_or_404(LabProfile, pk=lab_pk, is_approved=True)
@@ -161,11 +169,23 @@ def _process_and_save_lab_tests(
                         is_active=True
                     ).first()
                     if not test_offering:
-                        raise ObjectDoesNotExist(f"External Lab '{lab_profile.name}' (ID: {lab_pk}) does not offer test: '{test_name}' or offering is inactive.")
-                    test_definition = test_offering.test
+                        # Instead of raising an error, create a generic test definition
+                        test_definition, created = TestDefinition.objects.get_or_create(name=test_name)
+                        logger.warning(f"Test '{test_name}' not found in external lab '{lab_profile.name}'. Created generic test definition.")
+                    else:
+                        test_definition = test_offering.test
                     # Mark the external lab to be set on the prescription later
                     # (handle multiple different external labs if necessary - current logic uses last one)
                     external_lab_profile_to_set = lab_profile
+                
+                else:
+                    # No specific lab selected or external lab option chosen
+                    # Create or get a generic test definition
+                    test_definition, created = TestDefinition.objects.get_or_create(name=test_name)
+                    if created:
+                        logger.info(f"Created new test definition for '{test_name}' (no specific lab selected)")
+                    else:
+                        logger.info(f"Using existing test definition for '{test_name}' (no specific lab selected)")
 
                 # --- Create LabTest Object ---
                 lab_test = LabTest.objects.create(
@@ -264,7 +284,7 @@ def _send_notifications(
             try:
                 # Get clinic staff to notify - using the correct model relationships
                 clinic_recipients = User.objects.filter(
-                    labstaff__clinic=doctor.clinic,
+                    labstaff__lab__clinic=doctor.clinic,
                     groups__name='lab'
                 ).distinct()
 
@@ -292,6 +312,98 @@ def _send_notifications(
             except Exception as e:
                 logger.error(f"Error finding lab staff for clinic {doctor.clinic.id}: {e}", exc_info=True)
                 messages.warning(request, "Failed to find lab staff to notify.")
+
+def _create_followup_appointment(prescription: Prescription, doctor: Doctor, patient: Patient, request, selected_time: str = None) -> Optional[Appointment]:
+    """
+    Creates a follow-up appointment based on the prescription's follow-up date.
+    Returns the created appointment or None if creation fails.
+    """
+    if not prescription.follow_up_date:
+        return None
+    
+    try:
+        appointment_time = None
+        available_slots = None
+        
+        if selected_time:
+            # Use the selected time if provided
+            try:
+                appointment_time = datetime.strptime(selected_time, '%H:%M').time()
+                # Check if the selected time slot is available
+                available_slots = AppointmentSlot.objects.filter(
+                    doctor=doctor,
+                    date=prescription.follow_up_date,
+                    start_time=appointment_time,
+                    is_booked=False
+                ).first()
+                
+                if not available_slots:
+                    logger.warning(f"Selected time slot {selected_time} is not available for follow-up date {prescription.follow_up_date}. Will try to find another slot.")
+                    appointment_time = None
+            except ValueError:
+                logger.error(f"Invalid time format: {selected_time}")
+                appointment_time = None
+        
+        if not appointment_time:
+            # Get first available slot for the follow-up date
+            available_slots = AppointmentSlot.objects.filter(
+                doctor=doctor,
+                date=prescription.follow_up_date,
+                is_booked=False
+            ).order_by('start_time').first()
+            
+            if not available_slots:
+                # If no slots available, create a default appointment time (9 AM)
+                appointment_time = datetime.strptime('09:00', '%H:%M').time()
+                logger.warning(f"No available slots found for follow-up date {prescription.follow_up_date}. Using default time 9:00 AM.")
+            else:
+                appointment_time = available_slots.start_time
+        
+        # Create the follow-up appointment
+        try:
+            appointment = Appointment.objects.create(
+                patient=patient,
+                doctor=doctor,
+                appointment_date=prescription.follow_up_date,
+                appointment_time=appointment_time,
+                reason=f"Follow-up appointment for prescription #{prescription.id}",
+                status='scheduled',
+                is_telemedicine=False,
+                is_emergency=False,
+                is_walk_in=False
+            )
+        except Exception as e:
+            logger.error(f"Error creating appointment object: {e}", exc_info=True)
+            raise
+        
+        # Mark the slot as booked if we used an existing slot
+        if available_slots:
+            available_slots.is_booked = True
+            available_slots.save()
+            logger.info(f"Marked slot {available_slots.id} as booked for appointment {appointment.id}")
+        
+        logger.info(f"Created follow-up appointment {appointment.id} for prescription {prescription.id} at {appointment_time}")
+        
+        # Send notification to patient about the follow-up appointment
+        if patient.user:
+            try:
+                create_notification(
+                    recipient=patient.user,
+                    message=f"Follow-up appointment scheduled for {prescription.follow_up_date.strftime('%B %d, %Y')} at {appointment_time.strftime('%I:%M %p')}",
+                    sender=request.user,
+                    notification_type='appointment_scheduled',
+                    related_object=appointment,
+                    action_url=reverse('users:appointment_detail', kwargs={'pk': appointment.id})
+                )
+                logger.info(f"Sent follow-up appointment notification to patient {patient.id}")
+            except Exception as e:
+                logger.error(f"Error sending follow-up appointment notification: {e}", exc_info=True)
+        
+        return appointment
+        
+    except Exception as e:
+        logger.error(f"Error creating follow-up appointment for prescription {prescription.id}: {e}", exc_info=True)
+        return None
 
 # --- Main View ---
 
@@ -348,6 +460,17 @@ def create_prescription(request, patient_id):
                 lab_prescription, processed_labs_info = _process_and_save_lab_tests(
                     lab_formset, patient, doctor, request
                 )
+
+                # --- Create Follow-up Appointment (if follow-up date is set) ---
+                followup_appointment = None
+                if prescription.follow_up_date:
+                    # Get selected time from request
+                    selected_time = request.POST.get('selected_followup_time')
+                    followup_appointment = _create_followup_appointment(prescription, doctor, patient, request, selected_time)
+                    if followup_appointment:
+                        messages.success(request, f'Follow-up appointment scheduled for {prescription.follow_up_date.strftime("%B %d, %Y")} at {followup_appointment.appointment_time.strftime("%I:%M %p")}.')
+                    else:
+                        messages.warning(request, 'Prescription saved, but failed to schedule follow-up appointment. Please schedule it manually.')
 
                 # --- Send Notifications (After successful save) ---
                 # This runs outside the main saving logic failure path, but inside the transaction
