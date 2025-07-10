@@ -26,13 +26,16 @@ sys.path.append(os.path.join(BASE_DIR, 'users', 'scripts'))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
+# Load environment variables from .env file
+load_dotenv()
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "REMOVED"
+SECRET_KEY = os.getenv('SECRET_KEY', "django-insecure-k8vyukz!b&*so)!y^-(q7_p^3@z98cs598n40+2$iirmreujg5")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
 
 
 # Application definition
@@ -121,11 +124,11 @@ DATABASES = {
     #}
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'rxdoctor',
-        'USER': 'REMOVED ',
-        'PASSWORD': 'REMOVED',
-        'HOST': 'REMOVED',
-        'PORT': 'REMOVED',
+        'NAME': os.getenv('DB_NAME', 'rxdoctor'),
+        'USER': os.getenv('DB_USER', 'avnadmin'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'AVNS_j2JJoOD4YoWw-aIRhpW'),
+        'HOST': os.getenv('DB_HOST', 'pg-f3d30b1-rxdoctor.g.aivencloud.com'),
+        'PORT': os.getenv('DB_PORT', '15132'),
     }
 }
 
@@ -255,16 +258,14 @@ CSRF_TRUSTED_ORIGINS = [
     "http://192.168.56.1:19006",
     "http://192.168.56.1:8000",
 ]
-load_dotenv()
-
 FIREBASE_CONFIG = {
-    "apiKey": "REMOVED",
-    "authDomain": "REMOVED",
-    "projectId": "REMOVED",
-    "storageBucket": "REMOVED.firebasestorage.app",
-    "messagingSenderId": "REMOVED",
-    "appId": "1:REMOVED:web:dce2f4264333d6bd5cb21a",
-    "measurementId": "REMOVED"
+    "apiKey": os.getenv('FIREBASE_API_KEY', "AIzaSyCGnoREZ7l7AYrELWhwKIN7stp9qKoBI4M"),
+    "authDomain": os.getenv('FIREBASE_AUTH_DOMAIN', "rxdoctor-d25c3.firebaseapp.com"),
+    "projectId": os.getenv('FIREBASE_PROJECT_ID', "rxdoctor-d25c3"),
+    "storageBucket": os.getenv('FIREBASE_STORAGE_BUCKET', "rxdoctor-d25c3.firebasestorage.app"),
+    "messagingSenderId": os.getenv('FIREBASE_MESSAGING_SENDER_ID', "708530042351"),
+    "appId": os.getenv('FIREBASE_APP_ID', "1:708530042351:web:dce2f4264333d6bd5cb21a"),
+    "measurementId": os.getenv('FIREBASE_MEASUREMENT_ID', "G-N03MD3X36N")
 }
 
 # Add authentication backends
@@ -274,8 +275,8 @@ AUTHENTICATION_BACKENDS = (
 )
 
 # Add social auth settings
-SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = 'your-google-oauth2-key'
-SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = 'your-google-oauth2-secret'
+SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv('GOOGLE_OAUTH2_KEY', 'your-google-oauth2-key')
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv('GOOGLE_OAUTH2_SECRET', 'your-google-oauth2-secret')
 
 # Add your domain to allowed hosts
 ALLOWED_HOSTS = ['*', 'localhost', '127.0.0.1', '192.168.29.57']
