@@ -279,5 +279,6 @@ SOCIALACCOUNT_PROVIDERS = {
 
 # Firebase Authentication
 FIREBASE_AUTH = {
-    'SERVICE_ACCOUNT_KEY_FILE': os.path.join(BASE_DIR, 'firebase-service-account.json'),
+    'SERVICE_ACCOUNT_KEY_FILE': os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY_FILE', 
+                                        os.path.join(BASE_DIR, 'firebase-service-account.json')),
 }
