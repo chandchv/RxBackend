@@ -23,17 +23,42 @@
             </ul>
             <a href="{% url 'labs:download_template' %}" 
                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
-                Download Template CSV
+                📥 Download Template CSV
             </a>
         </div>
 
-        <form method="POST" enctype="multipart/form-data" class="space-y-6">
+        <!-- Loading overlay -->
+        <div id="loadingOverlay" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="mt-3 text-center">
+                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
+                        <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mt-4">Processing Upload</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p class="text-sm text-gray-500" id="progressText">
+                            Please wait while we process your CSV file...
+                        </p>
+                        <div class="mt-4">
+                            <div class="bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-600 h-2 rounded-full animate-pulse" style="width: 100%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <form method="POST" enctype="multipart/form-data" class="space-y-6" id="uploadForm">
             {% csrf_token %}
             
             <div>
                 <label class="block text-sm font-medium text-gray-700">CSV File</label>
                 <div class="mt-1 flex items-center">
-                    <input type="file" name="csv_file" accept=".csv" required
+                    <input type="file" name="csv_file" id="csvFile" accept=".csv" required
                            class="block w-full text-sm text-gray-500
                                   file:mr-4 file:py-2 file:px-4
                                   file:rounded-md file:border-0
@@ -41,15 +66,92 @@
                                   file:bg-blue-50 file:text-blue-700
                                   hover:file:bg-blue-100">
                 </div>
+                <p class="mt-2 text-sm text-gray-500" id="fileInfo"></p>
             </div>
 
-            <div class="flex justify-end">
-                <button type="submit" 
-                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
-                    Upload Tests
+            <div class="flex justify-between items-center">
+                <a href="{% url 'labs:lab_dashboard' %}" 
+                   class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    ← Back to Dashboard
+                </a>
+                <button type="submit" id="uploadBtn"
+                        class="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span id="uploadBtnText">🚀 Upload Tests</span>
+                    <svg id="uploadSpinner" class="hidden animate-spin ml-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
                 </button>
             </div>
         </form>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadForm = document.getElementById('uploadForm');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const uploadBtnText = document.getElementById('uploadBtnText');
+    const uploadSpinner = document.getElementById('uploadSpinner');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const csvFile = document.getElementById('csvFile');
+    const fileInfo = document.getElementById('fileInfo');
+    const progressText = document.getElementById('progressText');
+
+    // File selection handler
+    csvFile.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const size = (file.size / 1024).toFixed(2);
+            fileInfo.textContent = `Selected: ${file.name} (${size} KB)`;
+            fileInfo.className = 'mt-2 text-sm text-green-600';
+        } else {
+            fileInfo.textContent = '';
+        }
+    });
+
+    // Form submission handler
+    uploadForm.addEventListener('submit', function(e) {
+        const file = csvFile.files[0];
+        if (!file) {
+            e.preventDefault();
+            alert('Please select a CSV file to upload.');
+            return;
+        }
+
+        if (!file.name.toLowerCase().endsWith('.csv')) {
+            e.preventDefault();
+            alert('Please select a valid CSV file.');
+            return;
+        }
+
+        // Show loading state
+        uploadBtn.disabled = true;
+        uploadBtnText.textContent = 'Processing...';
+        uploadSpinner.classList.remove('hidden');
+        loadingOverlay.classList.remove('hidden');
+        
+        // Update progress text with file info
+        const size = (file.size / 1024).toFixed(2);
+        progressText.innerHTML = `
+            Processing <strong>${file.name}</strong> (${size} KB)<br>
+            <small class="text-gray-400">This may take a few moments...</small>
+        `;
+
+        // Prevent double submission
+        uploadForm.style.pointerEvents = 'none';
+    });
+
+    // Handle page visibility change (if user switches tabs)
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden && loadingOverlay.classList.contains('hidden') === false) {
+            progressText.innerHTML = `
+                Still processing your upload...<br>
+                <small class="text-gray-400">Please don't close this tab until complete.</small>
+            `;
+        }
+    });
+});
+</script>
+
 {% endblock %} 

@@ -338,7 +338,7 @@ class Prescription(TimeStampedModel):
     follow_up_date = models.DateField(null=True, blank=True)
 
     class Meta:
-        ordering = ['-date']
+        ordering = ['-created_at']
         indexes = [
             models.Index(fields=['patient', 'date']),
             models.Index(fields=['doctor', 'date']),
@@ -346,7 +346,7 @@ class Prescription(TimeStampedModel):
 
     def __str__(self):
         patient_name = self.patient.get_full_name() if self.patient else "Unknown Patient"
-        return f"Prescription for {patient_name} on {self.date.strftime('%Y-%m-%d')}"
+        return f"Prescription for {patient_name} on {self.created_at.strftime('%Y-%m-%d')}"
 
     def clean(self):
         # Compare date parts only
@@ -379,7 +379,7 @@ class PrescriptionItem(TimeStampedModel):
     prescription = models.ForeignKey(
         Prescription, 
         related_name='items', 
-        on_delete=models.CASCADE
+        on_delete=models.CASCADE 
     )
     medicine = models.CharField(max_length=200)
     # Update dosage field to use choices
@@ -769,15 +769,14 @@ class StaffLeave(TimeStampedModel):
 def save_user_profile(sender, instance, created, **kwargs):
     """Create or update user profile when user is saved"""
     try:
-        # Check if profile exists
-        if created:
-            # Only create profile if it doesn't exist and user was just created
-            UserProfile.objects.get_or_create(user=instance)
-        else:
-            # If user exists but profile doesn't, create it
+        # Check if profile already exists
+        if not hasattr(instance, 'userprofile'):
+            # Only create profile if it doesn't exist
             UserProfile.objects.get_or_create(user=instance)
     except Exception as e:
         print(f"Error creating user profile: {str(e)}")
+        # Don't let this error break user creation
+        pass
 
 class BillingItem(models.Model):
     ITEM_TYPES = [
@@ -1094,4 +1093,36 @@ class LabRegistration(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.registration_number})"
+
+class PrescriptionTemplate(models.Model):
+    """Model for storing prescription templates created by doctors"""
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='prescription_templates')
+    name = models.CharField(max_length=200, help_text="Template name for easy identification")
+    data = models.JSONField(help_text="Structured prescription data including medicines, diagnosis, etc.")
+    is_favorite = models.BooleanField(default=False, help_text="Mark as favorite for quick access")
+    usage_count = models.PositiveIntegerField(default=0, help_text="Number of times this template has been used")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-is_favorite', '-usage_count', '-updated_at']
+        unique_together = ['doctor', 'name']
+
+    def __str__(self):
+        return f"{self.doctor.name} - {self.name}"
+
+    def increment_usage(self):
+        """Increment usage count when template is used"""
+        self.usage_count += 1
+        self.save(update_fields=['usage_count'])
+
+    def get_medicines_count(self):
+        """Get number of medicines in template"""
+        medicines = self.data.get('medicines', [])
+        return len(medicines) if isinstance(medicines, list) else 0
+
+    def get_lab_tests_count(self):
+        """Get number of lab tests in template"""
+        lab_tests = self.data.get('lab_tests', [])
+        return len(lab_tests) if isinstance(lab_tests, list) else 0
  

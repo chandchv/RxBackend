@@ -1,0 +1,305 @@
+<div class="space-y-4">
+    <div>
+        <h4 class="font-medium mb-2">Recent Templates</h4>
+        <div id="recent-templates-list" class="space-y-2">
+            <!-- Templates will be loaded here -->
+        </div>
+    </div>
+    
+    <div>
+        <h4 class="font-medium mb-2">Common Templates</h4>
+        <div class="grid grid-cols-1 gap-2">
+            <button onclick="loadCommonTemplate('fever_cold')" 
+                    class="p-3 text-left bg-purple-50 hover:bg-purple-100 rounded border border-purple-200">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <strong class="text-purple-800">Fever & Cold</strong>
+                        <div class="text-xs text-purple-600 mt-1">URTI • Paracetamol, Amoxicillin</div>
+                    </div>
+                    <span class="text-xs bg-purple-200 text-purple-800 px-2 py-1 rounded">2 meds</span>
+                </div>
+            </button>
+            
+            <button onclick="loadCommonTemplate('hypertension')" 
+                    class="p-3 text-left bg-blue-50 hover:bg-blue-100 rounded border border-blue-200">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <strong class="text-blue-800">Hypertension</strong>
+                        <div class="text-xs text-blue-600 mt-1">Essential HTN • Amlodipine, Losartan</div>
+                    </div>
+                    <span class="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded">2 meds</span>
+                </div>
+            </button>
+            
+            <button onclick="loadCommonTemplate('diabetes')" 
+                    class="p-3 text-left bg-green-50 hover:bg-green-100 rounded border border-green-200">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <strong class="text-green-800">Diabetes</strong>
+                        <div class="text-xs text-green-600 mt-1">Type 2 DM • Metformin, Glimepiride</div>
+                    </div>
+                    <span class="text-xs bg-green-200 text-green-800 px-2 py-1 rounded">2 meds</span>
+                </div>
+            </button>
+            
+            <button onclick="loadCommonTemplate('gastritis')" 
+                    class="p-3 text-left bg-orange-50 hover:bg-orange-100 rounded border border-orange-200">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <strong class="text-orange-800">Gastritis</strong>
+                        <div class="text-xs text-orange-600 mt-1">Acid reflux • Omeprazole, Antacids</div>
+                    </div>
+                    <span class="text-xs bg-orange-200 text-orange-800 px-2 py-1 rounded">2 meds</span>
+                </div>
+            </button>
+            
+            <button onclick="loadCommonTemplate('pain_management')" 
+                    class="p-3 text-left bg-red-50 hover:bg-red-100 rounded border border-red-200">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <strong class="text-red-800">Pain Management</strong>
+                        <div class="text-xs text-red-600 mt-1">Chronic pain • Ibuprofen, Paracetamol</div>
+                    </div>
+                    <span class="text-xs bg-red-200 text-red-800 px-2 py-1 rounded">2 meds</span>
+                </div>
+            </button>
+        </div>
+    </div>
+    
+    <div>
+        <h4 class="font-medium mb-2">Save Current as Template</h4>
+        <div class="flex space-x-2">
+            <input type="text" id="template-name" 
+                   class="flex-1 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="Template name (e.g., My Fever Rx)">
+            <button onclick="saveCurrentAsTemplate()" 
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Save
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Common template definitions
+const commonTemplates = {
+    fever_cold: {
+        name: 'Fever & Cold',
+        diagnosis: 'Upper Respiratory Tract Infection',
+        medicines: [
+            { name: 'Paracetamol', dosage: '500mg', frequency: 'Every 6 hours', duration: '5 days' },
+            { name: 'Amoxicillin', dosage: '500mg', frequency: 'Three times daily', duration: '7 days' }
+        ],
+        advice: 'Rest well, drink plenty of fluids, avoid cold foods'
+    },
+    hypertension: {
+        name: 'Hypertension',
+        diagnosis: 'Essential Hypertension',
+        medicines: [
+            { name: 'Amlodipine', dosage: '5mg', frequency: 'Once daily', duration: 'Lifetime' },
+            { name: 'Losartan', dosage: '50mg', frequency: 'Once daily', duration: 'Lifetime' }
+        ],
+        advice: 'Low salt diet, regular exercise, monitor BP daily'
+    },
+    diabetes: {
+        name: 'Diabetes',
+        diagnosis: 'Type 2 Diabetes Mellitus',
+        medicines: [
+            { name: 'Metformin', dosage: '500mg', frequency: 'Twice daily', duration: 'Lifetime' },
+            { name: 'Glimepiride', dosage: '1mg', frequency: 'Once daily', duration: 'Lifetime' }
+        ],
+        advice: 'Low carb diet, regular exercise, monitor blood sugar'
+    },
+    gastritis: {
+        name: 'Gastritis',
+        diagnosis: 'Acid Peptic Disease',
+        medicines: [
+            { name: 'Omeprazole', dosage: '20mg', frequency: 'Once daily', duration: '4 weeks' },
+            { name: 'Antacids', dosage: 'As needed', frequency: 'After meals', duration: '2 weeks' }
+        ],
+        advice: 'Avoid spicy foods, eat small frequent meals, no smoking'
+    },
+    pain_management: {
+        name: 'Pain Management',
+        diagnosis: 'Chronic Pain Syndrome',
+        medicines: [
+            { name: 'Ibuprofen', dosage: '400mg', frequency: 'Every 8 hours', duration: '7 days' },
+            { name: 'Paracetamol', dosage: '500mg', frequency: 'Every 6 hours', duration: '7 days' }
+        ],
+        advice: 'Rest the affected area, apply ice/heat as needed'
+    }
+};
+
+function loadCommonTemplate(templateKey) {
+    const template = commonTemplates[templateKey];
+    if (!template) return;
+    
+    // Set diagnosis
+    document.querySelector('input[name="diagnosis"]').value = template.diagnosis;
+    
+    // Clear existing medicines
+    const medicinesContainer = document.getElementById('medicines-container');
+    medicinesContainer.innerHTML = '';
+    
+    // Reset medicine count
+    if (typeof medicineCount !== 'undefined') {
+        medicineCount = 0;
+    }
+    
+    // Add medicines from template
+    template.medicines.forEach((medicine) => {
+        if (typeof addMedicineFromSuggestion === 'function') {
+            addMedicineFromSuggestion(medicine.name, medicine);
+        } else {
+            addMedicineFromTemplateDirect(medicine);
+        }
+    });
+    
+    // Set advice
+    document.querySelector('textarea[name="advice"]').value = template.advice;
+    
+    hideQuickAdd();
+    showToast(`Loaded template: ${template.name}`, 'success');
+}
+
+function addMedicineFromTemplateDirect(medicine) {
+    const container = document.getElementById('medicines-container');
+    const noMedicines = document.getElementById('no-medicines');
+    
+    if (!container) {
+        console.error('Medicines container not found');
+        return;
+    }
+    
+    const medicineCard = document.createElement('div');
+    medicineCard.className = 'medicine-card bg-gray-50 p-4 rounded-lg border';
+    
+    // Get current medicine count
+    const currentCount = container.querySelectorAll('.medicine-card').length;
+    
+    medicineCard.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Medicine</label>
+                <input type="text" name="medicines[${currentCount}][name]" 
+                       value="${medicine.name}"
+                       class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="Search medicine...">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Dosage</label>
+                <input type="text" name="medicines[${currentCount}][dosage]" 
+                       value="${medicine.dosage}"
+                       class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="e.g., 500mg">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Duration</label>
+                <div class="flex items-center space-x-2">
+                    <input type="text" name="medicines[${currentCount}][duration]" 
+                           value="${medicine.duration}"
+                           class="w-20 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                           placeholder="5">
+                    <select name="medicines[${currentCount}][frequency]" 
+                            class="flex-1 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Select frequency</option>
+                        <option value="Once daily" ${medicine.frequency === 'Once daily' ? 'selected' : ''}>Once daily</option>
+                        <option value="Twice daily" ${medicine.frequency === 'Twice daily' ? 'selected' : ''}>Twice daily</option>
+                        <option value="Three times daily" ${medicine.frequency === 'Three times daily' ? 'selected' : ''}>Three times daily</option>
+                        <option value="Four times daily" ${medicine.frequency === 'Four times daily' ? 'selected' : ''}>Four times daily</option>
+                        <option value="Every 6 hours" ${medicine.frequency === 'Every 6 hours' ? 'selected' : ''}>Every 6 hours</option>
+                        <option value="Every 8 hours" ${medicine.frequency === 'Every 8 hours' ? 'selected' : ''}>Every 8 hours</option>
+                        <option value="As needed" ${medicine.frequency === 'As needed' ? 'selected' : ''}>As needed</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Instructions</label>
+                <input type="text" name="medicines[${currentCount}][instructions]" 
+                       value="${medicine.instructions || ''}"
+                       class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="e.g., After meals">
+                <button type="button" onclick="this.closest('.medicine-card').remove()" 
+                        class="mt-2 text-red-600 hover:text-red-800 text-sm">
+                    Remove
+                </button>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(medicineCard);
+    if (noMedicines) {
+        noMedicines.style.display = 'none';
+    }
+}
+
+function saveCurrentAsTemplate() {
+    const templateName = document.getElementById('template-name').value.trim();
+    if (!templateName) {
+        showToast('Please enter a template name', 'error');
+        return;
+    }
+    
+    // Collect current form data
+    const formData = {
+        name: templateName,
+        diagnosis: document.querySelector('input[name="diagnosis"]').value,
+        advice: document.querySelector('textarea[name="advice"]').value,
+        medicines: [],
+        lab_tests: []
+    };
+    
+    // Collect medicines
+    const medicineCards = document.querySelectorAll('.medicine-card');
+    medicineCards.forEach(card => {
+        const medicine = {
+            name: card.querySelector('input[name*="[name]"]').value,
+            dosage: card.querySelector('input[name*="[dosage]"]').value,
+            frequency: card.querySelector('select[name*="[frequency]"]').value,
+            duration: card.querySelector('input[name*="[duration]"]').value,
+            instructions: card.querySelector('input[name*="[instructions]"]').value
+        };
+        formData.medicines.push(medicine);
+    });
+    
+    // Save template via API
+    fetch('{% url "users:save_template" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(`Template "${templateName}" saved successfully`, 'success');
+            hideQuickAdd();
+            loadRecentTemplates();
+        } else {
+            showToast('Error saving template', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving template:', error);
+        showToast('Error saving template', 'error');
+    });
+}
+
+// Load recent templates on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadRecentTemplates();
+});
+
+function loadRecentTemplates() {
+    fetch('{% url "users:recent_templates" %}')
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById('recent-templates-list').innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error loading templates:', error);
+        });
+}
+</script> 

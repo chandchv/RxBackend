@@ -6,7 +6,17 @@ from django.core.exceptions import PermissionDenied
 from django.http import JsonResponse, HttpResponse, Http404
 from django.contrib.auth import get_user_model
 from .forms import LabOrderForm, LabRegistrationForm, LabTestOfferingForm, ExternalLabTestOfferingForm
-from .models import ExternalLabTestOffering, LabProfile, LabTestOffering, TestDefinition, LabOrder, LabOrderTest, LabResult, CommissionLedger
+from .models import (
+    ExternalLabTestOffering, LabProfile, LabTestOffering, LabUser, TestDefinition, 
+    LabOrder, LabOrderTest, LabResult, CommissionLedger,
+    # New models for enhanced dashboard
+    SpecimenContainer, Specimen, SpecimenProcessing,
+    QualityControlTest, QCResult,
+    LabReport, TestResult,
+    ReportDelivery, CommunicationLog,
+    B2BPartner, B2BInvoice, B2BInvoiceItem,
+    LabAnalytics
+)
 from users.models import Appointment, Doctor, Patient, Lab, LabTest, LabTestPrescription
 from django.db.models import Q, Sum, Count
 import os
@@ -14,6 +24,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 import csv
 import io
+import logging
 from django.core.mail import send_mail
 from django.utils import timezone
 from datetime import timedelta
@@ -21,10 +32,28 @@ from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.contrib.auth.models import Group
 from notifications.models import Notification
 from rest_framework.permissions import IsAuthenticated
+from decimal import Decimal
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 # Create your views here.
+
+def get_lab_profile_for_user(user):
+    """
+    Helper function to get lab profile for a user, handling both direct ownership and lab user associations.
+    Returns the lab profile or raises LabProfile.DoesNotExist if not found.
+    """
+    try:
+        # First check if user has a direct lab profile
+        return LabProfile.objects.get(user=user)
+    except LabProfile.DoesNotExist:
+        # Check if user is a lab staff member
+        try:
+            lab_user = LabUser.objects.get(user=user, is_active=True)
+            return lab_user.lab_profile
+        except LabUser.DoesNotExist:
+            raise LabProfile.DoesNotExist("User is not associated with any lab")
 
 def lab_registration(request):
     if request.method == 'POST':
@@ -136,7 +165,7 @@ def admin_lab_dashboard(request):
     
     # For regular lab users
     try:
-        lab_profile = LabProfile.objects.get(user=request.user)
+        lab_profile = get_lab_profile_for_user(request.user)
         if not lab_profile.is_approved:
             messages.error(request, 'Your lab account is not yet approved.')
             return redirect('labs:registration_pending')
@@ -173,7 +202,7 @@ def admin_lab_dashboard(request):
         doctor_requests = LabOrder.objects.filter(
             chosen_lab=lab_profile,
             status='PENDING'
-        ).select_related('doctor', 'test')[:5]
+        ).select_related('doctor', 'patient')[:5]
         
         # Get payment statistics
         payment_stats = {
@@ -210,11 +239,21 @@ def admin_lab_dashboard(request):
 
 @login_required
 def lab_dashboard(request):
-    """Main lab dashboard view"""
+    """Enhanced lab dashboard with comprehensive management features"""
     # Get the lab profile for the logged-in user
-    lab_profile = get_object_or_404(LabProfile, user=request.user)
+    # First check if user has a direct lab profile
+    try:
+        lab_profile = LabProfile.objects.get(user=request.user)
+    except LabProfile.DoesNotExist:
+        # Check if user is a lab staff member
+        try:
+            lab_user = LabUser.objects.get(user=request.user, is_active=True)
+            lab_profile = lab_user.lab_profile
+        except LabUser.DoesNotExist:
+            messages.error(request, 'Lab profile not found. Please contact your administrator.')
+            return redirect('users:login')
     
-    # Get statistics
+    # Get comprehensive statistics
     stats = {
         'total_tests': ExternalLabTestOffering.objects.filter(lab_profile=lab_profile).count(),
         'pending_orders': LabOrder.objects.filter(chosen_lab=lab_profile, status='PENDING').count(),
@@ -222,17 +261,35 @@ def lab_dashboard(request):
         'total_revenue': LabOrder.objects.filter(
             chosen_lab=lab_profile, 
             status='COMPLETED'
-        ).aggregate(total=Sum('total_price'))['total'] or 0
+        ).aggregate(total=Sum('total_price'))['total'] or 0,
+        'specimens_pending': Specimen.objects.filter(
+            lab_order__chosen_lab=lab_profile,
+            processing__processing_completed__isnull=True
+        ).count(),
+        'qc_tests_today': QCResult.objects.filter(
+            qc_test__test_definition__offered_by_external_labs__lab_profile=lab_profile,
+            run_date__date=timezone.now().date()
+        ).count(),
+        'reports_pending_approval': LabReport.objects.filter(
+            lab_order__chosen_lab=lab_profile,
+            status='PENDING_REVIEW'
+        ).count(),
+        'critical_values_today': TestResult.objects.filter(
+            report__lab_order__chosen_lab=lab_profile,
+            abnormality_type__in=['CRITICAL_HIGH', 'CRITICAL_LOW'],
+            performed_at__date=timezone.now().date()
+        ).count(),
     }
     
-    # Get recent orders
-    recent_orders = LabOrder.objects.filter(chosen_lab=lab_profile).order_by('-order_date')[:5]
+    # Get recent orders with specimens
+    recent_orders = LabOrder.objects.filter(
+        chosen_lab=lab_profile
+    ).select_related('patient', 'doctor').prefetch_related('specimens').order_by('-order_date')[:5]
     
     # Get available tests
     available_tests = ExternalLabTestOffering.objects.filter(lab_profile=lab_profile, is_active=True).order_by('test__name')[:5]
     
     # Get recent doctor requests (combine both LabTest and LabOrder)
-    # Get lab tests from prescriptions
     lab_tests = LabTest.objects.filter(
         prescription__external_lab=lab_profile,
         status__in=['REQUESTED', 'ASSIGNED']
@@ -249,8 +306,8 @@ def lab_dashboard(request):
             'id': f'test_{test.id}',
             'type': 'test',
             'test_name': test.test_definition.name if test.test_definition else 'Unknown Test',
-            'patient_name': test.prescription.patient.get_full_name(),
-            'doctor_name': f"Dr. {test.prescription.doctor.get_full_name()}",
+            'patient_name': test.prescription.patient.get_full_name() if getattr(test.prescription, 'patient', None) and hasattr(test.prescription.patient, 'get_full_name') else (test.prescription.patient.get_full_name() if getattr(test.prescription, 'patient', None) else str(test.prescription.patient)),
+            'doctor_name': f"Dr. {test.prescription.doctor.name}" if getattr(test.prescription, 'doctor', None) and hasattr(test.prescription.doctor, 'name') else (test.prescription.doctor.get_full_name() if getattr(test.prescription, 'doctor', None) else str(test.prescription.doctor)),
             'date': test.created_at,
             'status': test.status,
         })
@@ -267,8 +324,8 @@ def lab_dashboard(request):
             'id': f'order_{order.id}',
             'type': 'order',
             'test_name': ', '.join([test.name for test in order.tests.all()]),
-            'patient_name': order.patient.get_full_name() if order.patient else 'Unknown Patient',
-            'doctor_name': f"Dr. {order.doctor.get_full_name()}" if order.doctor else 'Unknown Doctor',
+            'patient_name': order.patient.get_full_name() if getattr(order, 'patient', None) and hasattr(order.patient, 'get_full_name') else (order.patient.get_full_name() if getattr(order, 'patient', None) else str(order.patient)),
+            'doctor_name': f"Dr. {order.doctor.name}" if getattr(order, 'doctor', None) and hasattr(order.doctor, 'name') else (order.doctor.get_full_name() if getattr(order, 'doctor', None) else str(order.doctor)),
             'date': order.order_date,
             'status': order.status,
         })
@@ -291,6 +348,114 @@ def lab_dashboard(request):
         ).aggregate(total=Sum('total_price'))['total'] or 0
     }
     
+    # Get specimen management data
+    specimen_stats = {
+        'pending_collection': Specimen.objects.filter(
+            lab_order__chosen_lab=lab_profile,
+            collection_date__isnull=True
+        ).count(),
+        'in_processing': Specimen.objects.filter(
+            lab_order__chosen_lab=lab_profile,
+            processing__processing_started__isnull=False,
+            processing__processing_completed__isnull=True
+        ).count(),
+        'completed_today': Specimen.objects.filter(
+            lab_order__chosen_lab=lab_profile,
+            processing__processing_completed__date=timezone.now().date()
+        ).count(),
+        'containers_available': SpecimenContainer.objects.filter(
+            lab_profile=lab_profile,
+            is_available=True
+        ).count(),
+    }
+    
+    # Get quality control data
+    qc_stats = {
+        'tests_today': QCResult.objects.filter(
+            qc_test__test_definition__offered_by_external_labs__lab_profile=lab_profile,
+            run_date__date=timezone.now().date()
+        ).count(),
+        'in_control': QCResult.objects.filter(
+            qc_test__test_definition__offered_by_external_labs__lab_profile=lab_profile,
+            run_date__date=timezone.now().date(),
+            is_in_control=True
+        ).count(),
+        'out_of_control': QCResult.objects.filter(
+            qc_test__test_definition__offered_by_external_labs__lab_profile=lab_profile,
+            run_date__date=timezone.now().date(),
+            is_in_control=False
+        ).count(),
+        'pending_review': QCResult.objects.filter(
+            qc_test__test_definition__offered_by_external_labs__lab_profile=lab_profile,
+            reviewed_by__isnull=True
+        ).count(),
+    }
+    
+    # Get report management data
+    report_stats = {
+        'draft_reports': LabReport.objects.filter(
+            lab_order__chosen_lab=lab_profile,
+            status='DRAFT'
+        ).count(),
+        'pending_review': LabReport.objects.filter(
+            lab_order__chosen_lab=lab_profile,
+            status='PENDING_REVIEW'
+        ).count(),
+        'approved_today': LabReport.objects.filter(
+            lab_order__chosen_lab=lab_profile,
+            status='APPROVED',
+            approved_at__date=timezone.now().date()
+        ).count(),
+        'released_today': LabReport.objects.filter(
+            lab_order__chosen_lab=lab_profile,
+            status='RELEASED',
+            released_at__date=timezone.now().date()
+        ).count(),
+    }
+    
+    # Get B2B partner data
+    b2b_stats = {
+        'active_partners': B2BPartner.objects.filter(is_active=True).count(),
+        'pending_invoices': B2BInvoice.objects.filter(
+            lab_profile=lab_profile,
+            status='SENT'
+        ).count(),
+        'overdue_invoices': B2BInvoice.objects.filter(
+            lab_profile=lab_profile,
+            status='OVERDUE'
+        ).count(),
+        'total_b2b_revenue': B2BInvoice.objects.filter(
+            lab_profile=lab_profile,
+            status='PAID'
+        ).aggregate(total=Sum('total_amount'))['total'] or 0,
+    }
+    
+    # Get recent specimens
+    recent_specimens = Specimen.objects.filter(
+        lab_order__chosen_lab=lab_profile
+    ).select_related('container', 'lab_order__patient').order_by('-created_at')[:5]
+    
+    # Get recent QC results
+    recent_qc_results = QCResult.objects.filter(
+        qc_test__test_definition__offered_by_external_labs__lab_profile=lab_profile
+    ).select_related('qc_test', 'qc_test__test_definition').order_by('-run_date')[:5]
+    
+    # Get recent reports
+    recent_reports = LabReport.objects.filter(
+        lab_order__chosen_lab=lab_profile
+    ).select_related('lab_order__patient').order_by('-created_at')[:5]
+    
+    # Get recent communications
+    recent_communications = CommunicationLog.objects.filter(
+        lab_profile=lab_profile
+    ).select_related('recipient').order_by('-sent_at')[:5]
+    
+    # Get analytics data for charts
+    analytics_data = LabAnalytics.objects.filter(
+        lab_profile=lab_profile,
+        date__gte=timezone.now().date() - timezone.timedelta(days=30)
+    ).order_by('date')
+    
     context = {
         'lab_profile': lab_profile,
         'stats': stats,
@@ -298,6 +463,15 @@ def lab_dashboard(request):
         'available_tests': available_tests,
         'doctor_requests': doctor_requests,
         'payment_stats': payment_stats,
+        'specimen_stats': specimen_stats,
+        'qc_stats': qc_stats,
+        'report_stats': report_stats,
+        'b2b_stats': b2b_stats,
+        'recent_specimens': recent_specimens,
+        'recent_qc_results': recent_qc_results,
+        'recent_reports': recent_reports,
+        'recent_communications': recent_communications,
+        'analytics_data': analytics_data,
         'is_superuser': request.user.is_superuser,
     }
     
@@ -308,7 +482,7 @@ def add_test_offering(request):
     # Allow both superusers and lab users to add test offerings
     if not request.user.is_superuser:
         try:
-            lab_profile = LabProfile.objects.get(user=request.user)
+            lab_profile = get_lab_profile_for_user(request.user)
             if not lab_profile.is_approved:
                 messages.error(request, 'Your lab account is not yet approved.')
                 return redirect('labs:registration_pending')
@@ -327,7 +501,7 @@ def add_test_offering(request):
                         messages.error(request, 'Please select a lab.')
                         return render(request, 'labs/add_test_offering.html', {'form': form})
                 else:
-                    lab_profile = LabProfile.objects.get(user=request.user)
+                    lab_profile = get_lab_profile_for_user(request.user)
                 
                 # Create the test offering
                 offering = ExternalLabTestOffering(
@@ -370,7 +544,7 @@ def add_test_offering(request):
 @login_required
 def edit_test_offering(request, offering_id):
     try:
-        lab_profile = request.user.lab_profile
+        lab_profile = get_lab_profile_for_user(request.user)
         if not lab_profile.is_approved:
             raise PermissionDenied("Your lab account is not yet approved.")
         
@@ -410,7 +584,7 @@ def edit_test_offering(request, offering_id):
 @login_required
 def delete_test_offering(request, offering_id):
     try:
-        lab_profile = request.user.lab_profile
+        lab_profile = get_lab_profile_for_user(request.user)
         if not lab_profile.is_approved:
             raise PermissionDenied("Your lab account is not yet approved.")
         
@@ -431,21 +605,50 @@ def delete_test_offering(request, offering_id):
 @login_required
 def order_tests(request):
     lab_profile = None
+    # Initialize variables to avoid scope issues
+    form = None
+    available_tests = None
+    limited_tests = []
+    total_available = 0
+    test_prices = {}
+    from collections import defaultdict
+    tests_by_category = defaultdict(list)
+    categorized_tests = []
+    
     try:
         # Check if the user is associated with a lab
-        lab_profile = LabProfile.objects.get(user=request.user)
+        lab_profile = get_lab_profile_for_user(request.user)
         
         if not lab_profile.is_approved:
             messages.error(request, 'Your lab must be approved to order tests.')
             return redirect('labs:lab_dashboard')
 
         if request.method == 'POST':
-            form = LabOrderForm(request.POST)
+            # Get default clinic (first clinic or create one if none exists)
+            from users.models import Clinic
+            clinic = Clinic.objects.first()
+            if not clinic:
+                clinic = Clinic.objects.create(name="Default Clinic", address="Default Address")
+            
+            form = LabOrderForm(request.POST, clinic=clinic)
             if form.is_valid():
                 # Save the order without committing to get the patient
                 lab_order = form.save(commit=False)
                 lab_order.chosen_lab = lab_profile
                 lab_order.status = 'PENDING_PAYMENT'
+                
+                # Set the clinic for the patient if it was created
+                if hasattr(lab_order, 'patient') and lab_order.patient:
+                    # Try to get clinic from lab profile or use a default
+                    try:
+                        # If lab has an associated clinic, use it
+                        clinic = lab_profile.user.userprofile.clinic if hasattr(lab_profile.user, 'userprofile') else None
+                        if clinic:
+                            lab_order.patient.clinic = clinic
+                            lab_order.patient.save()
+                    except:
+                        pass  # Use default clinic
+                        
                 lab_order.save()  # Save to generate ID
                 
                 # Calculate total price and add selected tests
@@ -472,27 +675,126 @@ def order_tests(request):
             else:
                 messages.error(request, 'Please correct the errors below.')
         else:
-            form = LabOrderForm()
+            # Get default clinic for GET request
+            from users.models import Clinic
+            clinic = Clinic.objects.first()
+            if not clinic:
+                clinic = Clinic.objects.create(name="Default Clinic", address="Default Address")
+            
+            form = LabOrderForm(clinic=clinic)
             
             # Only show tests that this lab offers
             available_tests = TestDefinition.objects.filter(
                 offered_by_external_labs__lab_profile=lab_profile,
                 offered_by_external_labs__is_active=True
-            ).distinct()
-            
-            if not available_tests.exists():
-                messages.warning(request, 'Please add some test offerings before creating orders.')
-                return redirect('labs:manage_tests')
+            ).distinct().order_by('category', 'name')
             
             if not available_tests.exists():
                 messages.warning(request, 'Please add some test offerings before creating orders.')
                 return redirect('labs:manage_tests')
                 
             form.fields['tests'].queryset = available_tests
+            
+            # Get all test offerings for this lab in one query to avoid N+1 problem
+            test_offerings = ExternalLabTestOffering.objects.filter(
+                lab_profile=lab_profile,
+                is_active=True,
+                test__in=available_tests
+            ).select_related('test')
+            
+            # Create price lookup dictionary
+            test_prices = {}
+            for offering in test_offerings:
+                test_prices[offering.test.id] = {
+                    'price': offering.price,
+                    'turnaround_time': offering.turnaround_time_hours,
+                    'home_collection': offering.offers_home_collection
+                }
+            
+            # Group tests by category for better display
+            # tests_by_category is already initialized above
+            
+            # Get search and filter parameters
+            search_query = request.GET.get('search', '').strip()
+            category_filter = request.GET.get('category', '').strip()
+            
+            # Apply search and filters
+            filtered_tests = available_tests
+            
+            if search_query:
+                filtered_tests = filtered_tests.filter(
+                    Q(name__icontains=search_query) |
+                    Q(description__icontains=search_query) |
+                    Q(short_code__icontains=search_query)
+                )
+            
+            if category_filter:
+                if category_filter == 'Uncategorized':
+                    filtered_tests = filtered_tests.filter(Q(category__isnull=True) | Q(category=''))
+                else:
+                    filtered_tests = filtered_tests.filter(category=category_filter)
+            
+            # For display, limit to reasonable number but allow pagination-like behavior
+            # If searching or filtering, show more results
+            if search_query or category_filter:
+                limited_tests = list(filtered_tests[:100])  # Show up to 100 when searching
+            else:
+                # Default view: show sample from each category but more tests
+                if filtered_tests.count() > 100:
+                    # Get all unique categories from available tests
+                    all_categories = set()
+                    for test in filtered_tests[:300]:  # Sample more tests to find categories
+                        category = test.category or 'Uncategorized'
+                        all_categories.add(category)
+                    
+                    limited_tests = []
+                    # Get more tests from each category for better variety
+                    for category in sorted(all_categories):
+                        if category == 'Uncategorized':
+                            cat_tests = list(filtered_tests.filter(category__isnull=True)[:8]) + \
+                                       list(filtered_tests.filter(category='')[:8])
+                        else:
+                            cat_tests = list(filtered_tests.filter(category=category)[:8])
+                        
+                        limited_tests.extend(cat_tests)
+                        
+                        # Show more tests - up to 120 total
+                        if len(limited_tests) >= 120:
+                            break
+                    
+                    limited_tests = limited_tests[:120]
+                else:
+                    limited_tests = list(filtered_tests[:100])
+            
+            total_available = filtered_tests.count()
+            
+            # Now organize the limited tests by category for display
+            for test in limited_tests:
+                category = test.category or 'Uncategorized'
+                tests_by_category[category].append(test)
+                
+                # Set default values if not found in offerings
+                if test.id not in test_prices:
+                    test_prices[test.id] = {
+                        'price': 0,
+                        'turnaround_time': 24,
+                        'home_collection': False
+                    }
+        
+        # Convert defaultdict to list of tuples for template compatibility
+        categorized_tests = sorted(tests_by_category.items())
+        
+        # Create categories list from categorized_tests
+        categories = [cat for cat, tests in categorized_tests]
         
         return render(request, 'labs/order_lab_tests.html', {
             'form': form,
-            'lab_profile': lab_profile
+            'lab_profile': lab_profile,
+            'available_tests': limited_tests,
+            'total_available_tests': total_available,
+            'categorized_tests': categorized_tests,
+            'test_prices': test_prices,
+            'categories': categories
         })
         
     except LabProfile.DoesNotExist:
@@ -549,13 +851,44 @@ def order_lab_tests(request, patient_id):
             return redirect('users:patient_detail', patient_id=patient_id)
         
         # GET request - show available tests and labs
-        available_tests = TestDefinition.objects.all()
+        # Group tests by category
+        from collections import defaultdict
+        
+        available_tests = TestDefinition.objects.all().order_by('category', 'name')
         approved_labs = LabProfile.objects.filter(is_approved=True)
+        
+        # Group tests by category
+        tests_by_category = defaultdict(list)
+        for test in available_tests:
+            category = test.category or 'Uncategorized'
+            tests_by_category[category].append(test)
+        
+        # Convert to sorted list of tuples
+        categorized_tests = sorted(tests_by_category.items())
+        
+        # Get all unique categories for filter dropdown
+        all_categories = available_tests.values_list('category', flat=True).distinct()
+        categories = [cat for cat in all_categories if cat] + ['Uncategorized']
+        
+        # Create a simple test_prices dictionary for template compatibility
+        # Since this is doctor ordering for patients, we don't need specific lab pricing yet
+        test_prices = {}
+        for test in available_tests:
+            test_prices[test.id] = {
+                'price': 0,  # Will be determined when lab is chosen
+                'turnaround_time': 24,  # Default 24 hours
+                'home_collection': False  # Default no home collection
+            }
         
         context = {
             'patient': patient,
             'available_tests': available_tests,
-            'approved_labs': approved_labs
+            'categorized_tests': categorized_tests,
+            'approved_labs': approved_labs,
+            'categories': categories,
+            'test_prices': test_prices,
+            'current_search': '',
+            'current_category': ''
         }
         
         return render(request, 'labs/order_tests.html', context)
@@ -748,18 +1081,46 @@ def manage_tests(request):
             return render(request, 'labs/manage_tests.html', context)
         
         # For regular lab users
-        lab_profile = LabProfile.objects.get(user=request.user)
+        lab_profile = get_lab_profile_for_user(request.user)
         if not lab_profile.is_approved:
             messages.error(request, 'Your lab account is not yet approved.')
             return redirect('labs:registration_pending')
         
+        # Get filter parameters
+        category_filter = request.GET.get('category', '')
+        status_filter = request.GET.get('status', '')
+        search_query = request.GET.get('search', '')
+        
         # Get test offerings for this lab
         test_offerings = ExternalLabTestOffering.objects.filter(
             lab_profile=lab_profile
-        ).select_related('test')
+        ).select_related('test').order_by('test__category', 'test__name')
+        
+        # Apply filters
+        if category_filter:
+            test_offerings = test_offerings.filter(test__category__icontains=category_filter)
+        if status_filter:
+            is_active = status_filter == 'active'
+            test_offerings = test_offerings.filter(is_active=is_active)
+        if search_query:
+            test_offerings = test_offerings.filter(
+                Q(test__name__icontains=search_query) |
+                Q(test__description__icontains=search_query) |
+                Q(test__short_code__icontains=search_query)
+            )
+        
+        # Get unique categories for filter dropdown
+        categories = TestDefinition.objects.filter(
+            offered_by_external_labs__lab_profile=lab_profile
+        ).values_list('category', flat=True).distinct().order_by('category')
+        categories = [cat for cat in categories if cat]  # Remove empty categories
         
         context = {
             'tests': test_offerings,
+            'categories': categories,
+            'current_category': category_filter,
+            'current_status': status_filter,
+            'current_search': search_query,
             'is_superuser': False
         }
         return render(request, 'labs/manage_tests.html', context)
@@ -769,6 +1130,72 @@ def manage_tests(request):
     except Exception as e:
         messages.error(request, f'Error accessing test management: {str(e)}')
         return redirect('labs:lab_dashboard')
+
+@login_required
+def update_test_offering(request):
+    """AJAX endpoint for updating test offering fields"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        test_id = data.get('test_id')
+        
+        if not test_id:
+            return JsonResponse({'error': 'Test ID required'}, status=400)
+        
+        # Get the lab profile for the user
+        lab_profile = get_lab_profile_for_user(request.user)
+        
+        # Get the test offering and verify ownership
+        test_offering = get_object_or_404(
+            ExternalLabTestOffering, 
+            id=test_id, 
+            lab_profile=lab_profile
+        )
+        
+        # Update fields if provided
+        if 'price' in data:
+            try:
+                price = float(data['price'])
+                if price < 0:
+                    raise ValueError("Price cannot be negative")
+                test_offering.price = price
+            except (ValueError, TypeError):
+                return JsonResponse({'error': 'Invalid price value'}, status=400)
+        
+        if 'turnaround_time_hours' in data:
+            try:
+                hours = int(data['turnaround_time_hours'])
+                if hours < 1:
+                    raise ValueError("Turnaround time must be at least 1 hour")
+                test_offering.turnaround_time_hours = hours
+            except (ValueError, TypeError):
+                return JsonResponse({'error': 'Invalid turnaround time'}, status=400)
+        
+        if 'offers_home_collection' in data:
+            test_offering.offers_home_collection = str(data['offers_home_collection']).lower() == 'true'
+        
+        if 'is_active' in data:
+            test_offering.is_active = str(data['is_active']).lower() == 'true'
+        
+        test_offering.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Test offering updated successfully'
+        })
+        
+    except LabProfile.DoesNotExist:
+        return JsonResponse({'error': 'Lab profile not found'}, status=403)
+    except ExternalLabTestOffering.DoesNotExist:
+        return JsonResponse({'error': 'Test offering not found'}, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+    except Exception as e:
+        logger.error(f"Error updating test offering: {e}")
+        return JsonResponse({'error': 'Server error'}, status=500)
 
 @login_required
 def delete_test_offering(request, offering_id):
@@ -848,53 +1275,122 @@ def available_labs(request):
 def bulk_upload_tests(request):
     if request.method == 'POST':
         try:
-            lab_profile = LabProfile.objects.get(user=request.user)
-            lab = Lab.objects.get(profile=lab_profile)
+            lab_profile = get_lab_profile_for_user(request.user)
+            
+            if not lab_profile.is_approved:
+                messages.error(request, 'Your lab account is not yet approved.')
+                return redirect('labs:registration_pending')
             
             csv_file = request.FILES['csv_file']
             if not csv_file.name.endswith('.csv'):
                 messages.error(request, 'Please upload a CSV file')
-                return redirect('labs:dashboard')
+                return redirect('labs:bulk_upload_tests')
             
             data = csv_file.read().decode('utf-8')
             io_string = io.StringIO(data)
             reader = csv.DictReader(io_string)
             
             created_count = 0
-            for row in reader:
-                # Create or get test definition
-                test, created = TestDefinition.objects.get_or_create(
-                    name=row['name'],
-                    defaults={
-                        'short_code': row.get('short_code', ''),
-                        'description': row.get('description', ''),
-                        'category': row.get('category', ''),
-                        'preparation_instructions': row.get('preparation_instructions', '')
-                    }
-                )
-                
-                # Create test offering for the lab
-                offering, created = ExternalLabTestOffering.objects.get_or_create(
-                    lab_profile=lab_profile,
-                    test=test,
-                    defaults={
-                        'price': row.get('price', 0),
-                        'turnaround_time_hours': row.get('turnaround_time_hours', 24),
-                        'offers_home_collection': row.get('offers_home_collection', 'False').lower() == 'true',
-                        'specific_instructions': row.get('specific_instructions', ''),
-                        'is_active': True
-                    }
-                )
-                
-                if created:
-                    created_count += 1
+            updated_count = 0
+            error_count = 0
+            processed_count = 0
             
-            messages.success(request, f'Successfully uploaded {created_count} test offerings')
-            return redirect('labs:dashboard')
+            # Convert reader to list to get total count for progress
+            rows = list(reader)
+            total_rows = len(rows)
+            
+            logger.info(f"Starting bulk upload for {lab_profile.name} with {total_rows} rows")
+            
+            for row in rows:
+                processed_count += 1
+                try:
+                    # Create or get test definition
+                    test, test_created = TestDefinition.objects.get_or_create(
+                        name=row['name'],
+                        defaults={
+                            'short_code': row.get('short_code', ''),
+                            'description': row.get('description', ''),
+                            'category': row.get('category', ''),
+                            'preparation_instructions': row.get('preparation_instructions', '')
+                        }
+                    )
+                    
+                    # Parse price - handle both numeric and string formats
+                    try:
+                        price = float(str(row.get('price', 0)).replace(',', ''))
+                    except (ValueError, TypeError):
+                        price = 0
+                    
+                    # Parse turnaround time - handle invalid values
+                    try:
+                        turnaround_time = int(row.get('turnaround_time_hours', 24))
+                        # Handle edge case where scraper might have set '00000'
+                        if turnaround_time == 0:
+                            turnaround_time = 24
+                    except (ValueError, TypeError):
+                        turnaround_time = 24
+                    
+                    # Parse boolean for home collection
+                    home_collection_str = str(row.get('offers_home_collection', 'false')).lower()
+                    offers_home_collection = home_collection_str in ['true', '1', 'yes', 'on']
+                    
+                    # Check if offering already exists for this lab and test
+                    try:
+                        offering = ExternalLabTestOffering.objects.get(
+                            lab_profile=lab_profile,
+                            test=test
+                        )
+                        # Update existing offering
+                        offering.price = price
+                        offering.turnaround_time_hours = turnaround_time
+                        offering.offers_home_collection = offers_home_collection
+                        offering.specific_instructions = row.get('specific_instructions', '')
+                        offering.is_active = True
+                        offering.save()
+                        updated_count += 1
+                    except ExternalLabTestOffering.DoesNotExist:
+                        # Create new offering
+                        offering = ExternalLabTestOffering.objects.create(
+                            lab_profile=lab_profile,
+                            test=test,
+                            price=price,
+                            turnaround_time_hours=turnaround_time,
+                            offers_home_collection=offers_home_collection,
+                            specific_instructions=row.get('specific_instructions', ''),
+                            is_active=True
+                        )
+                        created_count += 1
+                        
+                except Exception as row_error:
+                    error_count += 1
+                    logger.error(f"Error processing row {processed_count}/{total_rows} ({row.get('name', 'Unknown')}): {row_error}")
+                    continue
+            
+            # Log completion
+            logger.info(f"Bulk upload completed for {lab_profile.name}: {created_count} created, {updated_count} updated, {error_count} errors")
+            
+            # Provide detailed feedback
+            success_count = created_count + updated_count
+            if success_count > 0:
+                if created_count > 0 and updated_count > 0:
+                    messages.success(request, f'✅ Upload completed! Created {created_count} new tests and updated {updated_count} existing tests.')
+                elif created_count > 0:
+                    messages.success(request, f'✅ Upload completed! Successfully created {created_count} new test offerings.')
+                elif updated_count > 0:
+                    messages.success(request, f'✅ Upload completed! Successfully updated {updated_count} existing test offerings.')
+                    
+            if error_count > 0:
+                messages.warning(request, f'⚠️ {error_count} out of {total_rows} rows had errors and were skipped. Check the logs for details.')
+                
+            if success_count == 0:
+                messages.error(request, '❌ No tests were added or updated. Please check your CSV format and try again.')
+            
+            return redirect('labs:lab_dashboard')
             
         except Exception as e:
+            logger.error(f"Bulk upload error: {e}")
             messages.error(request, f'Error uploading tests: {str(e)}')
-            return redirect('labs:dashboard')
+            return redirect('labs:bulk_upload_tests')
     
     return render(request, 'labs/bulk_upload_tests.html')
 
@@ -935,7 +1431,7 @@ def download_template(request):
 def orders_list(request):
     # Get the lab profile for the logged-in user
     try:
-        lab_profile = LabProfile.objects.get(user=request.user)
+        lab_profile = get_lab_profile_for_user(request.user)
     except LabProfile.DoesNotExist:
         messages.error(request, 'You are not associated with any lab.')
         return redirect('home')
@@ -978,7 +1474,11 @@ def orders_list(request):
 @login_required
 def order_detail(request, order_id):
     # Get the lab profile for the logged-in user
-    lab_profile = get_object_or_404(LabProfile, user=request.user)
+    try:
+        lab_profile = get_lab_profile_for_user(request.user)
+    except LabProfile.DoesNotExist:
+        messages.error(request, 'You are not associated with any lab.')
+        return redirect('labs:lab_dashboard')
     
     # Get the order and verify it belongs to this lab
     order = get_object_or_404(LabOrder, id=order_id, chosen_lab=lab_profile)
@@ -1011,7 +1511,11 @@ def order_detail(request, order_id):
 @login_required
 def confirm_payment(request, order_id):
     # Get the lab profile for the logged-in user
-    lab_profile = get_object_or_404(LabProfile, user=request.user)
+    try:
+        lab_profile = get_lab_profile_for_user(request.user)
+    except LabProfile.DoesNotExist:
+        messages.error(request, 'You are not associated with any lab.')
+        return redirect('labs:lab_dashboard')
     
     # Get the order and verify it belongs to this lab
     order = get_object_or_404(LabOrder, id=order_id, chosen_lab=lab_profile)
@@ -1067,7 +1571,11 @@ def confirm_payment(request, order_id):
 @login_required
 def update_sample_status(request, order_id):
     # Get the lab profile for the logged-in user
-    lab_profile = get_object_or_404(LabProfile, user=request.user)
+    try:
+        lab_profile = get_lab_profile_for_user(request.user)
+    except LabProfile.DoesNotExist:
+        messages.error(request, 'You are not associated with any lab.')
+        return redirect('labs:lab_dashboard')
     
     # Get the order and verify it belongs to this lab
     order = get_object_or_404(LabOrder, id=order_id, chosen_lab=lab_profile)
@@ -1131,7 +1639,10 @@ def update_sample_status(request, order_id):
 def upload_result_api(request):
     try:
         # Get the lab profile for the logged-in user
-        lab_profile = get_object_or_404(LabProfile, user=request.user)
+        try:
+            lab_profile = get_lab_profile_for_user(request.user)
+        except LabProfile.DoesNotExist:
+            return Response({'error': 'You are not associated with any lab'}, status=403)
         
         # Get the order ID and verify it belongs to this lab
         order_id = request.data.get('order_id')
@@ -1179,7 +1690,11 @@ def upload_result_api(request):
 @login_required
 def doctor_requests(request):
     # Get the lab profile for the logged-in user
-    lab_profile = get_object_or_404(LabProfile, user=request.user)
+    try:
+        lab_profile = get_lab_profile_for_user(request.user)
+    except LabProfile.DoesNotExist:
+        messages.error(request, 'You are not associated with any lab.')
+        return redirect('labs:lab_dashboard')
     
     # Get filter parameters
     status = request.GET.get('status', '')
@@ -1221,8 +1736,8 @@ def doctor_requests(request):
             'id': f'test_{test.id}',  # Format: test_123
             'type': 'test',
             'test_name': test.test_definition.name if test.test_definition else 'Unknown Test',
-            'patient_name': test.prescription.patient.get_full_name(),
-            'doctor_name': f"Dr. {test.prescription.doctor.get_full_name()}",
+            'patient_name': test.prescription.patient.get_full_name() if getattr(test.prescription, 'patient', None) and hasattr(test.prescription.patient, 'get_full_name') else (test.prescription.patient.get_full_name() if getattr(test.prescription, 'patient', None) else str(test.prescription.patient)),
+            'doctor_name': f"Dr. {test.prescription.doctor.name}" if getattr(test.prescription, 'doctor', None) and hasattr(test.prescription.doctor, 'name') else (test.prescription.doctor.get_full_name() if getattr(test.prescription, 'doctor', None) else str(test.prescription.doctor)),
             'date': test.created_at,
             'status': test.status,
             'collection_type': test.collection_type,
@@ -1235,8 +1750,8 @@ def doctor_requests(request):
             'id': f'order_{order.id}',  # Format: order_123
             'type': 'order',
             'test_name': ', '.join([test.name for test in order.tests.all()]),
-            'patient_name': order.patient.get_full_name() if order.patient else 'Unknown Patient',
-            'doctor_name': f"Dr. {order.doctor.get_full_name()}" if order.doctor else 'Unknown Doctor',
+            'patient_name': order.patient.get_full_name() if getattr(order, 'patient', None) and hasattr(order.patient, 'get_full_name') else (order.patient.get_full_name() if getattr(order, 'patient', None) else str(order.patient)),
+            'doctor_name': f"Dr. {order.doctor.name}" if getattr(order, 'doctor', None) and hasattr(order.doctor, 'name') else (order.doctor.get_full_name() if getattr(order, 'doctor', None) else str(order.doctor)),
             'date': order.order_date,
             'status': order.status,
             'collection_type': 'N/A',
@@ -1273,7 +1788,11 @@ def edit_lab(request, lab_id=None):
         lab_profile = get_object_or_404(LabProfile, id=lab_id)
     else:
         # Get the lab profile for the logged-in user
-        lab_profile = get_object_or_404(LabProfile, user=request.user)
+        try:
+            lab_profile = get_lab_profile_for_user(request.user)
+        except LabProfile.DoesNotExist:
+            messages.error(request, 'You are not associated with any lab.')
+            return redirect('labs:lab_dashboard')
     
     if request.method == 'POST':
         form = LabRegistrationForm(request.POST, instance=lab_profile)
@@ -1477,3 +1996,203 @@ def process_lab_request(request, request_id, request_type):
         }
     
     return render(request, 'labs/process_lab_request.html', context)
+
+@login_required
+def create_lab_user(request, lab_id):
+    """Create a new user for a specific lab"""
+    if not request.user.is_superuser:
+        raise PermissionDenied("Only superusers can create lab users.")
+    
+    lab_profile = get_object_or_404(LabProfile, id=lab_id)
+    
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        first_name = request.POST.get('first_name', '')
+        last_name = request.POST.get('last_name', '')
+        user_type = request.POST.get('user_type', 'LAB_STAFF')
+        
+        if not all([username, email, password]):
+            messages.error(request, 'Username, email, and password are required.')
+            return redirect('labs:create_lab_user', lab_id=lab_id)
+        
+        try:
+            # Check if user already exists
+            if User.objects.filter(username=username).exists():
+                messages.error(request, 'Username already exists.')
+                return redirect('labs:create_lab_user', lab_id=lab_id)
+            
+            if User.objects.filter(email=email).exists():
+                messages.error(request, 'Email already exists.')
+                return redirect('labs:create_lab_user', lab_id=lab_id)
+            
+            # Create the user
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name
+            )
+            
+            # Add to lab group
+            lab_group, created = Group.objects.get_or_create(name='lab')
+            user.groups.add(lab_group)
+            
+            # Create lab user profile
+            LabUser.objects.create(
+                user=user,
+                lab_profile=lab_profile,
+                user_type=user_type
+            )
+            
+            messages.success(request, f'User {username} created successfully for {lab_profile.name}.')
+            return redirect('labs:dashboard')
+            
+        except Exception as e:
+            messages.error(request, f'Error creating user: {str(e)}')
+            return redirect('labs:create_lab_user', lab_id=lab_id)
+    
+    return render(request, 'labs/create_lab_user.html', {
+        'lab_profile': lab_profile,
+        'user_types': [
+            ('LAB_STAFF', 'Lab Staff'),
+            ('LAB_TECHNICIAN', 'Lab Technician'),
+            ('LAB_MANAGER', 'Lab Manager'),
+            ('LAB_ADMIN', 'Lab Administrator'),
+        ]
+    })
+
+@login_required
+def manage_lab_tests(request, lab_id):
+    """Manage tests for a specific lab"""
+    if not request.user.is_superuser:
+        raise PermissionDenied("Only superusers can manage lab tests.")
+    
+    lab_profile = get_object_or_404(LabProfile, id=lab_id)
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        test_id = request.POST.get('test_id')
+        
+        if action == 'add_test':
+            test_definition_id = request.POST.get('test_definition_id')
+            price = request.POST.get('price')
+            turnaround_time = request.POST.get('turnaround_time')
+            offers_home_collection = request.POST.get('offers_home_collection') == 'on'
+            
+            if not all([test_definition_id, price, turnaround_time]):
+                messages.error(request, 'Test definition, price, and turnaround time are required.')
+                return redirect('labs:manage_lab_tests', lab_id=lab_id)
+            
+            try:
+                test_definition = TestDefinition.objects.get(id=test_definition_id)
+                ExternalLabTestOffering.objects.create(
+                    lab_profile=lab_profile,
+                    test=test_definition,
+                    price=Decimal(price),
+                    turnaround_time_hours=int(turnaround_time),
+                    offers_home_collection=offers_home_collection,
+                    is_active=True
+                )
+                messages.success(request, f'Test {test_definition.name} added to {lab_profile.name}.')
+            except Exception as e:
+                messages.error(request, f'Error adding test: {str(e)}')
+        
+        elif action == 'remove_test':
+            try:
+                test_offering = ExternalLabTestOffering.objects.get(id=test_id, lab_profile=lab_profile)
+                test_name = test_offering.test.name
+                test_offering.delete()
+                messages.success(request, f'Test {test_name} removed from {lab_profile.name}.')
+            except ExternalLabTestOffering.DoesNotExist:
+                messages.error(request, 'Test offering not found.')
+            except Exception as e:
+                messages.error(request, f'Error removing test: {str(e)}')
+        
+        elif action == 'toggle_test':
+            try:
+                test_offering = ExternalLabTestOffering.objects.get(id=test_id, lab_profile=lab_profile)
+                test_offering.is_active = not test_offering.is_active
+                test_offering.save()
+                status = 'activated' if test_offering.is_active else 'deactivated'
+                messages.success(request, f'Test {test_offering.test.name} {status}.')
+            except ExternalLabTestOffering.DoesNotExist:
+                messages.error(request, 'Test offering not found.')
+            except Exception as e:
+                messages.error(request, f'Error toggling test: {str(e)}')
+        
+        return redirect('labs:manage_lab_tests', lab_id=lab_id)
+    
+    # Get current lab tests
+    lab_tests = ExternalLabTestOffering.objects.filter(lab_profile=lab_profile).select_related('test')
+    
+    # Get available test definitions (not already added to this lab)
+    existing_test_ids = lab_tests.values_list('test_id', flat=True)
+    available_tests = TestDefinition.objects.exclude(id__in=existing_test_ids)
+    
+    # Get lab users
+    # Get main lab user (owner of lab profile)
+    main_lab_user = lab_profile.user
+    
+    # Get additional lab users
+    additional_lab_users = LabUser.objects.filter(lab_profile=lab_profile, is_active=True).select_related('user')
+    
+    # Combine them for display
+    lab_users = []
+    lab_users.append({
+        'user': main_lab_user,
+        'user_type': 'LAB_OWNER',
+        'is_main_user': True
+    })
+    
+    for lab_user in additional_lab_users:
+        lab_users.append({
+            'user': lab_user.user,
+            'user_type': lab_user.user_type,
+            'is_main_user': False
+        })
+    
+    context = {
+        'lab_profile': lab_profile,
+        'lab_tests': lab_tests,
+        'available_tests': available_tests,
+        'lab_users': lab_users,
+    }
+    
+    return render(request, 'labs/manage_lab_tests.html', context)
+
+@login_required
+def remove_lab_user(request, lab_id, user_id):
+    """Remove a user from a lab"""
+    if not request.user.is_superuser:
+        raise PermissionDenied("Only superusers can remove lab users.")
+    
+    lab_profile = get_object_or_404(LabProfile, id=lab_id)
+    user = get_object_or_404(User, id=user_id)
+    
+    try:
+        # Remove from lab group
+        lab_group = Group.objects.get(name='lab')
+        user.groups.remove(lab_group)
+        
+        # Remove lab user profile if exists
+        try:
+            lab_user = LabUser.objects.get(user=user, lab_profile=lab_profile)
+            lab_user.delete()
+        except LabUser.DoesNotExist:
+            pass
+        
+        # If this was the main lab user, deactivate the lab
+        if user == lab_profile.user:
+            lab_profile.is_active = False
+            lab_profile.save()
+            messages.warning(request, f'Lab {lab_profile.name} has been deactivated as the main user was removed.')
+        else:
+            messages.success(request, f'User {user.username} removed from {lab_profile.name}.')
+        
+    except Exception as e:
+        messages.error(request, f'Error removing user: {str(e)}')
+    
+    return redirect('labs:manage_lab_tests', lab_id=lab_id)

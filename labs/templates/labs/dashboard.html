@@ -77,6 +77,7 @@
                                class="text-green-600 hover:text-green-900 mr-4">Approve</a>
                             {% endif %}
                             <a href="{% url 'labs:edit_lab' lab.id %}" class="text-blue-600 hover:text-blue-900 mr-4">Edit</a>
+                            <a href="{% url 'labs:manage_lab_tests' lab.id %}" class="text-purple-600 hover:text-purple-900 mr-4">Manage</a>
                             <a href="{% url 'labs:deactivate_lab' lab.id %}" class="text-red-600 hover:text-red-900">Deactivate</a>
                         </td>
                     </tr>

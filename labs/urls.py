@@ -38,6 +38,7 @@ urlpatterns = [
     path('edit-test/<int:offering_id>/', views.edit_test_offering, name='edit_test_offering'),
     path('delete-test/<int:offering_id>/', views.delete_test_offering, name='delete_test_offering'),
     path('order-tests/', views.order_tests, name='order_tests'),
+    path('order-lab-tests/<int:patient_id>/', views.order_lab_tests, name='order_lab_tests'),
     path('orders/', views.orders_list, name='orders_list'),
     path('orders/<int:order_id>/', views.order_detail, name='order_detail'),
     path('orders/<int:order_id>/confirm-payment/', views.confirm_payment, name='confirm_payment'),
@@ -45,6 +46,7 @@ urlpatterns = [
     path('orders/<int:order_id>/upload-result_api/', views.upload_result_api, name='upload_result_api'),
     path('doctor-requests/', views.doctor_requests, name='doctor_requests'),
     path('manage-tests/', views.manage_tests, name='manage_tests'),
+    path('update-test-offering/', views.update_test_offering, name='update_test_offering'),
     path('api/upload-result/', views.upload_result_api, name='upload_result_api'),
     path('results/<int:result_id>/download/', views.download_lab_result, name='download_result'),
     path('api/labs/available/', views.available_labs, name='available_labs'), 
@@ -55,4 +57,9 @@ urlpatterns = [
     path('edit-lab/<int:lab_id>/', views.edit_lab, name='edit_lab'),
     path('deactivate-lab/<int:lab_id>/', views.deactivate_lab, name='deactivate_lab'),
     path('process-request/<str:request_id>/<str:request_type>/', views.process_lab_request, name='process_lab_request'),
+    
+    # Lab user and test management
+    path('create-lab-user/<int:lab_id>/', views.create_lab_user, name='create_lab_user'),
+    path('manage-lab-tests/<int:lab_id>/', views.manage_lab_tests, name='manage_lab_tests'),
+    path('remove-lab-user/<int:lab_id>/<int:user_id>/', views.remove_lab_user, name='remove_lab_user'),
 ]   

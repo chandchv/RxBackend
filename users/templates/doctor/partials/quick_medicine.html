@@ -1,0 +1,248 @@
+<div class="space-y-4">
+    <div>
+        <h4 class="font-medium mb-2">Frequent Medicines</h4>
+        <div class="grid grid-cols-2 gap-2">
+            <button onclick="addQuickMedicine('Paracetamol', '500mg', '1-0-1', '5 days')" 
+                    class="p-2 text-left bg-green-50 hover:bg-green-100 rounded text-sm">
+                <strong>Paracetamol</strong>
+                <div class="text-xs text-gray-600">500mg • 1-0-1</div>
+            </button>
+            <button onclick="addQuickMedicine('Ibuprofen', '400mg', '1-1-1', '5 days')" 
+                    class="p-2 text-left bg-green-50 hover:bg-green-100 rounded text-sm">
+                <strong>Ibuprofen</strong>
+                <div class="text-xs text-gray-600">400mg • 1-1-1</div>
+            </button>
+            <button onclick="addQuickMedicine('Amoxicillin', '500mg', '1-1-1', '7 days')" 
+                    class="p-2 text-left bg-green-50 hover:bg-green-100 rounded text-sm">
+                <strong>Amoxicillin</strong>
+                <div class="text-xs text-gray-600">500mg • 1-1-1</div>
+            </button>
+            <button onclick="addQuickMedicine('Metformin', '500mg', '1-0-1', 'Lifetime')" 
+                    class="p-2 text-left bg-green-50 hover:bg-green-100 rounded text-sm">
+                <strong>Metformin</strong>
+                <div class="text-xs text-gray-600">500mg • 1-0-1</div>
+            </button>
+            <button onclick="addQuickMedicine('Amlodipine', '5mg', '1-0-0', 'Lifetime')" 
+                    class="p-2 text-left bg-green-50 hover:bg-green-100 rounded text-sm">
+                <strong>Amlodipine</strong>
+                <div class="text-xs text-gray-600">5mg • 1-0-0</div>
+            </button>
+            <button onclick="addQuickMedicine('Omeprazole', '20mg', '1-0-0', '4 weeks')" 
+                    class="p-2 text-left bg-green-50 hover:bg-green-100 rounded text-sm">
+                <strong>Omeprazole</strong>
+                <div class="text-xs text-gray-600">20mg • 1-0-0</div>
+            </button>
+        </div>
+    </div>
+    
+    <div>
+        <h4 class="font-medium mb-2">Search Medicines</h4>
+        <input type="text" id="medicine-search" 
+               class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+               placeholder="Type medicine name..."
+               onkeyup="searchMedicines(this.value)">
+        <div id="medicine-search-results" class="mt-2 max-h-40 overflow-y-auto"></div>
+    </div>
+    
+    <div>
+        <h4 class="font-medium mb-2">Custom Medicine</h4>
+        <div class="grid grid-cols-2 gap-2">
+            <input type="text" id="custom-medicine-name" 
+                   class="border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="Medicine name">
+            <input type="text" id="custom-medicine-dosage" 
+                   class="border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="Dosage">
+        </div>
+        <div class="grid grid-cols-2 gap-2 mt-2">
+            <input type="text" id="custom-medicine-frequency" 
+                   class="border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="Frequency">
+            <input type="text" id="custom-medicine-duration" 
+                   class="border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="Duration">
+        </div>
+        <button onclick="addCustomMedicine()" 
+                class="mt-2 w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+            Add Custom Medicine
+        </button>
+    </div>
+</div>
+
+<script>
+function addQuickMedicine(name, dosage, frequency, duration) {
+    const medicineData = {
+        name: name,
+        dosage: dosage,
+        frequency: frequency,
+        duration: duration,
+        instructions: ''
+    };
+    
+    // Call the function from the main template
+    if (typeof addMedicineFromSuggestion === 'function') {
+        addMedicineFromSuggestion(name, medicineData);
+    } else {
+        // Fallback: directly add to the medicines container
+        addMedicineToPrescriptionDirect(medicineData);
+    }
+}
+
+function searchMedicines(query) {
+    if (query.length < 2) {
+        document.getElementById('medicine-search-results').innerHTML = '';
+        return;
+    }
+    
+    // Use the real drug search API
+    fetch(`/users/api/medicines/search/?query=${encodeURIComponent(query)}`)
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById('medicine-search-results').innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error searching medicines:', error);
+            // Fallback to static list
+            searchMedicinesFallback(query);
+        });
+}
+
+function searchMedicinesFallback(query) {
+    // Fallback static medicine list
+    const allMedicines = [
+        { name: 'Paracetamol', dosage: '500mg', frequency: '1-0-1' },
+        { name: 'Ibuprofen', dosage: '400mg', frequency: '1-1-1' },
+        { name: 'Amoxicillin', dosage: '500mg', frequency: '1-1-1' },
+        { name: 'Metformin', dosage: '500mg', frequency: '1-0-1' },
+        { name: 'Amlodipine', dosage: '5mg', frequency: '1-0-0' },
+        { name: 'Omeprazole', dosage: '20mg', frequency: '1-0-0' },
+        { name: 'Dextromethorphan', dosage: '15mg', frequency: '1-1-1-1' },
+        { name: 'Guaifenesin', dosage: '200mg', frequency: '1-1-1-1' }
+    ];
+    
+    const filtered = allMedicines.filter(med => 
+        med.name.toLowerCase().includes(query.toLowerCase())
+    );
+    
+    const resultsDiv = document.getElementById('medicine-search-results');
+    resultsDiv.innerHTML = filtered.map(med => `
+        <div class="p-2 hover:bg-gray-100 rounded cursor-pointer" 
+             onclick="addQuickMedicine('${med.name}', '${med.dosage}', '${med.frequency}', '5 days')">
+            <strong>${med.name}</strong>
+            <div class="text-xs text-gray-600">${med.dosage} • ${med.frequency}</div>
+        </div>
+    `).join('');
+}
+
+function addCustomMedicine() {
+    const name = document.getElementById('custom-medicine-name').value.trim();
+    const dosage = document.getElementById('custom-medicine-dosage').value.trim();
+    const frequency = document.getElementById('custom-medicine-frequency').value.trim();
+    const duration = document.getElementById('custom-medicine-duration').value.trim();
+    
+    if (!name || !dosage) {
+        if (typeof showToast === 'function') {
+            showToast('Please enter medicine name and dosage', 'error');
+        } else {
+            alert('Please enter medicine name and dosage');
+        }
+        return;
+    }
+    
+    const medicineData = {
+        name: name,
+        dosage: dosage,
+        frequency: frequency || 'As prescribed',
+        duration: duration || '5 days',
+        instructions: ''
+    };
+    
+    // Call the function from the main template
+    if (typeof addMedicineFromSuggestion === 'function') {
+        addMedicineFromSuggestion(name, medicineData);
+    } else {
+        // Fallback: directly add to the medicines container
+        addMedicineToPrescriptionDirect(medicineData);
+    }
+}
+
+// Fallback function if addMedicineFromSuggestion is not available
+function addMedicineToPrescriptionDirect(medicineData) {
+    // This is a fallback that directly manipulates the DOM
+    const container = document.getElementById('medicines-container');
+    const noMedicines = document.getElementById('no-medicines');
+    
+    if (!container) {
+        console.error('Medicines container not found');
+        return;
+    }
+    
+    const medicineCard = document.createElement('div');
+    medicineCard.className = 'medicine-card bg-gray-50 p-4 rounded-lg border';
+    
+    // Get current medicine count
+    const currentCount = container.querySelectorAll('.medicine-card').length;
+    
+    medicineCard.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Medicine</label>
+                <input type="text" name="medicines[${currentCount}][name]" 
+                       value="${medicineData.name}"
+                       class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="Search medicine...">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Dosage</label>
+                <input type="text" name="medicines[${currentCount}][dosage]" 
+                       value="${medicineData.dosage}"
+                       class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="e.g., 500mg">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Duration</label>
+                <div class="flex items-center space-x-2">
+                    <input type="text" name="medicines[${currentCount}][duration]" 
+                           value="${medicineData.duration}"
+                           class="w-20 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                           placeholder="5">
+                    <select name="medicines[${currentCount}][frequency]" 
+                            class="flex-1 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Select frequency</option>
+                        <option value="1-0-0" ${medicineData.frequency === '1-0-0' ? 'selected' : ''}>1-0-0 (Morning only)</option>
+                        <option value="0-0-1" ${medicineData.frequency === '0-0-1' ? 'selected' : ''}>0-0-1 (Night only)</option>
+                        <option value="1-0-1" ${medicineData.frequency === '1-0-1' ? 'selected' : ''}>1-0-1 (Morning & Night)</option>
+                        <option value="1-1-1" ${medicineData.frequency === '1-1-1' ? 'selected' : ''}>1-1-1 (Three times daily)</option>
+                        <option value="1-1-0" ${medicineData.frequency === '1-1-0' ? 'selected' : ''}>1-1-0 (Morning & Afternoon)</option>
+                        <option value="0-1-1" ${medicineData.frequency === '0-1-1' ? 'selected' : ''}>0-1-1 (Afternoon & Night)</option>
+                        <option value="1-1-1-1" ${medicineData.frequency === '1-1-1-1' ? 'selected' : ''}>1-1-1-1 (Four times daily)</option>
+                        <option value="Every 6 hours" ${medicineData.frequency === 'Every 6 hours' ? 'selected' : ''}>Every 6 hours</option>
+                        <option value="Every 8 hours" ${medicineData.frequency === 'Every 8 hours' ? 'selected' : ''}>Every 8 hours</option>
+                        <option value="Every 12 hours" ${medicineData.frequency === 'Every 12 hours' ? 'selected' : ''}>Every 12 hours</option>
+                        <option value="As needed" ${medicineData.frequency === 'As needed' ? 'selected' : ''}>As needed (SOS)</option>
+                        <option value="Before meals" ${medicineData.frequency === 'Before meals' ? 'selected' : ''}>Before meals</option>
+                        <option value="After meals" ${medicineData.frequency === 'After meals' ? 'selected' : ''}>After meals</option>
+                        <option value="Empty stomach" ${medicineData.frequency === 'Empty stomach' ? 'selected' : ''}>Empty stomach</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Instructions</label>
+                <input type="text" name="medicines[${currentCount}][instructions]" 
+                       value="${medicineData.instructions}"
+                       class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="e.g., After meals">
+                <button type="button" onclick="this.closest('.medicine-card').remove()" 
+                        class="mt-2 text-red-600 hover:text-red-800 text-sm">
+                    Remove
+                </button>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(medicineCard);
+    if (noMedicines) {
+        noMedicines.style.display = 'none';
+    }
+}
+</script> 

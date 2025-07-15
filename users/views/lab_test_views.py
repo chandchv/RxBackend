@@ -69,9 +69,12 @@ def lab_prescription_detail(request, prescription_id):
         messages.error(request, 'You do not have permission to view this prescription.')
         return redirect('dashboard')
     
+    # Get lab tests for this prescription
+    lab_tests = LabTest.objects.filter(prescription=prescription).select_related('test_definition')
+    
     context = {
         'prescription': prescription,
-        'tests': prescription.tests.all(),
+        'tests': lab_tests,
         'booking': getattr(prescription, 'booking', None)
     }
     return render(request, 'doctor/lab_prescription_detail.html', context)
@@ -102,9 +105,12 @@ def book_lab_test(request, prescription_id):
         messages.success(request, 'Lab test booked successfully.')
         return redirect('lab_prescription_detail', prescription_id=prescription.id)
     
+    # Get lab tests for this prescription
+    lab_tests = LabTest.objects.filter(prescription=prescription).select_related('test_definition')
+    
     context = {
         'prescription': prescription,
-        'tests': prescription.tests.all()
+        'tests': lab_tests
     }
     return render(request, 'patient/book_lab_test.html', context)
 

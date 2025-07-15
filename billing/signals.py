@@ -121,6 +121,7 @@ def create_lab_test_billing(sender, instance, created, **kwargs):
             lab_test=instance,
             bill=bill,
             base_price=base_price,
+            discount_percentage=Decimal('0.00'),
             is_home_collection=is_home_collection,
             home_collection_fee=home_collection_fee,
             commission_percentage=commission_percentage

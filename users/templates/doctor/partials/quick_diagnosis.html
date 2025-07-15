@@ -1,0 +1,67 @@
+<div class="space-y-4">
+    <div>
+        <h4 class="font-medium mb-2">Common Diagnoses</h4>
+        <div class="grid grid-cols-2 gap-2">
+            <button onclick="selectQuickDiagnosis('Hypertension')" 
+                    class="p-2 text-left bg-blue-50 hover:bg-blue-100 rounded text-sm">
+                Hypertension
+            </button>
+            <button onclick="selectQuickDiagnosis('Diabetes Mellitus')" 
+                    class="p-2 text-left bg-blue-50 hover:bg-blue-100 rounded text-sm">
+                Diabetes Mellitus
+            </button>
+            <button onclick="selectQuickDiagnosis('Upper Respiratory Tract Infection')" 
+                    class="p-2 text-left bg-blue-50 hover:bg-blue-100 rounded text-sm">
+                URTI
+            </button>
+            <button onclick="selectQuickDiagnosis('Gastroenteritis')" 
+                    class="p-2 text-left bg-blue-50 hover:bg-blue-100 rounded text-sm">
+                Gastroenteritis
+            </button>
+            <button onclick="selectQuickDiagnosis('Migraine')" 
+                    class="p-2 text-left bg-blue-50 hover:bg-blue-100 rounded text-sm">
+                Migraine
+            </button>
+            <button onclick="selectQuickDiagnosis('Anxiety Disorder')" 
+                    class="p-2 text-left bg-blue-50 hover:bg-blue-100 rounded text-sm">
+                Anxiety
+            </button>
+            <button onclick="selectQuickDiagnosis('Depression')" 
+                    class="p-2 text-left bg-blue-50 hover:bg-blue-100 rounded text-sm">
+                Depression
+            </button>
+            <button onclick="selectQuickDiagnosis('Osteoarthritis')" 
+                    class="p-2 text-left bg-blue-50 hover:bg-blue-100 rounded text-sm">
+                Osteoarthritis
+            </button>
+        </div>
+    </div>
+    
+    <div>
+        <h4 class="font-medium mb-2">Custom Diagnosis</h4>
+        <input type="text" id="custom-diagnosis" 
+               class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+               placeholder="Type custom diagnosis...">
+        <button onclick="addCustomDiagnosis()" 
+                class="mt-2 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            Add Custom Diagnosis
+        </button>
+    </div>
+</div>
+
+<script>
+function selectQuickDiagnosis(diagnosis) {
+    document.querySelector('input[name="diagnosis"]').value = diagnosis;
+    hideQuickAdd();
+    showToast(`Diagnosis "${diagnosis}" added`, 'success');
+}
+
+function addCustomDiagnosis() {
+    const customDiagnosis = document.getElementById('custom-diagnosis').value.trim();
+    if (customDiagnosis) {
+        document.querySelector('input[name="diagnosis"]').value = customDiagnosis;
+        hideQuickAdd();
+        showToast(`Custom diagnosis "${customDiagnosis}" added`, 'success');
+    }
+}
+</script> 

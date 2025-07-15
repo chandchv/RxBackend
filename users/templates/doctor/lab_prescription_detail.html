@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+
+{% block title %}Lab Test Prescription{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <!-- Header -->
+        <div class="border-b p-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold">Lab Test Prescription</h1>
+                    <p class="text-gray-600">Prescription ID: {{ prescription.id }}</p>
+                </div>
+                <div class="text-right">
+                    <span class="px-3 py-1 rounded-full text-sm font-semibold
+                        {% if prescription.status == 'PENDING' %}bg-yellow-100 text-yellow-800
+                        {% elif prescription.status == 'BOOKED' %}bg-blue-100 text-blue-800
+                        {% elif prescription.status == 'COMPLETED' %}bg-green-100 text-green-800
+                        {% else %}bg-red-100 text-red-800{% endif %}">
+                        {{ prescription.get_status_display }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Prescription Details -->
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h2 class="text-lg font-semibold mb-4">Prescription Information</h2>
+                    <div class="space-y-2">
+                        <p><strong>Prescribed By:</strong> Dr. {{ prescription.doctor.get_full_name }}</p>
+                        <p><strong>Date:</strong> {{ prescription.prescription_date|date:"F j, Y" }}</p>
+                        <p><strong>Preferred Lab Type:</strong> {{ prescription.get_preferred_lab_type_display }}</p>
+                        {% if prescription.inhouse_lab %}
+                        <p><strong>In-house Lab:</strong> {{ prescription.inhouse_lab.name }}</p>
+                        {% endif %}
+                        {% if prescription.external_lab %}
+                        <p><strong>External Lab:</strong> {{ prescription.external_lab.name }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                <div>
+                    <h2 class="text-lg font-semibold mb-4">Booking Status</h2>
+                    <div class="space-y-2">
+                        {% if prescription.status == 'PENDING' %}
+                        <p class="text-yellow-600">This prescription is pending booking. Please book your lab tests at your preferred lab or choose a lab below.</p>
+                        {% elif prescription.status == 'BOOKED' %}
+                        <p class="text-blue-600">Your tests have been booked.</p>
+                        {% if booking %}
+                            <p><strong>Collection Type:</strong> {{ booking.get_collection_type_display }}</p>
+                            <p><strong>Collection Date:</strong> {{ booking.collection_date|date:"F j, Y H:i" }}</p>
+                            {% if booking.collection_address %}
+                            <p><strong>Collection Address:</strong> {{ booking.collection_address }}</p>
+                            {% endif %}
+                        {% endif %}
+                        {% elif prescription.status == 'COMPLETED' %}
+                        <p class="text-green-600">All tests have been completed. Please check individual test results below.</p>
+                        {% elif prescription.status == 'CANCELLED' %}
+                        <p class="text-red-600">This prescription has been cancelled.</p>
+                        {% endif %}
+                        
+                        {% if prescription.notes %}
+                        <div class="mt-4">
+                            <h3 class="font-medium text-gray-700">Doctor's Notes:</h3>
+                            <p class="mt-1 text-gray-600">{{ prescription.notes }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prescribed Tests -->
+            <div class="mt-8">
+                <h2 class="text-lg font-semibold mb-4">Prescribed Tests</h2>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Collection Type</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for test in tests %}
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="font-medium text-gray-900">{{ test.test_definition.name }}</div>
+                                    {% if test.doctor_notes %}
+                                    <div class="text-sm text-gray-500">{{ test.doctor_notes }}</div>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                        {% if test.collection_type == 'IN_CLINIC' %}bg-indigo-100 text-indigo-800
+                                        {% else %}bg-purple-100 text-purple-800{% endif %}">
+                                        {{ test.get_collection_type_display }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                        {% if test.status == 'REQUESTED' %}bg-yellow-100 text-yellow-800
+                                        {% elif test.status == 'ASSIGNED' %}bg-blue-100 text-blue-800
+                                        {% elif test.status == 'SAMPLE_COLLECTED' %}bg-indigo-100 text-indigo-800
+                                        {% elif test.status == 'PROCESSING' %}bg-purple-100 text-purple-800
+                                        {% elif test.status == 'COMPLETED' %}bg-green-100 text-green-800
+                                        {% elif test.status == 'REVIEWED' %}bg-green-700 text-white
+                                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                        {{ test.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    {% if test.status == 'COMPLETED' or test.status == 'REVIEWED' %}
+                                    <a href="{% url 'users:patient_lab_test_detail' test.id %}" class="text-blue-600 hover:text-blue-900">
+                                        View Results
+                                    </a>
+                                    {% else %}
+                                    <span class="text-gray-500">Pending</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Book Tests -->
+            {% if prescription.status == 'PENDING' %}
+            <div class="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h2 class="text-lg font-semibold mb-4">Book Your Tests</h2>
+                <p class="mb-4">You can book your lab tests at any of our partner labs or at the doctor's clinic.</p>
+                
+                <a href="{% url 'users:book_lab_test' prescription.id %}" 
+                   class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Book Lab Tests
+                </a>
+            </div>
+            {% endif %}
+
+            <!-- Actions -->
+            <div class="mt-8 border-t pt-6 flex justify-end">
+                <a href="{% url 'users:patient_dashboard' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    <i class="fas fa-arrow-left mr-2"></i> Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

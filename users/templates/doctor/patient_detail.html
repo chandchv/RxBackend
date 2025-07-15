@@ -10,9 +10,13 @@
             <div class="flex justify-between items-center">
                 <h1 class="text-2xl font-bold text-gray-900">{{ patient.get_full_name }}</h1>
                 <div class="space-x-2">
-                    <a href="{% url 'users:create_prescription' patient.id %}" 
+                    <a href="{% url 'users:prescription_selection' patient.id %}" 
                        class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-300 hover:bg-blue-700">
                         New Prescription
+                    </a>
+                    <a href="{% url 'labs:order_lab_tests' patient.id %}" 
+                       class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
+                        Order Lab Tests
                     </a>
                     <a href="{% url 'users:create_appointment' %}?patient={{ patient.id }}" 
                        class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
@@ -47,24 +51,40 @@
                 </div>
                 
                 <div>
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Patient Vital Signs</h3>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-medium text-gray-900">Patient Vital Signs</h3>
+                        <a href="{% url 'users:patient_vitals_history' patient.id %}" 
+                           class="text-sm text-blue-600 hover:text-blue-800">View History</a>
+                    </div>
                     <dl class="grid grid-cols-1 gap-2">
                         
                         <div class="flex justify-between">
                             <dt class="text-sm font-medium text-gray-500">Blood Pressure</dt>
-                            <dd class="text-sm text-gray-900">{{ patient_vitals.blood_pressure }}</dd>
+                            <dd class="text-sm text-gray-900">{{ patient_vitals.blood_pressure|default:'Not recorded' }}</dd>
                         </div>
                         <div class="flex justify-between">
                             <dt class="text-sm font-medium text-gray-500">Temperature</dt>
-                            <dd class="text-sm text-gray-900">{{ patient_vitals.temperature }}</dd>
+                            <dd class="text-sm text-gray-900">{{ patient_vitals.temperature|default:'Not recorded' }}</dd>
                         </div>
                         <div class="flex justify-between">
                             <dt class="text-sm font-medium text-gray-500">Pulse</dt>
-                            <dd class="text-sm text-gray-900">{{ patient_vitals.heart_rate }}</dd>
+                            <dd class="text-sm text-gray-900">{{ patient_vitals.heart_rate|default:'Not recorded' }}</dd>
                         </div>
                         <div class="flex justify-between">
                             <dt class="text-sm font-medium text-gray-500">Oxygen Saturation</dt>
-                            <dd class="text-sm text-gray-900">{{ patient_vitals.oxygen_saturation }}</dd>
+                            <dd class="text-sm text-gray-900">{{ patient_vitals.oxygen_saturation|default:'Not recorded' }}</dd>
+                        </div>
+                        <div class="flex justify-between">
+                            <dt class="text-sm font-medium text-gray-500">Weight</dt>
+                            <dd class="text-sm text-gray-900">{{ patient_vitals.weight|default:'Not recorded' }} kg</dd>
+                        </div>
+                        <div class="flex justify-between">
+                            <dt class="text-sm font-medium text-gray-500">Height</dt>
+                            <dd class="text-sm text-gray-900">{{ patient_vitals.height|default:'Not recorded' }} cm</dd>
+                        </div>
+                        <div class="flex justify-between">
+                            <dt class="text-sm font-medium text-gray-500">BMI</dt>
+                            <dd class="text-sm text-gray-900">{{ patient_vitals.bmi|default:'Not calculated' }}</dd>
                         </div>
                         
 
@@ -172,13 +192,21 @@
         <div class="px-6 py-4">
             <h3 class="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
             <div class="space-x-4">
-                <a href="{% url 'users:create_prescription' patient.id %}" 
+                <a href="{% url 'users:prescription_selection' patient.id %}" 
                    class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
                     New Prescription
+                </a>
+                <a href="{% url 'labs:order_lab_tests' patient.id %}" 
+                   class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
+                    Order Lab Tests
                 </a>
                 <a href="{% url 'users:create_appointment' %}?patient={{ patient.id }}" 
                    class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
                     Schedule Appointment
+                </a>
+                <a href="{% url 'users:patient_vitals_history' patient.id %}" 
+                   class="inline-flex items-center px-4 py-2 border border-purple-300 rounded-md shadow-sm text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100">
+                    View Vitals History
                 </a>
             </div>
         </div>

@@ -261,12 +261,381 @@ class CommissionLedger(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.get_transaction_type_display()} - {self.amount} for Order #{self.order.id}"
+        return f"{self.transaction_type} - {self.amount} for {self.user}"
 
     def save(self, *args, **kwargs):
-        """
-        Update paid_at when status changes to PAID
-        """
         if self.status == 'PAID' and not self.paid_at:
             self.paid_at = timezone.now()
         super().save(*args, **kwargs)
+
+# ===== SPECIMEN MANAGEMENT MODELS =====
+
+class SpecimenContainer(models.Model):
+    """Barcode-labeled specimen containers for easy identification"""
+    CONTAINER_TYPES = [
+        ('VACUTAINER_RED', 'BD Vacutainer Red Top'),
+        ('VACUTAINER_PURPLE', 'BD Vacutainer Purple Top'),
+        ('VACUTAINER_BLUE', 'BD Vacutainer Blue Top'),
+        ('VACUTAINER_GREEN', 'BD Vacutainer Green Top'),
+        ('URINE_CONTAINER', 'Urine Collection Container'),
+        ('STOOL_CONTAINER', 'Stool Collection Container'),
+        ('SWAB_CONTAINER', 'Swab Container'),
+        ('CUSTOM', 'Custom Container'),
+    ]
+    
+    barcode = models.CharField(max_length=50, unique=True, help_text="Unique barcode for specimen identification")
+    container_type = models.CharField(max_length=20, choices=CONTAINER_TYPES)
+    lab_profile = models.ForeignKey(LabProfile, on_delete=models.CASCADE, related_name='specimen_containers')
+    is_available = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+    
+    def __str__(self):
+        return f"Container {self.barcode} ({self.get_container_type_display()})"
+
+class Specimen(models.Model):
+    """Complete specimen management with barcode tracking"""
+    SPECIMEN_TYPES = [
+        ('BLOOD', 'Blood'),
+        ('URINE', 'Urine'),
+        ('STOOL', 'Stool'),
+        ('SWAB', 'Swab'),
+        ('TISSUE', 'Tissue'),
+        ('CSF', 'Cerebrospinal Fluid'),
+        ('SALIVA', 'Saliva'),
+        ('OTHER', 'Other'),
+    ]
+    
+    COLLECTION_METHODS = [
+        ('VENIPUNCTURE', 'Venipuncture'),
+        ('FINGER_STICK', 'Finger Stick'),
+        ('HEEL_STICK', 'Heel Stick'),
+        ('MIDSTREAM', 'Midstream Urine'),
+        ('RANDOM', 'Random Urine'),
+        ('SWAB', 'Swab Collection'),
+        ('BIOPSY', 'Biopsy'),
+        ('OTHER', 'Other'),
+    ]
+    
+    specimen_id = models.CharField(max_length=50, unique=True, help_text="Unique specimen identifier")
+    container = models.ForeignKey(SpecimenContainer, on_delete=models.PROTECT, related_name='specimens')
+    lab_order = models.ForeignKey(LabOrder, on_delete=models.CASCADE, related_name='specimens')
+    specimen_type = models.CharField(max_length=20, choices=SPECIMEN_TYPES)
+    collection_method = models.CharField(max_length=20, choices=COLLECTION_METHODS)
+    collection_date = models.DateTimeField()
+    collected_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='collected_specimens')
+    collection_notes = models.TextField(blank=True)
+    volume_ml = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    color = models.CharField(max_length=50, blank=True)
+    appearance = models.CharField(max_length=100, blank=True)
+    batch_number = models.CharField(max_length=50, blank=True, help_text="Batch for processing")
+    processing_priority = models.CharField(max_length=20, choices=[
+        ('ROUTINE', 'Routine'),
+        ('URGENT', 'Urgent'),
+        ('STAT', 'Stat'),
+        ('EMERGENCY', 'Emergency'),
+    ], default='ROUTINE')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Specimen {self.specimen_id} - {self.specimen_type}"
+
+class SpecimenProcessing(models.Model):
+    """Track specimen processing workflow"""
+    specimen = models.OneToOneField(Specimen, on_delete=models.CASCADE, related_name='processing')
+    received_at_lab = models.DateTimeField(null=True, blank=True)
+    received_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='received_specimens')
+    processing_started = models.DateTimeField(null=True, blank=True)
+    processing_completed = models.DateTimeField(null=True, blank=True)
+    processed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='processed_specimens')
+    processing_notes = models.TextField(blank=True)
+    quality_check_passed = models.BooleanField(null=True, blank=True)
+    quality_check_notes = models.TextField(blank=True)
+    storage_location = models.CharField(max_length=100, blank=True)
+    disposal_date = models.DateField(null=True, blank=True)
+    
+    def __str__(self):
+        return f"Processing for {self.specimen.specimen_id}"
+
+# ===== QUALITY CONTROL MODELS =====
+
+class QualityControlTest(models.Model):
+    """Quality control test definitions"""
+    QC_TYPES = [
+        ('INTERNAL', 'Internal QC'),
+        ('EXTERNAL', 'External QC'),
+        ('PROFICIENCY', 'Proficiency Testing'),
+    ]
+    
+    name = models.CharField(max_length=255)
+    test_definition = models.ForeignKey(TestDefinition, on_delete=models.CASCADE, related_name='qc_tests')
+    qc_type = models.CharField(max_length=20, choices=QC_TYPES)
+    frequency = models.CharField(max_length=50, help_text="e.g., Daily, Weekly, Monthly")
+    target_value = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
+    acceptable_range_min = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
+    acceptable_range_max = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
+    westgard_rules = models.JSONField(default=list, blank=True, help_text="List of Westgard rules to apply")
+    is_active = models.BooleanField(default=True)
+    
+    def __str__(self):
+        return f"{self.name} - {self.test_definition.name}"
+
+class QCResult(models.Model):
+    """Quality control test results with Levey-Jennings chart data"""
+    qc_test = models.ForeignKey(QualityControlTest, on_delete=models.CASCADE, related_name='results')
+    specimen = models.ForeignKey(Specimen, on_delete=models.CASCADE, related_name='qc_results')
+    result_value = models.DecimalField(max_digits=10, decimal_places=4)
+    run_date = models.DateTimeField()
+    run_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    instrument = models.CharField(max_length=100, blank=True)
+    lot_number = models.CharField(max_length=50, blank=True)
+    is_in_control = models.BooleanField()
+    westgard_violations = models.JSONField(default=list, blank=True)
+    corrective_action = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='reviewed_qc_results')
+    review_date = models.DateTimeField(null=True, blank=True)
+    
+    def __str__(self):
+        return f"QC Result {self.id} - {self.qc_test.name}"
+
+# ===== RESULT REPORTING MODELS =====
+
+class LabReport(models.Model):
+    """Comprehensive lab report with approval workflow"""
+    REPORT_STATUS = [
+        ('DRAFT', 'Draft'),
+        ('PENDING_REVIEW', 'Pending Review'),
+        ('REVIEWED', 'Reviewed'),
+        ('APPROVED', 'Approved'),
+        ('RELEASED', 'Released to Patient'),
+        ('AMENDED', 'Amended'),
+    ]
+    
+    lab_order = models.OneToOneField(LabOrder, on_delete=models.CASCADE, related_name='report')
+    report_number = models.CharField(max_length=50, unique=True)
+    status = models.CharField(max_length=20, choices=REPORT_STATUS, default='DRAFT')
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='created_reports')
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='reviewed_reports')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='approved_reports')
+    approved_at = models.DateTimeField(null=True, blank=True)
+    released_at = models.DateTimeField(null=True, blank=True)
+    clinical_interpretation = models.TextField(blank=True)
+    recommendations = models.TextField(blank=True)
+    critical_values = models.JSONField(default=list, blank=True)
+    turnaround_time_hours = models.IntegerField(null=True, blank=True)
+    
+    def __str__(self):
+        return f"Report {self.report_number} - {self.lab_order}"
+
+class TestResult(models.Model):
+    """Individual test results within a report"""
+    report = models.ForeignKey(LabReport, on_delete=models.CASCADE, related_name='test_results')
+    test_definition = models.ForeignKey(TestDefinition, on_delete=models.CASCADE)
+    specimen = models.ForeignKey(Specimen, on_delete=models.CASCADE, related_name='test_results')
+    result_value = models.CharField(max_length=255)
+    unit = models.CharField(max_length=20, blank=True)
+    reference_range = models.CharField(max_length=100, blank=True)
+    is_abnormal = models.BooleanField(default=False)
+    abnormality_type = models.CharField(max_length=20, choices=[
+        ('HIGH', 'High'),
+        ('LOW', 'Low'),
+        ('CRITICAL_HIGH', 'Critical High'),
+        ('CRITICAL_LOW', 'Critical Low'),
+        ('NORMAL', 'Normal'),
+    ], default='NORMAL')
+    performed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    performed_at = models.DateTimeField()
+    verified_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='verified_results')
+    verified_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    
+    def __str__(self):
+        return f"{self.test_definition.name} - {self.result_value}"
+
+# ===== COMMUNICATION & DELIVERY MODELS =====
+
+class ReportDelivery(models.Model):
+    """Track report delivery to various stakeholders"""
+    DELIVERY_METHODS = [
+        ('EMAIL', 'Email'),
+        ('SMS', 'SMS'),
+        ('WHATSAPP', 'WhatsApp'),
+        ('FAX', 'Fax'),
+        ('PORTAL', 'Patient Portal'),
+        ('IN_PERSON', 'In Person'),
+    ]
+    
+    DELIVERY_STATUS = [
+        ('PENDING', 'Pending'),
+        ('SENT', 'Sent'),
+        ('DELIVERED', 'Delivered'),
+        ('FAILED', 'Failed'),
+        ('READ', 'Read'),
+    ]
+    
+    report = models.ForeignKey(LabReport, on_delete=models.CASCADE, related_name='deliveries')
+    recipient_type = models.CharField(max_length=20, choices=[
+        ('PATIENT', 'Patient'),
+        ('DOCTOR', 'Doctor'),
+        ('REFERRING_LAB', 'Referring Lab'),
+        ('INSURANCE', 'Insurance'),
+    ])
+    recipient_email = models.EmailField(blank=True)
+    recipient_phone = models.CharField(max_length=20, blank=True)
+    delivery_method = models.CharField(max_length=20, choices=DELIVERY_METHODS)
+    status = models.CharField(max_length=20, choices=DELIVERY_STATUS, default='PENDING')
+    sent_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+    failure_reason = models.TextField(blank=True)
+    retry_count = models.IntegerField(default=0)
+    
+    def __str__(self):
+        return f"Delivery {self.id} - {self.report.report_number} to {self.recipient_type}"
+
+class CommunicationLog(models.Model):
+    """Log all communications with stakeholders"""
+    COMMUNICATION_TYPES = [
+        ('ORDER_CONFIRMATION', 'Order Confirmation'),
+        ('PAYMENT_REMINDER', 'Payment Reminder'),
+        ('COLLECTION_REMINDER', 'Collection Reminder'),
+        ('RESULT_READY', 'Result Ready'),
+        ('CRITICAL_VALUE', 'Critical Value Alert'),
+        ('REPORT_DELIVERY', 'Report Delivery'),
+        ('GENERAL', 'General Communication'),
+    ]
+    
+    lab_profile = models.ForeignKey(LabProfile, on_delete=models.CASCADE, related_name='communications')
+    communication_type = models.CharField(max_length=30, choices=COMMUNICATION_TYPES)
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='received_communications')
+    subject = models.CharField(max_length=255)
+    message = models.TextField()
+    delivery_method = models.CharField(max_length=20, choices=ReportDelivery.DELIVERY_METHODS)
+    status = models.CharField(max_length=20, choices=ReportDelivery.DELIVERY_STATUS, default='PENDING')
+    sent_at = models.DateTimeField(auto_now_add=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    related_order = models.ForeignKey(LabOrder, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    def __str__(self):
+        return f"{self.communication_type} - {self.recipient}"
+
+# ===== B2B AUTOMATION MODELS =====
+
+class B2BPartner(models.Model):
+    """B2B partners including reference labs, hospitals, clinics"""
+    PARTNER_TYPES = [
+        ('REFERENCE_LAB', 'Reference Lab'),
+        ('HOSPITAL', 'Hospital'),
+        ('CLINIC', 'Clinic'),
+        ('INSURANCE', 'Insurance Company'),
+        ('CORPORATE', 'Corporate Client'),
+        ('PHARMACY', 'Pharmacy'),
+    ]
+    
+    name = models.CharField(max_length=255)
+    partner_type = models.CharField(max_length=20, choices=PARTNER_TYPES)
+    contact_person = models.CharField(max_length=255)
+    email = models.EmailField()
+    phone = models.CharField(max_length=20)
+    address = models.TextField()
+    tax_id = models.CharField(max_length=50, blank=True)
+    credit_days = models.IntegerField(default=30, help_text="Payment terms in days")
+    discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    is_active = models.BooleanField(default=True)
+    contract_start_date = models.DateField(null=True, blank=True)
+    contract_end_date = models.DateField(null=True, blank=True)
+    special_instructions = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.name} ({self.get_partner_type_display()})"
+
+class B2BInvoice(models.Model):
+    """Automated B2B invoicing"""
+    INVOICE_STATUS = [
+        ('DRAFT', 'Draft'),
+        ('SENT', 'Sent'),
+        ('PAID', 'Paid'),
+        ('OVERDUE', 'Overdue'),
+        ('CANCELLED', 'Cancelled'),
+    ]
+    
+    invoice_number = models.CharField(max_length=50, unique=True)
+    partner = models.ForeignKey(B2BPartner, on_delete=models.CASCADE, related_name='invoices')
+    lab_profile = models.ForeignKey(LabProfile, on_delete=models.CASCADE, related_name='b2b_invoices')
+    invoice_date = models.DateField()
+    due_date = models.DateField()
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    tax_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, choices=INVOICE_STATUS, default='DRAFT')
+    paid_date = models.DateField(null=True, blank=True)
+    payment_method = models.CharField(max_length=50, blank=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Invoice {self.invoice_number} - {self.partner.name}"
+
+class B2BInvoiceItem(models.Model):
+    """Individual items in B2B invoices"""
+    invoice = models.ForeignKey(B2BInvoice, on_delete=models.CASCADE, related_name='items')
+    lab_order = models.ForeignKey(LabOrder, on_delete=models.CASCADE, related_name='b2b_invoice_items')
+    test_name = models.CharField(max_length=255)
+    quantity = models.IntegerField(default=1)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    total_price = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    def __str__(self):
+        return f"{self.test_name} - {self.invoice.invoice_number}"
+
+# ===== ANALYTICS & DASHBOARD MODELS =====
+
+class LabAnalytics(models.Model):
+    """Store analytics data for dashboard"""
+    lab_profile = models.ForeignKey(LabProfile, on_delete=models.CASCADE, related_name='analytics')
+    date = models.DateField()
+    total_orders = models.IntegerField(default=0)
+    completed_orders = models.IntegerField(default=0)
+    pending_orders = models.IntegerField(default=0)
+    total_revenue = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    average_turnaround_time = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    quality_control_passed = models.IntegerField(default=0)
+    quality_control_failed = models.IntegerField(default=0)
+    critical_values_count = models.IntegerField(default=0)
+    home_collections = models.IntegerField(default=0)
+    lab_visits = models.IntegerField(default=0)
+    
+    class Meta:
+        unique_together = ['lab_profile', 'date']
+    
+    def __str__(self):
+        return f"Analytics {self.lab_profile.name} - {self.date}"
+
+class LabUser(models.Model):
+    """Model to handle multiple users per lab profile"""
+    USER_TYPES = [
+        ('LAB_STAFF', 'Lab Staff'),
+        ('LAB_TECHNICIAN', 'Lab Technician'),
+        ('LAB_MANAGER', 'Lab Manager'),
+        ('LAB_ADMIN', 'Lab Administrator'),
+    ]
+    
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='lab_user_profile')
+    lab_profile = models.ForeignKey(LabProfile, on_delete=models.CASCADE, related_name='lab_users')
+    user_type = models.CharField(max_length=20, choices=USER_TYPES, default='LAB_STAFF')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Lab User'
+        verbose_name_plural = 'Lab Users'
+        unique_together = ['user', 'lab_profile']
+    
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.get_user_type_display()} at {self.lab_profile.name}"

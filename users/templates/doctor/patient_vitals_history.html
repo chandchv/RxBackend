@@ -1,0 +1,314 @@
+{% extends 'base.html' %}
+
+{% block title %}Patient Vitals History - {{ patient.get_full_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden mb-8">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Patient Vitals History</h1>
+                    <p class="text-gray-600">{{ patient.get_full_name }} - {{ patient.patient_id }}</p>
+                </div>
+                <div class="space-x-2">
+                    <a href="{% url 'users:patient_detail' patient.id %}" 
+                       class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        Back to Patient
+                    </a>
+                    <a href="{% url 'users:add_patient_vitals' patient.id %}" 
+                       class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
+                        Add New Vitals
+                    </a>
+                    <a href="{% url 'users:prescription_selection' patient.id %}" 
+                       class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                        New Prescription
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <svg class="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Total Readings</p>
+                    <p class="text-2xl font-semibold text-gray-900">{{ total_readings }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <svg class="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Latest Reading</p>
+                    <p class="text-2xl font-semibold text-gray-900">
+                        {% if latest_vitals %}
+                            {{ latest_vitals.created_at|date:"M j, Y" }}
+                        {% else %}
+                            No Data
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <svg class="h-8 w-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Weight Trend</p>
+                    <p class="text-2xl font-semibold text-gray-900">
+                        {% if latest_vitals.weight %}
+                            {{ latest_vitals.weight }} kg
+                        {% else %}
+                            -
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <svg class="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Heart Rate</p>
+                    <p class="text-2xl font-semibold text-gray-900">
+                        {% if latest_vitals.heart_rate %}
+                            {{ latest_vitals.heart_rate }} bpm
+                        {% else %}
+                            -
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vitals History Table -->
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">Vitals History</h2>
+        </div>
+        
+        {% if vitals_history %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weight (kg)</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Height (cm)</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">BMI</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Blood Pressure</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Temperature (°C)</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Heart Rate (bpm)</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Oxygen Saturation (%)</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recorded By</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for vital_data in vitals_history %}
+                    {% with vitals=vital_data.vitals trends=vital_data.trends %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ vitals.created_at|date:"M j, Y" }}
+                            <br>
+                            <span class="text-gray-500">{{ vitals.created_at|time:"g:i A" }}</span>
+                        </td>
+                        
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if vitals.weight %}
+                            <div class="flex items-center">
+                                <span class="text-sm text-gray-900">{{ vitals.weight }}</span>
+                                {% if trends.weight_trend %}
+                                <span class="ml-2 text-xs px-2 py-1 rounded-full 
+                                    {% if trends.weight_trend.direction == 'up' %}bg-red-100 text-red-800
+                                    {% elif trends.weight_trend.direction == 'down' %}bg-green-100 text-green-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {% if trends.weight_trend.direction == 'up' %}↗
+                                    {% elif trends.weight_trend.direction == 'down' %}↘
+                                    {% else %}→{% endif %}
+                                    {{ trends.weight_trend.change|floatformat:1 }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ vitals.height|default:'-' }}
+                        </td>
+                        
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ vitals.bmi|default:'-' }}
+                        </td>
+                        
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ vitals.blood_pressure|default:'-' }}
+                        </td>
+                        
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if vitals.temperature %}
+                            <div class="flex items-center">
+                                <span class="text-sm text-gray-900">{{ vitals.temperature }}</span>
+                                {% if trends.temperature_trend %}
+                                <span class="ml-2 text-xs px-2 py-1 rounded-full 
+                                    {% if trends.temperature_trend.direction == 'up' %}bg-red-100 text-red-800
+                                    {% elif trends.temperature_trend.direction == 'down' %}bg-green-100 text-green-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {% if trends.temperature_trend.direction == 'up' %}↗
+                                    {% elif trends.temperature_trend.direction == 'down' %}↘
+                                    {% else %}→{% endif %}
+                                    {{ trends.temperature_trend.change|floatformat:1 }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if vitals.heart_rate %}
+                            <div class="flex items-center">
+                                <span class="text-sm text-gray-900">{{ vitals.heart_rate }}</span>
+                                {% if trends.heart_rate_trend %}
+                                <span class="ml-2 text-xs px-2 py-1 rounded-full 
+                                    {% if trends.heart_rate_trend.direction == 'up' %}bg-red-100 text-red-800
+                                    {% elif trends.heart_rate_trend.direction == 'down' %}bg-green-100 text-green-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {% if trends.heart_rate_trend.direction == 'up' %}↗
+                                    {% elif trends.heart_rate_trend.direction == 'down' %}↘
+                                    {% else %}→{% endif %}
+                                    {{ trends.heart_rate_trend.change|floatformat:0 }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if vitals.oxygen_saturation %}
+                            <div class="flex items-center">
+                                <span class="text-sm text-gray-900">{{ vitals.oxygen_saturation }}</span>
+                                {% if trends.oxygen_trend %}
+                                <span class="ml-2 text-xs px-2 py-1 rounded-full 
+                                    {% if trends.oxygen_trend.direction == 'up' %}bg-green-100 text-green-800
+                                    {% elif trends.oxygen_trend.direction == 'down' %}bg-red-100 text-red-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {% if trends.oxygen_trend.direction == 'up' %}↗
+                                    {% elif trends.oxygen_trend.direction == 'down' %}↘
+                                    {% else %}→{% endif %}
+                                    {{ trends.oxygen_trend.change|floatformat:1 }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ vitals.recorded_by.get_full_name|default:'Unknown' }}
+                        </td>
+                    </tr>
+                    {% endwith %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-6 py-12 text-center">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">No vitals recorded</h3>
+            <p class="mt-1 text-sm text-gray-500">No vitals have been recorded for this patient yet.</p>
+            <div class="mt-6">
+                <a href="{% url 'users:add_patient_vitals' patient.id %}" 
+                   class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                    Record Vitals
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Vitals Charts Section -->
+    {% if vitals_history %}
+    <div class="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Weight Trend Chart -->
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Weight Trend</h3>
+            <div class="h-64 flex items-center justify-center text-gray-500">
+                <p>Chart visualization would go here</p>
+            </div>
+        </div>
+
+        <!-- Heart Rate Trend Chart -->
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Heart Rate Trend</h3>
+            <div class="h-64 flex items-center justify-center text-gray-500">
+                <p>Chart visualization would go here</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Quick Actions -->
+    <div class="mt-8 bg-white shadow-lg rounded-lg p-6">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
+                    <div class="flex flex-wrap gap-4">
+                <a href="{% url 'users:add_patient_vitals' patient.id %}" 
+                   class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                    <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    Record New Vitals
+                </a>
+                <a href="{% url 'users:patient_detail' patient.id %}" 
+                   class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                    Back to Patient
+                </a>
+            </div>
+    </div>
+</div>
+
+<script>
+// Add any JavaScript for interactive features here
+document.addEventListener('DOMContentLoaded', function() {
+    // You can add chart libraries like Chart.js here for visualizations
+    console.log('Vitals history page loaded');
+});
+</script>
+{% endblock %} 

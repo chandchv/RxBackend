@@ -282,36 +282,81 @@ def _send_notifications(
             message_detail = f"New lab test request for {patient.get_full_name()}"
             
             try:
-                # Get clinic staff to notify - using the correct model relationships
-                clinic_recipients = User.objects.filter(
-                    labstaff__lab__clinic=doctor.clinic,
-                    groups__name='lab'
-                ).distinct()
+                if lab_info['lab_type'] == LAB_TYPE_INTERNAL:
+                    # Get lab staff for internal lab
+                    lab_staff_recipients = User.objects.filter(
+                        labstaff__lab__clinic=doctor.clinic,
+                        labstaff__is_active=True
+                    ).distinct()
 
-                if clinic_recipients.exists():
-                    for recipient in clinic_recipients:
-                        if recipient:
-                            try:
-                                create_notification(
-                                    recipient=recipient,
-                                    message=f"{message_detail} for internal lab {lab_info['lab_name']}. Collection type: {lab_info['lab_test'].get_collection_type_display()}. {lab_info['lab_test'].doctor_notes or ''}",
-                                    sender=sender,
-                                    notification_type='lab_test_new',
-                                    related_object=lab_prescription,
-                                    action_url=f"/labs/test/{lab_prescription.id}/"
-                                )
-                                logger.info(f"Sent notification to lab staff {recipient.username} for lab {lab_info['lab_name']}")
-                            except Exception as e:
-                                logger.error(f"Error sending notification to lab staff {recipient.username}: {e}", exc_info=True)
-                                messages.warning(request, f"Failed to send notification to lab staff for {lab_info['lab_name']}")
-                    
-                    notified_labs.add(lab_key)
-                    logger.info(f"Successfully sent notifications to {clinic_recipients.count()} internal lab staff for {lab_info['lab_name']}")
+                    if lab_staff_recipients.exists():
+                        for recipient in lab_staff_recipients:
+                            if recipient:
+                                try:
+                                    create_notification(
+                                        recipient=recipient,
+                                        message=f"{message_detail} for internal lab {lab_info['lab_name']}. Collection type: {lab_info['lab_test'].get_collection_type_display()}. {lab_info['lab_test'].doctor_notes or ''}",
+                                        sender=sender,
+                                        notification_type='lab_test_new',
+                                        related_object=lab_prescription,
+                                        action_url=reverse('users:lab_test_detail', kwargs={'pk': lab_prescription.id})
+                                    )
+                                    logger.info(f"Sent notification to lab staff {recipient.username} for lab {lab_info['lab_name']}")
+                                except Exception as e:
+                                    logger.error(f"Error sending notification to lab staff {recipient.username}: {e}", exc_info=True)
+                                    messages.warning(request, f"Failed to send notification to lab staff for {lab_info['lab_name']}")
+                        
+                        notified_labs.add(lab_key)
+                        logger.info(f"Successfully sent notifications to {lab_staff_recipients.count()} internal lab staff for {lab_info['lab_name']}")
+                    else:
+                        logger.warning(f"No lab staff found for clinic {doctor.clinic.id} to notify for lab {lab_info['lab_name']}.")
+                
+                elif lab_info['lab_type'] == LAB_TYPE_EXTERNAL:
+                    # Get external lab profile and notify the lab user
+                    try:
+                        lab_profile = lab_info.get('lab_object')  # This should be the LabProfile object
+                        if lab_profile and lab_profile.user:
+                            create_notification(
+                                recipient=lab_profile.user,
+                                message=f"{message_detail} for your lab {lab_info['lab_name']}. Collection type: {lab_info['lab_test'].get_collection_type_display()}. {lab_info['lab_test'].doctor_notes or ''}",
+                                sender=sender,
+                                notification_type='lab_test_new',
+                                related_object=lab_prescription,
+                                                                        action_url=reverse('users:lab_test_detail', kwargs={'pk': lab_prescription.id})
+                            )
+                            notified_labs.add(lab_key)
+                            logger.info(f"Successfully sent notification to external lab {lab_info['lab_name']}")
+                        else:
+                            logger.warning(f"External LabProfile {lab_info['lab_pk']} has no user to notify.")
+                    except Exception as e:
+                        logger.error(f"Error sending notification to external lab {lab_info['lab_name']}: {e}", exc_info=True)
+                        messages.warning(request, f"Failed to send notification to external lab {lab_info['lab_name']}")
+                
                 else:
-                    logger.warning(f"No lab staff found for clinic {doctor.clinic.id} to notify for lab {lab_info['lab_name']}.")
+                    # Handle external lab (not associated with any specific lab)
+                    logger.info(f"Lab test for {lab_info['lab_name']} is external, no specific lab to notify.")
+                    
             except Exception as e:
                 logger.error(f"Error finding lab staff for clinic {doctor.clinic.id}: {e}", exc_info=True)
                 messages.warning(request, "Failed to find lab staff to notify.")
+
+    # --- Notify Patient about Lab Tests (if any) ---
+    if lab_prescription and processed_labs_info and patient.user:
+        try:
+            test_names = [lab_info['lab_test'].test_definition.name for lab_info in processed_labs_info]
+            test_list = ", ".join(test_names)
+            create_notification(
+                recipient=patient.user,
+                message=f"Dr. {doctor.name} has prescribed lab tests for you: {test_list}. Please visit the lab to get these tests done.",
+                sender=sender,
+                notification_type='lab_test_new',
+                related_object=lab_prescription,
+                action_url=reverse('users:lab_prescription_detail', kwargs={'prescription_id': lab_prescription.id})
+            )
+            logger.info(f"Sent lab test notification to patient {patient.id}")
+        except Exception as e:
+            logger.error(f"Error sending lab test notification to patient {patient.id}: {e}", exc_info=True)
+            messages.warning(request, "Failed to send lab test notification to patient.")
 
 def _create_followup_appointment(prescription: Prescription, doctor: Doctor, patient: Patient, request, selected_time: str = None) -> Optional[Appointment]:
     """

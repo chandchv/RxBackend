@@ -344,7 +344,7 @@
                 <div id="submenu-labtests" class="submenu">
                     <ul class="submenu-list">
                         {% if request.user.doctor %}
-                            <li><a href="#" class="submenu-link">Order Test</a></li>
+                            <li><a href="{% url 'users:doctor_lab_tests' %}" class="submenu-link">Order Test</a></li>
                             <li><a href="#" class="submenu-link">View Results</a></li>
                             <li><a href="#" class="submenu-link">Pending Orders</a></li>
                             <li><a href="#" class="submenu-link">Completed Tests</a></li>

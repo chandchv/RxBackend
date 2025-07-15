@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.contrib.auth.models import User
 from ..models import Doctor, Patient, Appointment, Staff, ActivityLog, LabTest, ClinicAdmin
+from labs.models import LabProfile
 from datetime import datetime, timedelta
 from django.contrib import messages
 import logging
@@ -129,6 +130,33 @@ def dashboard_redirect(request):
     except Exception as e:
         logger.error(f"Error checking clinic admin status: {str(e)}")
     
+    # Check if user is a lab user
+    try:
+        # First check if user has a direct lab profile (main lab user)
+        lab_profile = LabProfile.objects.filter(user=user).first()
+        if lab_profile:
+            if lab_profile.is_approved:
+                logger.info(f"Lab user {user.username or user.email} redirecting to lab dashboard")
+                return redirect('labs:lab_dashboard')
+            else:
+                logger.warning(f"Unapproved lab user {user.username or user.email} attempting to access dashboard")
+                messages.warning(request, 'Your lab account is pending approval. Please contact your administrator.')
+                return redirect('users:login')
+        
+        # Check if user is a lab staff member (additional lab users)
+        from labs.models import LabUser as LabUserModel
+        lab_user = LabUserModel.objects.filter(user=user, is_active=True).first()
+        if lab_user:
+            if lab_user.lab_profile.is_approved:
+                logger.info(f"Lab staff user {user.username or user.email} redirecting to lab dashboard")
+                return redirect('labs:lab_dashboard')
+            else:
+                logger.warning(f"Lab staff user {user.username or user.email} attempting to access unapproved lab")
+                messages.warning(request, 'The lab you are associated with is pending approval. Please contact your administrator.')
+                return redirect('users:login')
+    except Exception as e:
+        logger.error(f"Error checking lab status: {str(e)}")
+    
     # If no role is found, redirect to a default page
     logger.warning(f"No role found for user {user}")
     messages.warning(request, 'No user profile found. Please complete your profile.')
@@ -136,6 +164,8 @@ def dashboard_redirect(request):
 
 # Add a new view for profile setup
 def profile_setup(request):
+    from ..models import Clinic
+    
     if request.method == 'POST':
         # Handle profile creation
         try:
@@ -144,9 +174,25 @@ def profile_setup(request):
             if not date_of_birth:
                 messages.error(request, 'Date of birth is required')
                 return render(request, 'patient/profile_setup.html')
+            
+            # Get clinic - either from form or default to first available clinic
+            clinic_id = request.POST.get('clinic')
+            if clinic_id:
+                try:
+                    clinic = Clinic.objects.get(id=clinic_id)
+                except Clinic.DoesNotExist:
+                    messages.error(request, 'Selected clinic not found')
+                    return render(request, 'patient/profile_setup.html')
+            else:
+                # Default to first available clinic
+                clinic = Clinic.objects.first()
+                if not clinic:
+                    messages.error(request, 'No clinics available. Please contact administrator.')
+                    return render(request, 'patient/profile_setup.html')
                 
             patient = Patient.objects.create(
                 user=request.user,
+                clinic=clinic,  # Add the required clinic field
                 first_name=request.POST.get('first_name', request.user.first_name),
                 last_name=request.POST.get('last_name', request.user.last_name),
                 date_of_birth=date_of_birth,
@@ -161,4 +207,6 @@ def profile_setup(request):
         except Exception as e:
             messages.error(request, f'Error creating profile: {str(e)}')
     
-    return render(request, 'patient/profile_setup.html') 
+    # Get available clinics for the form
+    clinics = Clinic.objects.all()
+    return render(request, 'patient/profile_setup.html', {'clinics': clinics}) 

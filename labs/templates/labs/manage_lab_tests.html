@@ -1,0 +1,283 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage Lab - {{ lab_profile.name }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">{{ lab_profile.name }}</h1>
+                <p class="text-gray-600 mt-2">Lab Management Dashboard</p>
+            </div>
+            <a href="{% url 'labs:dashboard' %}" 
+               class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Lab Info Card -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">Contact Information</h3>
+                <p class="text-gray-600">{{ lab_profile.contact_person }}</p>
+                <p class="text-gray-600">{{ lab_profile.phone_number }}</p>
+                <p class="text-gray-600">{{ lab_profile.email }}</p>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">Address</h3>
+                <p class="text-gray-600">{{ lab_profile.address }}</p>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">Status</h3>
+                <span class="px-3 py-1 text-sm font-semibold rounded-full 
+                    {% if lab_profile.is_approved %}bg-green-100 text-green-800{% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                    {{ lab_profile.is_approved|yesno:"Approved,Pending Approval" }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+            <div class="space-y-3">
+                <a href="{% url 'labs:create_lab_user' lab_profile.id %}" 
+                   class="block w-full px-4 py-2 bg-blue-600 text-white text-center rounded-md hover:bg-blue-700 transition-colors">
+                    Add New User
+                </a>
+                <button onclick="showAddTestModal()" 
+                        class="block w-full px-4 py-2 bg-green-600 text-white text-center rounded-md hover:bg-green-700 transition-colors">
+                    Add New Test
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Statistics</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-blue-600">{{ lab_tests.count }}</p>
+                    <p class="text-sm text-gray-600">Total Tests</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-green-600">{{ lab_users|length }}</p>
+                    <p class="text-sm text-gray-600">Lab Users</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lab Tests Section -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-gray-900">Lab Tests</h2>
+            <span class="text-sm text-gray-500">{{ lab_tests.count }} tests</span>
+        </div>
+
+        {% if lab_tests %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test Name</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turnaround Time</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for test in lab_tests %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">{{ test.test.name }}</div>
+                            <div class="text-sm text-gray-500">{{ test.test.description|truncatewords:10 }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{{ test.price }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ test.turnaround_time_hours }} hours</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                {% if test.is_active %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ test.is_active|yesno:"Active,Inactive" }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                            <form method="post" class="inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="toggle_test">
+                                <input type="hidden" name="test_id" value="{{ test.id }}">
+                                <button type="submit" class="text-blue-600 hover:text-blue-900">
+                                    {{ test.is_active|yesno:"Deactivate,Activate" }}
+                                </button>
+                            </form>
+                            <form method="post" class="inline" onsubmit="return confirm('Are you sure you want to remove this test?')">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="remove_test">
+                                <input type="hidden" name="test_id" value="{{ test.id }}">
+                                <button type="submit" class="text-red-600 hover:text-red-900">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-8">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">No tests added</h3>
+            <p class="mt-1 text-sm text-gray-500">Get started by adding tests to this lab.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Lab Users Section -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-gray-900">Lab Users</h2>
+            <a href="{% url 'labs:create_lab_user' lab_profile.id %}" 
+               class="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700">
+                Add User
+            </a>
+        </div>
+
+        {% if lab_users %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for user_info in lab_users %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">{{ user_info.user.get_full_name|default:user_info.user.username }}</div>
+                            <div class="text-sm text-gray-500">@{{ user_info.user.username }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ user_info.user.email }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {% if user_info.is_main_user %}
+                                Lab Owner
+                            {% else %}
+                                {{ user_info.user_type|title|cut:"_" }}
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                Active
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            {% if not user_info.is_main_user %}
+                            <a href="{% url 'labs:remove_lab_user' lab_profile.id user_info.user.id %}" 
+                               class="text-red-600 hover:text-red-900"
+                               onclick="return confirm('Are you sure you want to remove this user from the lab?')">
+                                Remove
+                            </a>
+                            {% else %}
+                            <span class="text-gray-400">Main User</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-8">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">No users found</h3>
+            <p class="mt-1 text-sm text-gray-500">Get started by adding users to this lab.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Test Modal -->
+<div id="addTestModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Add New Test</h3>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_test">
+                
+                <div class="mb-4">
+                    <label for="test_definition_id" class="block text-sm font-medium text-gray-700 mb-2">Test *</label>
+                    <select name="test_definition_id" id="test_definition_id" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Select a test</option>
+                        {% for test in available_tests %}
+                        <option value="{{ test.id }}">{{ test.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label for="price" class="block text-sm font-medium text-gray-700 mb-2">Price (₹) *</label>
+                    <input type="number" name="price" id="price" step="0.01" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                           placeholder="Enter price">
+                </div>
+
+                <div class="mb-4">
+                    <label for="turnaround_time" class="block text-sm font-medium text-gray-700 mb-2">Turnaround Time (hours) *</label>
+                    <input type="number" name="turnaround_time" id="turnaround_time" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                           placeholder="Enter turnaround time in hours">
+                </div>
+
+                <div class="mb-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" name="offers_home_collection" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                        <span class="ml-2 text-sm text-gray-700">Offers Home Collection</span>
+                    </label>
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="hideAddTestModal()" 
+                            class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                        Add Test
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function showAddTestModal() {
+    document.getElementById('addTestModal').classList.remove('hidden');
+}
+
+function hideAddTestModal() {
+    document.getElementById('addTestModal').classList.add('hidden');
+}
+
+// Close modal when clicking outside
+document.getElementById('addTestModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        hideAddTestModal();
+    }
+});
+</script>
+{% endblock %} 

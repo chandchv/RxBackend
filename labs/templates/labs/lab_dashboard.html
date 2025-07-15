@@ -5,6 +5,7 @@
 
 {% block content %}
 <div class="container mx-auto px-4 py-8">
+    <!-- Header with Quick Actions -->
     <div class="flex justify-between items-center mb-6">
         <div>
             <h2 class="text-2xl font-bold">{{ lab_profile.name }}</h2>
@@ -22,10 +23,10 @@
                 Deactivate
             </a>
             {% endif %}
-            <a href="{% url 'labs:order_tests' %}" class="bg-blue-600 hover:bg-blue-700 text-white !text-black text-lg px-4 py-2 rounded-lg shadow transition duration-300 text-center"> 
+            <a href="{% url 'labs:order_tests' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition duration-300"> 
                 Order Tests
             </a>
-            <a href="{% url 'labs:manage_tests' %}" class="bg-blue-600 hover:bg-blue-700 text-white !text-black text-lg px-4 py-2 rounded-lg shadow transition duration-300 text-center">
+            <a href="{% url 'labs:manage_tests' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition duration-300">
                 Manage Tests
             </a>
         </div>
@@ -53,112 +54,306 @@
     </div>
     {% endif %}
 
-    <!-- Quick Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+    <!-- Main Statistics Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div class="bg-white rounded-lg shadow-md p-6">
-            <h3 class="text-lg font-semibold mb-2">Total Tests</h3>
-            <p class="text-3xl font-bold">{{ stats.total_tests }}</p>
+            <div class="flex items-center">
+                <div class="p-2 bg-blue-100 rounded-lg">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-semibold text-gray-700">Total Tests</h3>
+                    <p class="text-3xl font-bold text-blue-600">{{ stats.total_tests }}</p>
+                </div>
+            </div>
         </div>
+        
         <div class="bg-white rounded-lg shadow-md p-6">
-            <h3 class="text-lg font-semibold mb-2">Pending Orders</h3>
-            <p class="text-3xl font-bold">{{ stats.pending_orders }}</p>
+            <div class="flex items-center">
+                <div class="p-2 bg-yellow-100 rounded-lg">
+                    <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-semibold text-gray-700">Pending Orders</h3>
+                    <p class="text-3xl font-bold text-yellow-600">{{ stats.pending_orders }}</p>
+                </div>
+            </div>
         </div>
+        
         <div class="bg-white rounded-lg shadow-md p-6">
-            <h3 class="text-lg font-semibold mb-2">Completed Orders</h3>
-            <p class="text-3xl font-bold">{{ stats.completed_orders }}</p>
+            <div class="flex items-center">
+                <div class="p-2 bg-green-100 rounded-lg">
+                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-semibold text-gray-700">Completed Orders</h3>
+                    <p class="text-3xl font-bold text-green-600">{{ stats.completed_orders }}</p>
+                </div>
+            </div>
         </div>
+        
         <div class="bg-white rounded-lg shadow-md p-6">
-            <h3 class="text-lg font-semibold mb-2">Total Revenue</h3>
-            <p class="text-3xl font-bold">₹{{ stats.total_revenue }}</p>
+            <div class="flex items-center">
+                <div class="p-2 bg-purple-100 rounded-lg">
+                    <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-semibold text-gray-700">Total Revenue</h3>
+                    <p class="text-3xl font-bold text-purple-600">₹{{ stats.total_revenue }}</p>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Recent Orders -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-semibold">Recent Orders</h3>
-            <a href="{% url 'labs:orders_list' %}" class="text-blue-600 hover:text-blue-800">View All</a>
-        </div>
-        <div class="overflow-x-auto">
-            <table class="min-w-full">
-                <thead>
-                    <tr class="bg-gray-100">
-                        <th class="px-4 py-2">Order ID</th>
-                        <th class="px-4 py-2">Patient</th>
-                        <th class="px-4 py-2">Test</th>
-                        <th class="px-4 py-2">Status</th>
-                        <th class="px-4 py-2">Date</th>
-                        <th class="px-4 py-2">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for order in recent_orders %}
-                    <tr class="border-t">
-                        <td class="px-4 py-2">{{ order.id }}</td>
-                        <td class="px-4 py-2">{{ order.patient.get_full_name }}</td>
-                        <td class="px-4 py-2">{{ order.test.name }}</td>
-                        <td class="px-4 py-2">
-                            <span class="px-2 py-1 rounded text-sm 
-                                {% if order.status == 'PENDING' %}bg-yellow-100 text-yellow-800
-                                {% elif order.status == 'COMPLETED' %}bg-green-100 text-green-800
-                                {% else %}bg-blue-100 text-blue-800{% endif %}">
-                                {{ order.status }}
-                            </span>
-                        </td>
-                        <td class="px-4 py-2">{{ order.created_at|date:"M d, Y" }}</td>
-                        <td class="px-4 py-2">
-                            <a href="{% url 'labs:order_detail' order.id %}" class="text-blue-600 hover:text-blue-800">View</a>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6" class="px-4 py-2 text-center text-gray-500">No recent orders</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- Test Management -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <!-- Available Tests -->
+    <!-- Specialized Management Sections -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        
+        <!-- Specimen Management -->
         <div class="bg-white rounded-lg shadow-md p-6">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold">Available Tests</h3>
-                <a href="{% url 'labs:manage_tests' %}" class="text-blue-600 hover:text-blue-800">Manage</a>
+                <h3 class="text-lg font-semibold flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                    </svg>
+                    Specimen Management
+                </h3>
+                <a href="#" class="text-blue-600 hover:text-blue-800 text-sm">View All</a>
             </div>
-            <div class="space-y-2">
-                <div class="border-b pb-2">
-                    <style>
-                        .table-border {
-                            border: 1px solid #000;
-                        }
-                    </style>
-                    <table width="100%">
-                        <tr>
-                            <th>Test</th>
-                            <th>Price</th>
-                        </tr>
-                        {% for test in available_tests  %}
-                        
-                
-                        <tr>
-
-                            <td>
-                                <p class="font-medium">{{ test.test }}</p>
-                            </td>
-                            <td>
-                                <p class="font-medium">{{ test.price }}</p>
-                            </td>
-                        </tr>
-                       
-                        {% endfor %}
-                    </table>
-                    
+            
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="text-center p-3 bg-blue-50 rounded-lg">
+                    <p class="text-2xl font-bold text-blue-600">{{ specimen_stats.pending_collection }}</p>
+                    <p class="text-sm text-gray-600">Pending Collection</p>
                 </div>
-                
-                
+                <div class="text-center p-3 bg-yellow-50 rounded-lg">
+                    <p class="text-2xl font-bold text-yellow-600">{{ specimen_stats.in_processing }}</p>
+                    <p class="text-sm text-gray-600">In Processing</p>
+                </div>
+                <div class="text-center p-3 bg-green-50 rounded-lg">
+                    <p class="text-2xl font-bold text-green-600">{{ specimen_stats.completed_today }}</p>
+                    <p class="text-sm text-gray-600">Completed Today</p>
+                </div>
+                <div class="text-center p-3 bg-purple-50 rounded-lg">
+                    <p class="text-2xl font-bold text-purple-600">{{ specimen_stats.containers_available }}</p>
+                    <p class="text-sm text-gray-600">Containers Available</p>
+                </div>
+            </div>
+            
+            <div class="space-y-2">
+                {% for specimen in recent_specimens %}
+                <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                    <div>
+                        <p class="font-medium text-sm">{{ specimen.specimen_id }}</p>
+                        <p class="text-xs text-gray-600">{{ specimen.specimen_type }} - {{ specimen.lab_order.patient.get_full_name }}</p>
+                    </div>
+                    <span class="px-2 py-1 text-xs rounded-full
+                        {% if specimen.processing_priority == 'EMERGENCY' %}bg-red-100 text-red-800
+                        {% elif specimen.processing_priority == 'STAT' %}bg-orange-100 text-orange-800
+                        {% elif specimen.processing_priority == 'URGENT' %}bg-yellow-100 text-yellow-800
+                        {% else %}bg-green-100 text-green-800{% endif %}">
+                        {{ specimen.processing_priority }}
+                    </span>
+                </div>
+                {% empty %}
+                <p class="text-gray-500 text-sm">No recent specimens</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Quality Control -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                    </svg>
+                    Quality Control
+                </h3>
+                <a href="#" class="text-green-600 hover:text-green-800 text-sm">View All</a>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="text-center p-3 bg-green-50 rounded-lg">
+                    <p class="text-2xl font-bold text-green-600">{{ qc_stats.in_control }}</p>
+                    <p class="text-sm text-gray-600">In Control</p>
+                </div>
+                <div class="text-center p-3 bg-red-50 rounded-lg">
+                    <p class="text-2xl font-bold text-red-600">{{ qc_stats.out_of_control }}</p>
+                    <p class="text-sm text-gray-600">Out of Control</p>
+                </div>
+                <div class="text-center p-3 bg-blue-50 rounded-lg">
+                    <p class="text-2xl font-bold text-blue-600">{{ qc_stats.tests_today }}</p>
+                    <p class="text-sm text-gray-600">Tests Today</p>
+                </div>
+                <div class="text-center p-3 bg-yellow-50 rounded-lg">
+                    <p class="text-2xl font-bold text-yellow-600">{{ qc_stats.pending_review }}</p>
+                    <p class="text-sm text-gray-600">Pending Review</p>
+                </div>
+            </div>
+            
+            <div class="space-y-2">
+                {% for qc_result in recent_qc_results %}
+                <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                    <div>
+                        <p class="font-medium text-sm">{{ qc_result.qc_test.test_definition.name }}</p>
+                        <p class="text-xs text-gray-600">{{ qc_result.run_date|date:"M d, H:i" }}</p>
+                    </div>
+                    <span class="px-2 py-1 text-xs rounded-full
+                        {% if qc_result.is_in_control %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                        {% if qc_result.is_in_control %}In Control{% else %}Out of Control{% endif %}
+                    </span>
+                </div>
+                {% empty %}
+                <p class="text-gray-500 text-sm">No recent QC results</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Management & B2B -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        
+        <!-- Report Management -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Report Management
+                </h3>
+                <a href="#" class="text-purple-600 hover:text-purple-800 text-sm">View All</a>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="text-center p-3 bg-gray-50 rounded-lg">
+                    <p class="text-2xl font-bold text-gray-600">{{ report_stats.draft_reports }}</p>
+                    <p class="text-sm text-gray-600">Draft Reports</p>
+                </div>
+                <div class="text-center p-3 bg-yellow-50 rounded-lg">
+                    <p class="text-2xl font-bold text-yellow-600">{{ report_stats.pending_review }}</p>
+                    <p class="text-sm text-gray-600">Pending Review</p>
+                </div>
+                <div class="text-center p-3 bg-green-50 rounded-lg">
+                    <p class="text-2xl font-bold text-green-600">{{ report_stats.approved_today }}</p>
+                    <p class="text-sm text-gray-600">Approved Today</p>
+                </div>
+                <div class="text-center p-3 bg-blue-50 rounded-lg">
+                    <p class="text-2xl font-bold text-blue-600">{{ report_stats.released_today }}</p>
+                    <p class="text-sm text-gray-600">Released Today</p>
+                </div>
+            </div>
+            
+            <div class="space-y-2">
+                {% for report in recent_reports %}
+                <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                    <div>
+                        <p class="font-medium text-sm">{{ report.report_number }}</p>
+                        <p class="text-xs text-gray-600">{{ report.lab_order.patient.get_full_name }}</p>
+                    </div>
+                    <span class="px-2 py-1 text-xs rounded-full
+                        {% if report.status == 'RELEASED' %}bg-green-100 text-green-800
+                        {% elif report.status == 'APPROVED' %}bg-blue-100 text-blue-800
+                        {% elif report.status == 'PENDING_REVIEW' %}bg-yellow-100 text-yellow-800
+                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ report.status }}
+                    </span>
+                </div>
+                {% empty %}
+                <p class="text-gray-500 text-sm">No recent reports</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- B2B Management -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                    B2B Management
+                </h3>
+                <a href="#" class="text-indigo-600 hover:text-indigo-800 text-sm">View All</a>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="text-center p-3 bg-indigo-50 rounded-lg">
+                    <p class="text-2xl font-bold text-indigo-600">{{ b2b_stats.active_partners }}</p>
+                    <p class="text-sm text-gray-600">Active Partners</p>
+                </div>
+                <div class="text-center p-3 bg-yellow-50 rounded-lg">
+                    <p class="text-2xl font-bold text-yellow-600">{{ b2b_stats.pending_invoices }}</p>
+                    <p class="text-sm text-gray-600">Pending Invoices</p>
+                </div>
+                <div class="text-center p-3 bg-red-50 rounded-lg">
+                    <p class="text-2xl font-bold text-red-600">{{ b2b_stats.overdue_invoices }}</p>
+                    <p class="text-sm text-gray-600">Overdue Invoices</p>
+                </div>
+                <div class="text-center p-3 bg-green-50 rounded-lg">
+                    <p class="text-2xl font-bold text-green-600">₹{{ b2b_stats.total_b2b_revenue }}</p>
+                    <p class="text-sm text-gray-600">B2B Revenue</p>
+                </div>
+            </div>
+            
+            <div class="space-y-2">
+                <div class="p-3 bg-indigo-50 rounded-lg">
+                    <p class="text-sm font-medium text-indigo-800">Automated B2B Features</p>
+                    <p class="text-xs text-indigo-600 mt-1">• Auto-invoicing • Credit management • Partner discounts • Payment tracking</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Orders & Doctor Requests -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        
+        <!-- Recent Orders -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">Recent Orders</h3>
+                <a href="{% url 'labs:orders_list' %}" class="text-blue-600 hover:text-blue-800">View All</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Patient</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in recent_orders %}
+                        <tr class="border-t">
+                            <td class="px-4 py-2 text-sm">{{ order.id }}</td>
+                            <td class="px-4 py-2 text-sm">{{ order.patient.get_full_name }}</td>
+                            <td class="px-4 py-2">
+                                <span class="px-2 py-1 rounded text-xs 
+                                    {% if order.status == 'PENDING' %}bg-yellow-100 text-yellow-800
+                                    {% elif order.status == 'COMPLETED' %}bg-green-100 text-green-800
+                                    {% else %}bg-blue-100 text-blue-800{% endif %}">
+                                    {{ order.status }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-2 text-sm">{{ order.order_date|date:"M d, Y" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="px-4 py-2 text-center text-gray-500">No recent orders</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -173,7 +368,7 @@
                 <div class="border-b pb-2">
                     <div class="flex justify-between items-center">
                         <div>
-                            <p class="font-medium">{{ request.doctor_name }}</p>
+                            <p class="font-medium text-sm">{{ request.doctor_name }}</p>
                             <p class="text-sm text-gray-600">{{ request.test_name }}</p>
                             <p class="text-sm text-gray-500">Patient: {{ request.patient_name }}</p>
                         </div>
@@ -198,23 +393,135 @@
         </div>
     </div>
 
-    <!-- Payment Overview -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-        <h3 class="text-lg font-semibold mb-4">Payment Overview</h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="border rounded-lg p-4">
-                <h4 class="font-medium mb-2">Pending Payments</h4>
-                <p class="text-2xl font-bold">₹{{ payment_stats.pending }}</p>
+    <!-- Communication & Analytics -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        
+        <!-- Recent Communications -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                    </svg>
+                    Recent Communications
+                </h3>
+                <a href="#" class="text-teal-600 hover:text-teal-800 text-sm">View All</a>
             </div>
-            <div class="border rounded-lg p-4">
-                <h4 class="font-medium mb-2">Completed Payments</h4>
-                <p class="text-2xl font-bold">₹{{ payment_stats.completed }}</p>
+            
+            <div class="space-y-2">
+                {% for comm in recent_communications %}
+                <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                    <div>
+                        <p class="font-medium text-sm">{{ comm.communication_type|title }}</p>
+                        <p class="text-xs text-gray-600">{{ comm.recipient.get_full_name }}</p>
+                    </div>
+                    <span class="px-2 py-1 text-xs rounded-full
+                        {% if comm.status == 'DELIVERED' %}bg-green-100 text-green-800
+                        {% elif comm.status == 'SENT' %}bg-blue-100 text-blue-800
+                        {% elif comm.status == 'FAILED' %}bg-red-100 text-red-800
+                        {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                        {{ comm.status }}
+                    </span>
+                </div>
+                {% empty %}
+                <p class="text-gray-500 text-sm">No recent communications</p>
+                {% endfor %}
             </div>
-            <div class="border rounded-lg p-4">
-                <h4 class="font-medium mb-2">Total Revenue</h4>
-                <p class="text-2xl font-bold">₹{{ payment_stats.total }}</p>
+        </div>
+
+        <!-- Analytics Summary -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    Analytics Summary
+                </h3>
+                <a href="#" class="text-orange-600 hover:text-orange-800 text-sm">View Details</a>
+            </div>
+            
+            <div class="space-y-3">
+                <div class="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
+                    <span class="text-sm font-medium text-orange-800">Critical Values Today</span>
+                    <span class="text-lg font-bold text-orange-600">{{ stats.critical_values_today }}</span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                    <span class="text-sm font-medium text-blue-800">QC Tests Today</span>
+                    <span class="text-lg font-bold text-blue-600">{{ stats.qc_tests_today }}</span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                    <span class="text-sm font-medium text-green-800">Reports Pending Approval</span>
+                    <span class="text-lg font-bold text-green-600">{{ stats.reports_pending_approval }}</span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+                    <span class="text-sm font-medium text-purple-800">Specimens Pending</span>
+                    <span class="text-lg font-bold text-purple-600">{{ stats.specimens_pending }}</span>
+                </div>
             </div>
         </div>
     </div>
+
+    <!-- Quick Actions -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h3 class="text-lg font-semibold mb-4">Quick Actions</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <a href="#" class="p-4 bg-blue-50 rounded-lg text-center hover:bg-blue-100 transition-colors">
+                <svg class="w-8 h-8 mx-auto mb-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                <p class="text-sm font-medium text-blue-800">Add Specimen</p>
+            </a>
+            <a href="#" class="p-4 bg-green-50 rounded-lg text-center hover:bg-green-100 transition-colors">
+                <svg class="w-8 h-8 mx-auto mb-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p class="text-sm font-medium text-green-800">QC Test</p>
+            </a>
+            <a href="#" class="p-4 bg-purple-50 rounded-lg text-center hover:bg-purple-100 transition-colors">
+                <svg class="w-8 h-8 mx-auto mb-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <p class="text-sm font-medium text-purple-800">Create Report</p>
+            </a>
+            <a href="#" class="p-4 bg-indigo-50 rounded-lg text-center hover:bg-indigo-100 transition-colors">
+                <svg class="w-8 h-8 mx-auto mb-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                </svg>
+                <p class="text-sm font-medium text-indigo-800">Send Communication</p>
+            </a>
+        </div>
+    </div>
 </div>
+
+<!-- Analytics Chart Script -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Analytics chart can be added here
+    const ctx = document.getElementById('analyticsChart');
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['{{ analytics_data|length }} days ago', 'Today'],
+                datasets: [{
+                    label: 'Orders',
+                    data: [0, {{ stats.completed_orders }}],
+                    borderColor: 'rgb(59, 130, 246)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
 {% endblock %} 

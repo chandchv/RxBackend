@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+
+{% block title %}Add Patient Vitals - {{ patient.get_full_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden mb-8">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Add Patient Vitals</h1>
+                    <p class="text-gray-600">{{ patient.get_full_name }} - {{ patient.patient_id }}</p>
+                </div>
+                <div class="space-x-2">
+                    <a href="{% url 'users:patient_vitals_history' patient.id %}" 
+                       class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        Back to Vitals History
+                    </a>
+                    <a href="{% url 'users:patient_detail' patient.id %}" 
+                       class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                        Back to Patient
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vitals Form -->
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">Record New Vitals</h2>
+        </div>
+        
+        <form method="post" class="p-6">
+            {% csrf_token %}
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Weight and Height -->
+                <div class="space-y-4">
+                    <div>
+                        <label for="{{ form.weight.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            Weight (kg)
+                        </label>
+                        {{ form.weight }}
+                        {% if form.weight.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.weight.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    <div>
+                        <label for="{{ form.height.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            Height (cm)
+                        </label>
+                        {{ form.height }}
+                        {% if form.height.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.height.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Blood Pressure -->
+                <div>
+                    <label for="{{ form.blood_pressure.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                        Blood Pressure (mmHg)
+                    </label>
+                    {{ form.blood_pressure }}
+                    {% if form.blood_pressure.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.blood_pressure.errors.0 }}</p>
+                    {% endif %}
+                    <p class="mt-1 text-sm text-gray-500">Format: 120/80</p>
+                </div>
+            </div>
+            
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Temperature -->
+                <div>
+                    <label for="{{ form.temperature.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                        Temperature (°F)
+                    </label>
+                    {{ form.temperature }}
+                    {% if form.temperature.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.temperature.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                
+                <!-- Heart Rate -->
+                <div>
+                    <label for="{{ form.heart_rate.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                        Heart Rate (bpm)
+                    </label>
+                    {{ form.heart_rate }}
+                    {% if form.heart_rate.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.heart_rate.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                
+                <!-- Oxygen Saturation -->
+                <div>
+                    <label for="{{ form.oxygen_saturation.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                        Oxygen Saturation (%)
+                    </label>
+                    {{ form.oxygen_saturation }}
+                    {% if form.oxygen_saturation.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.oxygen_saturation.errors.0 }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Form Actions -->
+            <div class="mt-8 flex justify-end space-x-4">
+                <a href="{% url 'users:patient_vitals_history' patient.id %}" 
+                   class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    Cancel
+                </a>
+                <button type="submit" 
+                        class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                    <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    Record Vitals
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Normal Ranges Reference -->
+    <div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 class="text-lg font-medium text-blue-900 mb-4">Normal Vital Sign Ranges</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white rounded-lg p-4">
+                <h4 class="font-medium text-gray-900">Blood Pressure</h4>
+                <p class="text-sm text-gray-600">Normal: &lt; 120/80 mmHg</p>
+                <p class="text-sm text-gray-600">Elevated: 120-129/&lt;80 mmHg</p>
+            </div>
+            <div class="bg-white rounded-lg p-4">
+                <h4 class="font-medium text-gray-900">Heart Rate</h4>
+                <p class="text-sm text-gray-600">Normal: 60-100 bpm</p>
+                <p class="text-sm text-gray-600">Resting: 60-80 bpm</p>
+            </div>
+            <div class="bg-white rounded-lg p-4">
+                <h4 class="font-medium text-gray-900">Temperature</h4>
+                <p class="text-sm text-gray-600">Normal: 97-99°F</p>
+                <p class="text-sm text-gray-600">Fever: &gt;100.4°F</p>
+            </div>
+            <div class="bg-white rounded-lg p-4">
+                <h4 class="font-medium text-gray-900">Oxygen Saturation</h4>
+                <p class="text-sm text-gray-600">Normal: 95-100%</p>
+                <p class="text-sm text-gray-600">Low: &lt;95%</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-calculate BMI when weight and height are entered
+    const weightField = document.getElementById('{{ form.weight.id_for_label }}');
+    const heightField = document.getElementById('{{ form.height.id_for_label }}');
+    
+    function calculateBMI() {
+        const weight = parseFloat(weightField.value);
+        const height = parseFloat(heightField.value);
+        
+        if (weight && height && height > 0) {
+            const heightInMeters = height / 100;
+            const bmi = weight / (heightInMeters * heightInMeters);
+            console.log(`BMI: ${bmi.toFixed(2)}`);
+        }
+    }
+    
+    weightField.addEventListener('input', calculateBMI);
+    heightField.addEventListener('input', calculateBMI);
+});
+</script>
+{% endblock %} 

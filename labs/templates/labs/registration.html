@@ -1,147 +1,501 @@
 {% extends 'base.html' %}
 
-{% block title %}Lab Registration{% endblock %}
+{% block title %}Lab Registration - RxDoctor{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        padding: 2px;
+        margin-bottom: 2rem;
+    }
+    
+    .form-section-content {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+    }
+    
+    .form-input {
+        transition: all 0.3s ease;
+        border: 2px solid #e5e7eb;
+    }
+    
+    .form-input:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .certification-checkbox {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    
+    .certification-checkbox:hover {
+        background-color: #f9fafb;
+        border-color: #667eea;
+    }
+    
+    .certification-checkbox input[type="checkbox"] {
+        margin-right: 0.75rem;
+        transform: scale(1.2);
+    }
+    
+    .progress-bar {
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        height: 4px;
+        border-radius: 2px;
+        transition: width 0.3s ease;
+    }
+    
+    .step-indicator {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+    
+    .step-active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    .step-completed {
+        background: #10b981;
+        color: white;
+    }
+    
+    .step-pending {
+        background: #e5e7eb;
+        color: #6b7280;
+    }
+    
+    .floating-label {
+        position: relative;
+        margin-bottom: 1.5rem;
+    }
+    
+    .floating-label input,
+    .floating-label select,
+    .floating-label textarea {
+        width: 100%;
+        padding: 1rem 1rem 0.5rem 1rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        background: white;
+    }
+    
+    .floating-label label {
+        position: absolute;
+        top: 1rem;
+        left: 1rem;
+        font-size: 1rem;
+        color: #6b7280;
+        transition: all 0.3s ease;
+        pointer-events: none;
+        background: white;
+        padding: 0 0.25rem;
+    }
+    
+    .floating-label input:focus + label,
+    .floating-label input:not(:placeholder-shown) + label,
+    .floating-label select:focus + label,
+    .floating-label select:not([value=""]) + label,
+    .floating-label textarea:focus + label,
+    .floating-label textarea:not(:placeholder-shown) + label {
+        top: 0.5rem;
+        font-size: 0.75rem;
+        color: #667eea;
+        font-weight: 600;
+    }
+    
+    .floating-label input:focus,
+    .floating-label select:focus,
+    .floating-label textarea:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        outline: none;
+    }
+    
+    .submit-btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem 2rem;
+        border: none;
+        border-radius: 12px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    .submit-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+    
+    .submit-btn:active {
+        transform: translateY(0);
+    }
+    
+    .info-card {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .section-icon {
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
-    <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
-        <h2 class="text-2xl font-bold mb-6">Lab Registration</h2>
-        
-        {% if messages %}
-            {% for message in messages %}
-                <div class="mb-4 p-4 rounded {% if message.tags == 'success' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
-                    {{ message }}
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-8">
+    <div class="container mx-auto px-4 max-w-4xl">
+        <!-- Header Section -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mb-4">
+                <i class="fas fa-flask text-white text-2xl"></i>
+            </div>
+            <h1 class="text-4xl font-bold text-gray-900 mb-2">Lab Registration</h1>
+            <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+                Join our network of trusted laboratories and start providing quality diagnostic services to patients nationwide.
+            </p>
+        </div>
+
+        <!-- Info Card -->
+        <div class="info-card">
+            <div class="flex items-start">
+                <i class="fas fa-info-circle text-2xl mr-3 mt-1"></i>
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">Registration Process</h3>
+                    <p class="text-sm opacity-90">
+                        Your registration will be reviewed by our team within 24-48 hours. You'll receive an email notification once your account is approved.
+                    </p>
                 </div>
-            {% endfor %}
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-semibold text-gray-900">Registration Progress</h2>
+                <span class="text-sm text-gray-500">Step 1 of 4</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+                <div class="progress-bar" style="width: 25%"></div>
+            </div>
+            <div class="flex justify-between mt-4">
+                <div class="flex flex-col items-center">
+                    <div class="step-indicator step-active">1</div>
+                    <span class="text-xs mt-1 text-gray-600">Basic Info</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <div class="step-indicator step-pending">2</div>
+                    <span class="text-xs mt-1 text-gray-600">Contact</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <div class="step-indicator step-pending">3</div>
+                    <span class="text-xs mt-1 text-gray-600">Certifications</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <div class="step-indicator step-pending">4</div>
+                    <span class="text-xs mt-1 text-gray-600">Account</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        {% if messages %}
+            <div class="mb-6">
+                {% for message in messages %}
+                    <div class="p-4 mb-3 rounded-lg border-l-4 {% if message.tags == 'success' %}bg-green-50 border-green-400 text-green-700{% elif message.tags == 'error' %}bg-red-50 border-red-400 text-red-700{% else %}bg-blue-50 border-blue-400 text-blue-700{% endif %}">
+                        <div class="flex items-center">
+                            {% if message.tags == 'success' %}
+                                <i class="fas fa-check-circle mr-3"></i>
+                            {% elif message.tags == 'error' %}
+                                <i class="fas fa-exclamation-circle mr-3"></i>
+                            {% else %}
+                                <i class="fas fa-info-circle mr-3"></i>
+                            {% endif %}
+                            <span class="font-medium">{{ message }}</span>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
         {% endif %}
 
-        <form method="post" enctype="multipart/form-data" class="space-y-4">
+        <!-- Registration Form -->
+        <form method="post" enctype="multipart/form-data" class="space-y-6">
             {% csrf_token %}
             
-            <!-- Basic Information -->
-            <div class="space-y-4">
-                <h3 class="text-lg font-semibold">Basic Information</h3>
-                
-                <div>
-                    <label for="id_name" class="block text-sm font-medium text-gray-700">Lab Name</label>
-                    {{ form.name }}
-                    {% if form.name.errors %}
-                        <div class="text-red-500 text-sm">{{ form.name.errors }}</div>
-                    {% endif %}
-                </div>
-
-                <div>
-                    <label for="id_registration_number" class="block text-sm font-medium text-gray-700">Registration Number</label>
-                    {{ form.registration_number }}
-                    {% if form.registration_number.errors %}
-                        <div class="text-red-500 text-sm">{{ form.registration_number.errors }}</div>
-                    {% endif %}
-                </div>
-
-                <div>
-                    <label for="id_contact_person" class="block text-sm font-medium text-gray-700">Contact Person</label>
-                    {{ form.contact_person }}
-                    {% if form.contact_person.errors %}
-                        <div class="text-red-500 text-sm">{{ form.contact_person.errors }}</div>
-                    {% endif %}
-                </div>
-
-                <div>
-                    <label for="id_contact_person_designation" class="block text-sm font-medium text-gray-700">Contact Person Designation</label>
-                    {{ form.contact_person_designation }}
-                    {% if form.contact_person_designation.errors %}
-                        <div class="text-red-500 text-sm">{{ form.contact_person_designation.errors }}</div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Contact Information -->
-            <div class="space-y-4">
-                <h3 class="text-lg font-semibold">Contact Information</h3>
-                
-                <div>
-                    <label for="id_address" class="block text-sm font-medium text-gray-700">Address</label>
-                    {{ form.address }}
-                    {% if form.address.errors %}
-                        <div class="text-red-500 text-sm">{{ form.address.errors }}</div>
-                    {% endif %}
-                </div>
-
-                <div>
-                    <label for="id_phone_number" class="block text-sm font-medium text-gray-700">Phone Number</label>
-                    {{ form.phone_number }}
-                    {% if form.phone_number.errors %}
-                        <div class="text-red-500 text-sm">{{ form.phone_number.errors }}</div>
-                    {% endif %}
-                </div>
-
-                <div>
-                    <label for="id_email" class="block text-sm font-medium text-gray-700">Email</label>
-                    {{ form.email }}
-                    {% if form.email.errors %}
-                        <div class="text-red-500 text-sm">{{ form.email.errors }}</div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Certifications -->
-            <div class="space-y-4">
-                <h3 class="text-lg font-semibold">Certifications</h3>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Select Certifications</label>
-                    <div class="space-y-2">
-                        {{ form.certifications }}
+            <!-- Basic Information Section -->
+            <div class="form-section">
+                <div class="form-section-content">
+                    <div class="flex items-center mb-6">
+                        <div class="section-icon">
+                            <i class="fas fa-building"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-900">Basic Information</h3>
+                            <p class="text-gray-600">Tell us about your laboratory</p>
+                        </div>
                     </div>
-                    {% if form.certifications.errors %}
-                        <div class="text-red-500 text-sm">{{ form.certifications.errors }}</div>
-                    {% endif %}
-                </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="floating-label">
+                            {{ form.name }}
+                            <label for="id_name">Lab Name *</label>
+                            {% if form.name.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
 
-                <div>
-                    <label for="id_other_certification" class="block text-sm font-medium text-gray-700">Other Certification</label>
-                    {{ form.other_certification }}
-                    {% if form.other_certification.errors %}
-                        <div class="text-red-500 text-sm">{{ form.other_certification.errors }}</div>
-                    {% endif %}
+                        <div class="floating-label">
+                            {{ form.registration_number }}
+                            <label for="id_registration_number">Registration Number *</label>
+                            {% if form.registration_number.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.registration_number.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="floating-label">
+                            {{ form.contact_person }}
+                            <label for="id_contact_person">Contact Person *</label>
+                            {% if form.contact_person.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.contact_person.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="floating-label">
+                            {{ form.contact_person_designation }}
+                            <label for="id_contact_person_designation">Designation *</label>
+                            {% if form.contact_person_designation.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.contact_person_designation.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Account Information -->
-            <div class="space-y-4">
-                <h3 class="text-lg font-semibold">Account Information</h3>
+            <!-- Contact Information Section -->
+            <div class="form-section">
+                <div class="form-section-content">
+                    <div class="flex items-center mb-6">
+                        <div class="section-icon">
+                            <i class="fas fa-address-book"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-900">Contact Information</h3>
+                            <p class="text-gray-600">How can we reach you?</p>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-6">
+                        <div class="floating-label">
+                            {{ form.address }}
+                            <label for="id_address">Complete Address *</label>
+                            {% if form.address.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.address.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="floating-label">
+                                {{ form.phone_number }}
+                                <label for="id_phone_number">Phone Number *</label>
+                                {% if form.phone_number.errors %}
+                                    <div class="text-red-500 text-sm mt-1">{{ form.phone_number.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="floating-label">
+                                {{ form.email }}
+                                <label for="id_email">Email Address *</label>
+                                {% if form.email.errors %}
+                                    <div class="text-red-500 text-sm mt-1">{{ form.email.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Certifications Section -->
+            <div class="form-section">
+                <div class="form-section-content">
+                    <div class="flex items-center mb-6">
+                        <div class="section-icon">
+                            <i class="fas fa-certificate"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-900">Certifications & Accreditations</h3>
+                            <p class="text-gray-600">Select all applicable certifications</p>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-3">Select Certifications</label>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {{ form.certifications }}
+                            </div>
+                            {% if form.certifications.errors %}
+                                <div class="text-red-500 text-sm mt-2">{{ form.certifications.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="floating-label">
+                            {{ form.other_certification }}
+                            <label for="id_other_certification">Other Certifications</label>
+                            {% if form.other_certification.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.other_certification.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Account Information Section -->
+            <div class="form-section">
+                <div class="form-section-content">
+                    <div class="flex items-center mb-6">
+                        <div class="section-icon">
+                            <i class="fas fa-user-shield"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-900">Account Information</h3>
+                            <p class="text-gray-600">Create your login credentials</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="floating-label">
+                            {{ form.username }}
+                            <label for="id_username">Username *</label>
+                            {% if form.username.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.username.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="floating-label">
+                            {{ form.password1 }}
+                            <label for="id_password1">Password *</label>
+                            {% if form.password1.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.password1.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="floating-label md:col-span-2">
+                            {{ form.password2 }}
+                            <label for="id_password2">Confirm Password *</label>
+                            {% if form.password2.errors %}
+                                <div class="text-red-500 text-sm mt-1">{{ form.password2.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Section -->
+            <div class="bg-white rounded-lg shadow-lg p-8 text-center">
+                <div class="mb-6">
+                    <i class="fas fa-clipboard-check text-4xl text-green-500 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-2">Ready to Register?</h3>
+                    <p class="text-gray-600">Please review all information before submitting your registration.</p>
+                </div>
                 
-                <div>
-                    <label for="id_username" class="block text-sm font-medium text-gray-700">Username</label>
-                    {{ form.username }}
-                    {% if form.username.errors %}
-                        <div class="text-red-500 text-sm">{{ form.username.errors }}</div>
-                    {% endif %}
-                </div>
-
-                <div>
-                    <label for="id_password1" class="block text-sm font-medium text-gray-700">Password</label>
-                    {{ form.password1 }}
-                    {% if form.password1.errors %}
-                        <div class="text-red-500 text-sm">{{ form.password1.errors }}</div>
-                    {% endif %}
-                </div>
-
-                <div>
-                    <label for="id_password2" class="block text-sm font-medium text-gray-700">Confirm Password</label>
-                    {{ form.password2 }}
-                    {% if form.password2.errors %}
-                        <div class="text-red-500 text-sm">{{ form.password2.errors }}</div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="mt-6">
-                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                    Register
+                <button type="submit" class="submit-btn">
+                    <i class="fas fa-paper-plane mr-2"></i>
+                    Submit Registration
                 </button>
+                
+                <p class="text-sm text-gray-500 mt-4">
+                    By submitting this form, you agree to our 
+                    <a href="#" class="text-blue-600 hover:underline">Terms of Service</a> and 
+                    <a href="#" class="text-blue-600 hover:underline">Privacy Policy</a>
+                </p>
             </div>
         </form>
     </div>
 </div>
+
+<script>
+// Add floating label functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const inputs = document.querySelectorAll('.floating-label input, .floating-label select, .floating-label textarea');
+    
+    inputs.forEach(input => {
+        // Set placeholder to empty to prevent default browser behavior
+        input.setAttribute('placeholder', ' ');
+        
+        // Check if input has value on page load
+        if (input.value) {
+            input.classList.add('has-value');
+        }
+        
+        // Handle focus and blur events
+        input.addEventListener('focus', function() {
+            this.parentElement.classList.add('focused');
+        });
+        
+        input.addEventListener('blur', function() {
+            this.parentElement.classList.remove('focused');
+            if (this.value) {
+                this.classList.add('has-value');
+            } else {
+                this.classList.remove('has-value');
+            }
+        });
+        
+        // Handle input events for real-time validation
+        input.addEventListener('input', function() {
+            if (this.value) {
+                this.classList.add('has-value');
+            } else {
+                this.classList.remove('has-value');
+            }
+        });
+    });
+    
+    // Style certification checkboxes
+    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        const label = checkbox.nextElementSibling;
+        if (label && label.tagName === 'LABEL') {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'certification-checkbox';
+            checkbox.parentNode.insertBefore(wrapper, checkbox);
+            wrapper.appendChild(checkbox);
+            wrapper.appendChild(label);
+        }
+    });
+});
+</script>
 {% endblock %} 

@@ -1,126 +1,480 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load lab_extras %}
 
 {% block title %}Order Lab Tests - Walk-in Patient{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
-    <div class="max-w-4xl mx-auto">
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-bold">Order Lab Tests - Walk-in Patient</h1>
-            <a href="{% url 'labs:lab_dashboard' %}" class="text-blue-600 hover:text-blue-800">
-                Back to Dashboard
-            </a>
-        </div>
-
-        {% if messages %}
-        <div class="mb-6">
-            {% for message in messages %}
-            <div class="p-4 mb-4 {% if message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %} rounded-lg">
-                {{ message }}
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-
-        <form method="post" class="space-y-6 bg-white shadow-md rounded-lg p-6">
-            {% csrf_token %}
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Patient Information -->
-                <div class="space-y-4">
-                    <h2 class="text-xl font-semibold mb-4">Patient Information</h2>
-                    
-                    <div class="space-y-2">
-                        <label class="block text-sm font-medium text-gray-700">Full Name</label>
-                        {{ form.patient_name }}
-                        {% if form.patient_name.errors %}
-                        <p class="text-red-500 text-xs italic">{{ form.patient_name.errors.0 }}</p>
-                        {% endif %}
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-7xl mx-auto">
+            <!-- Header Section -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-800 mb-2">🧪 Order Lab Tests</h1>
+                        <p class="text-gray-600">Walk-in Patient Registration & Test Selection</p>
                     </div>
-                    
-                    <div class="space-y-2">
-                        <label class="block text-sm font-medium text-gray-700">Phone Number</label>
-                        {{ form.patient_phone }}
-                        {% if form.patient_phone.errors %}
-                        <p class="text-red-500 text-xs italic">{{ form.patient_phone.errors.0 }}</p>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="space-y-2">
-                        <label class="block text-sm font-medium text-gray-700">Email (Optional)</label>
-                        {{ form.patient_email }}
-                        {% if form.patient_email.errors %}
-                        <p class="text-red-500 text-xs italic">{{ form.patient_email.errors.0 }}</p>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-2">
-                            <label class="block text-sm font-medium text-gray-700">Age</label>
-                            {{ form.patient_age }}
-                            {% if form.patient_age.errors %}
-                            <p class="text-red-500 text-xs italic">{{ form.patient_age.errors.0 }}</p>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="space-y-2">
-                            <label class="block text-sm font-medium text-gray-700">Gender</label>
-                            {{ form.patient_gender }}
-                            {% if form.patient_gender.errors %}
-                            <p class="text-red-500 text-xs italic">{{ form.patient_gender.errors.0 }}</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Test Selection -->
-                <div class="space-y-4">
-                    <h2 class="text-xl font-semibold mb-4">Select Tests</h2>
-                    <div class="space-y-2 max-h-96 overflow-y-auto p-4 border rounded">
-                        {{ form.tests }}
-                        {% if form.tests.errors %}
-                        <p class="text-red-500 text-xs italic mt-2">{{ form.tests.errors.0 }}</p>
-                        {% endif %}
-                    </div>
+                    <a href="{% url 'labs:lab_dashboard' %}" 
+                       class="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                        </svg>
+                        Back to Dashboard
+                    </a>
                 </div>
             </div>
 
-            <div class="flex justify-end mt-6">
-                <button type="submit" class="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                    Create Order
-                </button>
+            {% if messages %}
+            <div class="mb-6">
+                {% for message in messages %}
+                <div class="p-4 mb-4 rounded-lg border-l-4 {% if message.tags == 'error' %}bg-red-50 border-red-400 text-red-700{% else %}bg-green-50 border-green-400 text-green-700{% endif %}">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            {% if message.tags == 'error' %}
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                            {% else %}
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                            {% endif %}
+                        </svg>
+                        {{ message }}
+                    </div>
+                </div>
+                {% endfor %}
             </div>
-        </form>
+            {% endif %}
+
+            <form method="post" class="space-y-8" id="orderForm">
+                {% csrf_token %}
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Patient Information -->
+                    <div class="lg:col-span-1">
+                        <div class="bg-white rounded-xl shadow-lg p-6 sticky top-8">
+                            <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                                <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                </svg>
+                                Patient Information
+                            </h2>
+                            
+                            <div class="space-y-4">
+                                <div class="form-group">
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Full Name *</label>
+                                    {{ form.patient_name }}
+                                    {% if form.patient_name.errors %}
+                                        <p class="text-red-500 text-xs mt-1">{{ form.patient_name.errors.0 }}</p>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Phone Number *</label>
+                                    {{ form.patient_phone }}
+                                    {% if form.patient_phone.errors %}
+                                        <p class="text-red-500 text-xs mt-1">{{ form.patient_phone.errors.0 }}</p>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Email (Optional)</label>
+                                    {{ form.patient_email }}
+                                    {% if form.patient_email.errors %}
+                                        <p class="text-red-500 text-xs mt-1">{{ form.patient_email.errors.0 }}</p>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="form-group">
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Age *</label>
+                                        {{ form.patient_age }}
+                                        {% if form.patient_age.errors %}
+                                            <p class="text-red-500 text-xs mt-1">{{ form.patient_age.errors.0 }}</p>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Gender *</label>
+                                        {{ form.patient_gender }}
+                                        {% if form.patient_gender.errors %}
+                                            <p class="text-red-500 text-xs mt-1">{{ form.patient_gender.errors.0 }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <!-- Order Summary -->
+                                <div class="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                    <h3 class="font-semibold text-blue-800 mb-3">Order Summary</h3>
+                                    <div id="selectedTestsList" class="space-y-2">
+                                        <p class="text-sm text-gray-600">No tests selected</p>
+                                    </div>
+                                    <div class="mt-3 pt-3 border-t border-blue-200">
+                                        <div class="flex justify-between items-center">
+                                            <span class="font-semibold text-blue-800">Total Amount:</span>
+                                            <span class="font-bold text-blue-800 text-lg" id="totalAmount">₹0</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Submit Button -->
+                                <button type="submit" id="submitBtn" 
+                                        class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-blue-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                                        disabled>
+                                    <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                    </svg>
+                                    Create Order
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Test Selection -->
+                    <div class="lg:col-span-2">
+                        <div class="bg-white rounded-xl shadow-lg p-6">
+                            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                                <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                                    <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    Select Lab Tests for {{ lab_profile.name }}
+                                </h2>
+                                
+                                <div class="text-sm text-gray-600 mb-4">
+                                    <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                                        Showing {{ available_tests|length }} of {{ total_available_tests }} available tests
+                                    </span>
+                                    {% if current_search or current_category %}
+                                        <span class="bg-green-100 text-green-800 px-2 py-1 rounded-full ml-2">
+                                            {% if current_search %}Search: "{{ current_search }}"{% endif %}
+                                            {% if current_category %}Category: {{ current_category }}{% endif %}
+                                        </span>
+                                        <a href="{% url 'labs:order_tests' %}" class="text-blue-600 hover:text-blue-800 ml-2 text-sm">Clear filters</a>
+                                    {% else %}
+                                        <span class="text-yellow-600 ml-2">
+                                            Use search to find specific tests from all {{ total_available_tests }} available
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div>    
+                                
+                                <!-- Enhanced Search and Filter Controls -->
+                                <form method="get" class="mb-6 p-4 bg-gray-50 rounded-lg border">
+                                    <div class="flex flex-col md:flex-row gap-3">
+                                        <div class="flex-1 relative">
+                                            <input type="text" name="search" id="testSearch" 
+                                                   value="{{ current_search }}"
+                                                   placeholder="Search by test name, description, or code..." 
+                                                   class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                            <svg class="w-5 h-5 absolute left-3 top-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                            </svg>
+                                        </div>
+                                        
+                                        <select name="category" id="categoryFilter" class="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                            <option value="">All Categories</option>
+                                            {% for category in categories %}
+                                                <option value="{{ category }}" {% if category == current_category %}selected{% endif %}>
+                                                    {{ category }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                        
+                                        <div class="flex gap-2">
+                                            <button type="submit" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                                                Search
+                                            </button>
+                                            {% if current_search or current_category %}
+                                                <a href="{% url 'labs:order_tests' %}" class="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium">
+                                                    Clear
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </form>
+
+                                <!-- Quick Action Buttons -->
+                                <div class="mb-6 flex flex-wrap gap-2">
+                                    <span class="text-sm font-medium text-gray-700 mr-2">Quick filters:</span>
+                                    {% for category in categories|slice:":8" %}
+                                        <a href="?category={{ category }}" 
+                                           class="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors
+                                                  {% if category == current_category %}bg-blue-100 text-blue-700{% endif %}">
+                                            {{ category }}
+                                        </a>
+                                    {% endfor %}
+                                    {% if categories|length > 8 %}
+                                        <span class="text-xs text-gray-500">+{{ categories|length|add:"-8" }} more</span>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Test Selection Controls -->
+                                <div class="mb-4 flex justify-between items-center">
+                                    <div class="flex gap-2">
+                                        <button type="button" id="selectAllBtn" 
+                                                class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium">
+                                            Select All Visible
+                                        </button>
+                                        <button type="button" id="clearAllBtn" 
+                                                class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium">
+                                            Clear All
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Selection Counter -->
+                            <div class="mb-6 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm text-gray-600">Selected Tests:</span>
+                                    <span class="font-semibold text-gray-800" id="selectedCount">0 tests</span>
+                                </div>
+                            </div>
+
+                            <!-- Tests by Category -->
+                            {% for category, tests in categorized_tests %}
+                            <div class="category-section mb-8 border border-gray-200 rounded-lg" data-category="{{ category }}">
+                                <div class="category-header bg-gradient-to-r from-gray-50 to-blue-50 p-4 rounded-t-lg border-b border-gray-200">
+                                    <div class="flex items-center justify-between">
+                                        <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                            <span class="w-3 h-3 bg-blue-500 rounded-full mr-3"></span>
+                                            {{ category }}
+                                            <span class="ml-2 text-sm font-normal text-gray-500 bg-white px-2 py-1 rounded-full">{{ tests|length }} tests</span>
+                                        </h3>
+                                        <button type="button" class="category-select-all text-xs px-3 py-1 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition-colors font-medium" 
+                                                data-category="{{ category }}">
+                                            Select All in {{ category }}
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="tests-grid p-4">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                        {% for test in tests %}
+                                        <div class="test-card border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all duration-200 hover:border-blue-300 cursor-pointer" 
+                                             data-category="{{ category }}" data-test-name="{{ test.name|lower }}">
+                                            <div class="flex items-start space-x-3">
+                                                <input type="checkbox" 
+                                                       name="tests" 
+                                                       value="{{ test.id }}" 
+                                                       id="test_{{ test.id }}"
+                                                       data-category="{{ category }}"
+                                                                                                               data-price="{{ test_prices|get_price:test.id }}"
+                                                       class="test-checkbox mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                                
+                                                <label for="test_{{ test.id }}" class="flex-1 cursor-pointer">
+                                                    <div class="flex justify-between items-start mb-2">
+                                                        <h4 class="text-sm font-semibold text-gray-900 leading-tight">{{ test.name }}</h4>
+                                                        {% if test.short_code %}
+                                                            <span class="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full ml-2 flex-shrink-0">{{ test.short_code }}</span>
+                                                        {% endif %}
+                                                    </div>
+                                                    
+                                                    {% if test.description %}
+                                                        <p class="text-sm text-gray-600 mb-3 line-clamp-2">{{ test.description|truncatewords:15 }}</p>
+                                                    {% endif %}
+                                                    
+                                                    <!-- Test Details -->
+                                                    <div class="space-y-2">
+                                                        <div class="flex justify-between items-center">
+                                                                                                                         <span class="text-lg font-bold text-green-600">₹{{ test_prices|get_price:test.id }}</span>
+                                                             <span class="text-xs text-gray-500">{{ test_prices|get_turnaround_time:test.id }}h turnaround</span>
+                                                        </div>
+                                                        
+                                                                                                                 {% if test_prices|get_home_collection:test.id %}
+                                                            <div class="flex items-center text-xs text-green-600">
+                                                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                                                                </svg>
+                                                                Home Collection Available
+                                                            </div>
+                                                        {% endif %}
+                                                    </div>
+                                                    
+                                                    {% if test.preparation_instructions %}
+                                                        <div class="mt-3 p-2 bg-yellow-50 border-l-3 border-yellow-400 rounded-r">
+                                                            <p class="text-xs text-yellow-800">
+                                                                <strong>Preparation:</strong> {{ test.preparation_instructions|truncatewords:15 }}
+                                                            </p>
+                                                        </div>
+                                                    {% endif %}
+                                                </label>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="text-center py-12">
+                                <svg class="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <h3 class="text-lg font-semibold text-gray-900 mb-2">No tests available</h3>
+                                <p class="text-gray-500 mb-4">Please add test offerings to your lab before creating orders.</p>
+                                <a href="{% url 'labs:add_test_offering' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                    Add Tests
+                                </a>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
 <style>
-    /* Form styling */
-    input[type="text"],
-    input[type="email"],
-    input[type="number"],
-    select {
-        @apply mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500;
-    }
-    
-    /* Checkbox styling */
-    .checkbox-list {
-        @apply space-y-2;
-    }
-    
-    .checkbox-item {
-        @apply flex items-center;
-    }
-    
-    input[type="checkbox"] {
-        @apply h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded;
-    }
-    
-    label {
-        @apply ml-2 block text-sm text-gray-900;
-    }
+/* Enhanced form styling */
+.form-group input,
+.form-group select {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    @apply outline-none ring-2 ring-blue-500 border-blue-500;
+}
+
+/* Test card hover effects */
+.test-card:hover {
+    @apply bg-blue-50;
+}
+
+.test-card:hover .test-checkbox {
+    @apply border-blue-500;
+}
+
+/* Category section styling */
+.category-section {
+    @apply transition-all duration-200;
+}
+
+.category-section.hidden {
+    @apply opacity-50;
+}
+
+/* Line clamp utility for text truncation */
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Smooth transitions */
+* {
+    @apply transition-colors duration-200;
+}
+
+/* Button hover effects */
+button:hover:not(:disabled) {
+    @apply shadow-lg;
+}
+
+/* Focus visible for accessibility */
+input:focus-visible,
+button:focus-visible,
+select:focus-visible {
+    @apply outline-2 outline-blue-500 outline-offset-2;
+}
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const testCheckboxes = document.querySelectorAll('.test-checkbox');
+    const selectedCountElement = document.getElementById('selectedCount');
+    const totalAmountElement = document.getElementById('totalAmount');
+    const selectedTestsList = document.getElementById('selectedTestsList');
+    const submitBtn = document.getElementById('submitBtn');
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const categorySelectAllBtns = document.querySelectorAll('.category-select-all');
+
+    function updateOrderSummary() {
+        const selectedTests = document.querySelectorAll('.test-checkbox:checked');
+        const count = selectedTests.length;
+        let totalPrice = 0;
+        
+        selectedCountElement.textContent = `${count} test${count !== 1 ? 's' : ''}`;
+        
+        // Clear current list
+        selectedTestsList.innerHTML = '';
+        
+        if (count === 0) {
+            selectedTestsList.innerHTML = '<p class="text-sm text-gray-600">No tests selected</p>';
+            submitBtn.disabled = true;
+        } else {
+            submitBtn.disabled = false;
+            
+            selectedTests.forEach(checkbox => {
+                const testCard = checkbox.closest('.test-card');
+                const testName = testCard.querySelector('label h4').textContent;
+                const price = parseFloat(checkbox.dataset.price) || 0;
+                totalPrice += price;
+                
+                const testItem = document.createElement('div');
+                testItem.className = 'flex justify-between items-center text-sm';
+                testItem.innerHTML = `
+                    <span class="text-gray-700">${testName}</span>
+                    <span class="font-semibold text-blue-600">₹${price}</span>
+                `;
+                selectedTestsList.appendChild(testItem);
+            });
+        }
+        
+        totalAmountElement.textContent = `₹${totalPrice.toFixed(0)}`;
+    }
+
+    // Event listeners
+    testCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateOrderSummary);
+    });
+
+    selectAllBtn.addEventListener('click', function() {
+        const visibleCheckboxes = document.querySelectorAll('.test-item:not([style*="display: none"]) .test-checkbox');
+        visibleCheckboxes.forEach(checkbox => {
+            checkbox.checked = true;
+        });
+        updateOrderSummary();
+    });
+
+    clearAllBtn.addEventListener('click', function() {
+        testCheckboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        updateOrderSummary();
+    });
+
+    categorySelectAllBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const category = this.dataset.category;
+            const categoryCheckboxes = document.querySelectorAll(`.test-checkbox[data-category="${category}"]`);
+            
+            categoryCheckboxes.forEach(checkbox => {
+                checkbox.checked = true;
+            });
+            updateOrderSummary();
+        });
+    });
+
+    // Make test cards clickable
+    document.querySelectorAll('.test-card').forEach(card => {
+        card.addEventListener('click', function(e) {
+            if (e.target.type !== 'checkbox' && e.target.tagName !== 'LABEL') {
+                const checkbox = this.querySelector('.test-checkbox');
+                checkbox.checked = !checkbox.checked;
+                updateOrderSummary();
+            }
+        });
+    });
+
+    // Initial update
+    updateOrderSummary();
+});
+</script>
+
 {% endblock %}
 
     

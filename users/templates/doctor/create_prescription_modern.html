@@ -1,0 +1,1042 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}Create Prescription - Modern Interface{% endblock %}
+
+{% block extra_css %}
+<style>
+    .medicine-card {
+        transition: all 0.2s ease;
+    }
+    .medicine-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    .suggestion-item {
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+    .suggestion-item:hover {
+        background-color: #f3f4f6;
+    }
+    .quick-add-panel {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+        max-width: 90vw;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    .overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+    }
+    .keyboard-shortcut {
+        background-color: #f3f4f6;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        padding: 2px 6px;
+        font-size: 12px;
+        font-family: monospace;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-4">
+                    <a href="{% url 'users:prescription_selection' patient.id %}" 
+                       class="text-gray-500 hover:text-gray-700">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                        </svg>
+                    </a>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900">Create Prescription</h1>
+                        <p class="text-sm text-gray-600">Modern Interface - {{ patient.get_full_name }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button onclick="saveDraft()" 
+                            class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                        </svg>
+                        Save Draft
+                    </button>
+                    <button onclick="submitPrescription()" 
+                            class="inline-flex items-center px-6 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        Save Prescription
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <form id="prescription-form" method="POST" class="space-y-8">
+            {% csrf_token %}
+            
+            <!-- Patient Info Bar -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Patient</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ patient.get_full_name }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Age</p>
+                        <p class="text-gray-900">{{ patient.date_of_birth|calculate_age }} years</p>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Gender</p>
+                        <p class="text-gray-900">{{ patient.get_gender_display }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Date</p>
+                        <p class="text-gray-900">{% now "F j, Y" %}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions Bar -->
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex flex-wrap items-center gap-3">
+                    <button type="button" onclick="showQuickAdd('diagnosis')" 
+                            class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Quick Diagnosis
+                        <span class="keyboard-shortcut ml-2">Ctrl+D</span>
+                    </button>
+                    
+                    <button type="button" onclick="showQuickAdd('medicine')" 
+                            class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                        </svg>
+                        Quick Medicine
+                        <span class="keyboard-shortcut ml-2">Ctrl+M</span>
+                    </button>
+                    
+                    <button type="button" onclick="showQuickAdd('template')" 
+                            class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"></path>
+                        </svg>
+                        Templates
+                        <span class="keyboard-shortcut ml-2">Ctrl+T</span>
+                    </button>
+                    
+                    <button type="button" onclick="showLabTests()" 
+                            class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Lab Tests
+                        <span class="keyboard-shortcut ml-2">Ctrl+L</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Clinical Information -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Left Column -->
+                <div class="space-y-6">
+                    <!-- Chief Complaints -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Chief Complaints
+                            <span class="text-red-500">*</span>
+                        </label>
+                        <textarea name="chief_complaints" rows="3" 
+                                  class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                  placeholder="Enter patient's chief complaints..."
+                                  oninput="getDiagnosisSuggestions(this.value)"></textarea>
+                        <div id="diagnosis-suggestions" class="mt-2"></div>
+                    </div>
+
+                    <!-- Clinical Findings -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Clinical Findings
+                        </label>
+                        <textarea name="clinical_findings" rows="3" 
+                                  class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                  placeholder="Enter clinical findings..."></textarea>
+                    </div>
+
+                    <!-- Diagnosis -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Diagnosis
+                            <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" name="diagnosis" 
+                               class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                               placeholder="Enter diagnosis..."
+                               oninput="getMedicineSuggestions(this.value)">
+                        <div id="medicine-suggestions" class="mt-2"></div>
+                    </div>
+                </div>
+
+                <!-- Right Column -->
+                <div class="space-y-6">
+                    <!-- Vitals (Optional) -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">Patient Vitals (Optional)</h3>
+                        {% if latest_vitals %}
+                        <div class="mb-4 p-3 bg-blue-50 rounded-lg">
+                            <p class="text-sm text-blue-800">
+                                <strong>Latest Vitals:</strong> 
+                                {% if latest_vitals.blood_pressure %}BP: {{ latest_vitals.blood_pressure }}{% endif %}
+                                {% if latest_vitals.temperature %}, Temp: {{ latest_vitals.temperature }}{% endif %}
+                                {% if latest_vitals.weight %}, Weight: {{ latest_vitals.weight }}{% endif %}
+                                {% if latest_vitals.heart_rate %}, HR: {{ latest_vitals.heart_rate }}{% endif %}
+                            </p>
+                        </div>
+                        {% endif %}
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Blood Pressure</label>
+                                <input type="text" name="blood_pressure" 
+                                       value="{{ vitals_data.blood_pressure|default:'' }}"
+                                       class="mt-1 w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                       placeholder="e.g., 120/80">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Temperature</label>
+                                <input type="text" name="temperature" 
+                                       value="{{ vitals_data.temperature|default:'' }}"
+                                       class="mt-1 w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                       placeholder="e.g., 98.6°F">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Weight</label>
+                                <input type="text" name="weight" 
+                                       value="{{ vitals_data.weight|default:'' }}"
+                                       class="mt-1 w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                       placeholder="e.g., 70 kg">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Heart Rate</label>
+                                <input type="text" name="heart_rate" 
+                                       value="{{ vitals_data.heart_rate|default:'' }}"
+                                       class="mt-1 w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                       placeholder="e.g., 72 bpm">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Advice -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Advice
+                        </label>
+                        <textarea name="advice" rows="4" 
+                                  class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                  placeholder="Enter advice for the patient..."></textarea>
+                    </div>
+
+                    <!-- Follow Up -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Follow Up Date
+                        </label>
+                        <input type="date" name="follow_up_date" 
+                               class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Medicines Section -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-medium text-gray-900">Medicines</h3>
+                        <button type="button" onclick="addMedicineRow()" 
+                                class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                            </svg>
+                            Add Medicine
+                        </button>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <div id="medicines-container" class="space-y-4">
+                        <!-- Medicine rows will be added here -->
+                    </div>
+                    <div id="no-medicines" class="text-center py-8 text-gray-500">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                        </svg>
+                        <p class="mt-2">No medicines added yet</p>
+                        <p class="text-sm">Click "Add Medicine" or use Quick Medicine to get started</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lab Tests Section -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-medium text-gray-900">Lab Tests (Optional)</h3>
+                        <button type="button" onclick="showLabTests()" 
+                                class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Add Lab Tests
+                        </button>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <div id="lab-tests-container" class="space-y-4">
+                        <!-- Lab test rows will be added here -->
+                    </div>
+                    <div id="no-lab-tests" class="text-center py-8 text-gray-500">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p class="mt-2">No lab tests added yet</p>
+                        <p class="text-sm">Click "Add Lab Tests" to prescribe laboratory investigations</p>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Quick Add Modal -->
+<div id="quick-add-modal" class="hidden">
+    <div class="overlay" onclick="hideQuickAdd()"></div>
+    <div class="quick-add-panel bg-white rounded-lg shadow-xl p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-medium text-gray-900" id="quick-add-title">Quick Add</h3>
+            <button onclick="hideQuickAdd()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="quick-add-content">
+            <!-- Content will be loaded here -->
+        </div>
+    </div>
+</div>
+
+<!-- Toast Notifications -->
+<div id="toast-container" class="fixed top-4 right-4 z-50"></div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let medicineCount = 0;
+let labTestCount = 0;
+
+// Initialize the form
+document.addEventListener('DOMContentLoaded', function() {
+    // Add keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey) {
+            switch(e.key) {
+                case 'd':
+                    e.preventDefault();
+                    showQuickAdd('diagnosis');
+                    break;
+                case 'm':
+                    e.preventDefault();
+                    showQuickAdd('medicine');
+                    break;
+                case 't':
+                    e.preventDefault();
+                    showQuickAdd('template');
+                    break;
+                case 'l':
+                    e.preventDefault();
+                    showLabTests();
+                    break;
+                case 's':
+                    e.preventDefault();
+                    saveDraft();
+                    break;
+            }
+        }
+    });
+
+    // Auto-save draft every 30 seconds
+    setInterval(saveDraft, 30000);
+});
+
+// Quick Add Functions
+function showQuickAdd(type) {
+    const modal = document.getElementById('quick-add-modal');
+    const content = document.getElementById('quick-add-content');
+    const title = document.getElementById('quick-add-title');
+    
+    title.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+    
+    // Load content via HTMX
+    fetch(`{% url 'users:quick_add_content' %}?type=${type}`)
+        .then(response => response.text())
+        .then(html => {
+            content.innerHTML = html;
+            modal.classList.remove('hidden');
+        });
+}
+
+function hideQuickAdd() {
+    document.getElementById('quick-add-modal').classList.add('hidden');
+}
+
+// Suggestion Functions
+function getDiagnosisSuggestions(query) {
+    if (query.length < 3) {
+        document.getElementById('diagnosis-suggestions').innerHTML = '';
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('chief_complaints', query);
+    
+    fetch('{% url "users:diagnosis_suggestions" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.text())
+    .then(html => {
+        document.getElementById('diagnosis-suggestions').innerHTML = html;
+    });
+}
+
+function getMedicineSuggestions(diagnosis) {
+    if (diagnosis.length < 3) {
+        document.getElementById('medicine-suggestions').innerHTML = '';
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('diagnosis', diagnosis);
+    
+    fetch('{% url "users:medicine_suggestions" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.text())
+    .then(html => {
+        document.getElementById('medicine-suggestions').innerHTML = html;
+    });
+}
+
+// Medicine Functions
+function addMedicineRow(medicineData = null) {
+    const container = document.getElementById('medicines-container');
+    const noMedicines = document.getElementById('no-medicines');
+    
+    const medicineCard = document.createElement('div');
+    medicineCard.className = 'medicine-card bg-gray-50 p-4 rounded-lg border';
+    medicineCard.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Medicine</label>
+                <div class="relative">
+                    <input type="text" name="medicines[${medicineCount}][name]" 
+                           value="${medicineData ? medicineData.name : ''}"
+                           class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                           placeholder="Search medicine..."
+                           oninput="searchMedicine(this.value, ${medicineCount})">
+                    <div id="medicine-suggestions-${medicineCount}" class="absolute w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10 hidden max-h-60 overflow-y-auto"></div>
+                </div>
+                <div id="medicine-details-${medicineCount}" class="mt-1"></div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Dosage</label>
+                <input type="text" name="medicines[${medicineCount}][dosage]" 
+                       value="${medicineData ? medicineData.dosage : ''}"
+                       class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="e.g., 500mg">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Duration & Frequency</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="text" name="medicines[${medicineCount}][duration]" 
+                           value="${medicineData ? medicineData.duration : ''}"
+                           class="border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                           placeholder="Duration (e.g., 5 days)">
+                    <select name="medicines[${medicineCount}][frequency]" 
+                            class="border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Select frequency</option>
+                        <option value="1-0-0" ${medicineData && medicineData.frequency === '1-0-0' ? 'selected' : ''}>1-0-0 (Morning only)</option>
+                        <option value="0-0-1" ${medicineData && medicineData.frequency === '0-0-1' ? 'selected' : ''}>0-0-1 (Night only)</option>
+                        <option value="1-0-1" ${medicineData && medicineData.frequency === '1-0-1' ? 'selected' : ''}>1-0-1 (Morning & Night)</option>
+                        <option value="1-1-1" ${medicineData && medicineData.frequency === '1-1-1' ? 'selected' : ''}>1-1-1 (Three times daily)</option>
+                        <option value="1-1-0" ${medicineData && medicineData.frequency === '1-1-0' ? 'selected' : ''}>1-1-0 (Morning & Afternoon)</option>
+                        <option value="0-1-1" ${medicineData && medicineData.frequency === '0-1-1' ? 'selected' : ''}>0-1-1 (Afternoon & Night)</option>
+                        <option value="1-1-1-1" ${medicineData && medicineData.frequency === '1-1-1-1' ? 'selected' : ''}>1-1-1-1 (Four times daily)</option>
+                        <option value="Every 6 hours" ${medicineData && medicineData.frequency === 'Every 6 hours' ? 'selected' : ''}>Every 6 hours</option>
+                        <option value="Every 8 hours" ${medicineData && medicineData.frequency === 'Every 8 hours' ? 'selected' : ''}>Every 8 hours</option>
+                        <option value="Every 12 hours" ${medicineData && medicineData.frequency === 'Every 12 hours' ? 'selected' : ''}>Every 12 hours</option>
+                        <option value="As needed" ${medicineData && medicineData.frequency === 'As needed' ? 'selected' : ''}>As needed (SOS)</option>
+                        <option value="Before meals" ${medicineData && medicineData.frequency === 'Before meals' ? 'selected' : ''}>Before meals</option>
+                        <option value="After meals" ${medicineData && medicineData.frequency === 'After meals' ? 'selected' : ''}>After meals</option>
+                        <option value="Empty stomach" ${medicineData && medicineData.frequency === 'Empty stomach' ? 'selected' : ''}>Empty stomach</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Instructions</label>
+                <input type="text" name="medicines[${medicineCount}][instructions]" 
+                       value="${medicineData ? medicineData.instructions : ''}"
+                       class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="e.g., After meals">
+                <button type="button" onclick="removeMedicineRow(this)" 
+                        class="mt-2 text-red-600 hover:text-red-800 text-sm">
+                    Remove
+                </button>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(medicineCard);
+    noMedicines.style.display = 'none';
+    medicineCount++;
+}
+
+function searchMedicine(query, index) {
+    if (query.length < 2) {
+        document.getElementById(`medicine-suggestions-${index}`).innerHTML = '';
+        document.getElementById(`medicine-suggestions-${index}`).classList.add('hidden');
+        return;
+    }
+    
+    fetch(`{% url 'users:search_medicines' %}?query=${encodeURIComponent(query)}`)
+        .then(response => response.text())
+        .then(html => {
+            const suggestionsDiv = document.getElementById(`medicine-suggestions-${index}`);
+            suggestionsDiv.innerHTML = html;
+            suggestionsDiv.classList.remove('hidden');
+        })
+        .catch(error => {
+            console.error('Error searching medicines:', error);
+        });
+}
+
+// Hide suggestions when clicking outside
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.medicine-card')) {
+        document.querySelectorAll('[id^="medicine-suggestions-"]').forEach(div => {
+            div.classList.add('hidden');
+        });
+    }
+});
+
+function removeMedicineRow(button) {
+    button.closest('.medicine-card').remove();
+    updateMedicineCount();
+}
+
+function updateMedicineCount() {
+    const cards = document.querySelectorAll('.medicine-card');
+    const noMedicines = document.getElementById('no-medicines');
+    
+    if (cards.length === 0) {
+        noMedicines.style.display = 'block';
+    } else {
+        noMedicines.style.display = 'none';
+    }
+}
+
+function getMedicineDetails(medicineName, index) {
+    if (medicineName.length < 2) {
+        document.getElementById(`medicine-details-${index}`).innerHTML = '';
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('name', medicineName);
+    
+    fetch('{% url "users:medicine_details" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.text())
+    .then(html => {
+        document.getElementById(`medicine-details-${index}`).innerHTML = html;
+    });
+}
+
+// Lab Test Functions
+function showLabTests() {
+    fetch('{% url "users:lab_test_panel" %}')
+        .then(response => response.text())
+        .then(html => {
+            const content = document.getElementById('quick-add-content');
+            content.innerHTML = html;
+            document.getElementById('quick-add-title').textContent = 'Lab Tests';
+            document.getElementById('quick-add-modal').classList.remove('hidden');
+        });
+}
+
+// Template Functions
+function loadTemplate(templateId) {
+    fetch(`{% url 'users:load_template' 0 %}`.replace('0', templateId))
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                populateFormFromTemplate(data.data);
+                hideQuickAdd();
+                showToast('Template loaded successfully', 'success');
+            } else {
+                showToast('Error loading template', 'error');
+            }
+        });
+}
+
+function populateFormFromTemplate(templateData) {
+    // Populate form fields
+    if (templateData.diagnosis) {
+        document.querySelector('input[name="diagnosis"]').value = templateData.diagnosis;
+    }
+    if (templateData.chief_complaints) {
+        document.querySelector('textarea[name="chief_complaints"]').value = templateData.chief_complaints;
+    }
+    if (templateData.clinical_findings) {
+        document.querySelector('textarea[name="clinical_findings"]').value = templateData.clinical_findings;
+    }
+    if (templateData.advice) {
+        document.querySelector('textarea[name="advice"]').value = templateData.advice;
+    }
+    
+    // Clear existing medicines and add from template
+    document.getElementById('medicines-container').innerHTML = '';
+    medicineCount = 0;
+    
+    if (templateData.medicines && templateData.medicines.length > 0) {
+        templateData.medicines.forEach(medicine => {
+            addMedicineRow(medicine);
+        });
+    }
+}
+
+// Save Functions
+function saveDraft() {
+    const formData = new FormData(document.getElementById('prescription-form'));
+    formData.append('is_draft', 'true');
+    
+    fetch('{% url "users:save_prescription_draft" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Draft saved automatically', 'success');
+        }
+    });
+}
+
+function submitPrescription() {
+    const form = document.getElementById('prescription-form');
+    form.submit();
+}
+
+// Utility Functions
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    
+    const bgColor = type === 'success' ? 'bg-green-500' : 
+                   type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+    
+    toast.className = `${bgColor} text-white px-6 py-3 rounded-lg shadow-lg mb-2 transition-opacity duration-300`;
+    toast.textContent = message;
+    
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => {
+            container.removeChild(toast);
+        }, 300);
+    }, 3000);
+}
+
+// Global functions for use in partials
+function selectDiagnosis(diagnosis) {
+    document.querySelector('input[name="diagnosis"]').value = diagnosis;
+    document.getElementById('diagnosis-suggestions').innerHTML = '';
+    getMedicineSuggestions(diagnosis);
+    hideQuickAdd();
+    showToast(`Diagnosis "${diagnosis}" added`, 'success');
+}
+
+function addMedicineFromSuggestion(medicineName, medicineData = null) {
+    addMedicineRow(medicineData || { name: medicineName });
+    document.getElementById('medicine-suggestions').innerHTML = '';
+    hideQuickAdd();
+    showToast(`Added ${medicineName}`, 'success');
+}
+
+// Additional functions for quick panels
+function selectQuickDiagnosis(diagnosis) {
+    document.querySelector('input[name="diagnosis"]').value = diagnosis;
+    hideQuickAdd();
+    showToast(`Diagnosis "${diagnosis}" added`, 'success');
+}
+
+function addQuickMedicine(name, dosage, frequency, duration) {
+    const medicineData = {
+        name: name,
+        dosage: dosage,
+        frequency: frequency,
+        duration: duration,
+        instructions: ''
+    };
+    
+    addMedicineRow(medicineData);
+    hideQuickAdd();
+    showToast(`Added ${name}`, 'success');
+}
+
+// Lab Test Functions - Global scope for HTMX loaded content
+let selectedLabTests = [];
+
+function addTestPanel(panelType) {
+    console.log('Adding test panel:', panelType);
+    
+    const testPanels = {
+        'CBC': ['Hemoglobin', 'WBC Count', 'Platelet Count', 'RBC Count'],
+        'LFT': ['ALT', 'AST', 'Alkaline Phosphatase', 'Bilirubin'],
+        'KFT': ['Creatinine', 'Urea', 'Uric Acid', 'Electrolytes'],
+        'Lipid': ['Total Cholesterol', 'HDL', 'LDL', 'Triglycerides'],
+        'Diabetes': ['Fasting Blood Sugar', 'HbA1c', 'Post Prandial Sugar'],
+        'Thyroid': ['TSH', 'T3', 'T4', 'Free T4']
+    };
+    
+    const tests = testPanels[panelType] || [];
+    console.log('Tests in panel:', tests);
+    
+    let addedCount = 0;
+    tests.forEach(test => {
+        if (!selectedLabTests.includes(test)) {
+            selectedLabTests.push(test);
+        }
+        
+        // Add directly to form for immediate feedback
+        const added = addLabTestToFormDirect(test);
+        if (added) addedCount++;
+    });
+    
+    updateSelectedLabTestsDisplay();
+    showLabTestMessage(`Added ${addedCount} test(s) from ${panelType} panel`);
+    console.log('Panel addition completed. Total selected tests:', selectedLabTests.length);
+}
+
+function addIndividualTest(testName) {
+    console.log('Adding individual test:', testName);
+    
+    if (!selectedLabTests.includes(testName)) {
+        selectedLabTests.push(testName);
+        updateSelectedLabTestsDisplay();
+    }
+    
+    // Add directly to form for immediate feedback
+    const added = addLabTestToFormDirect(testName);
+    if (added) {
+        showLabTestMessage(`Added ${testName}`);
+    }
+    
+    console.log('Individual test addition completed');
+}
+
+function addCustomTest() {
+    const customTestName = document.getElementById('custom-test-name')?.value.trim();
+    if (customTestName && !selectedLabTests.includes(customTestName)) {
+        selectedLabTests.push(customTestName);
+        document.getElementById('custom-test-name').value = '';
+        updateSelectedLabTestsDisplay();
+        
+        // Add directly to form for immediate feedback
+        const added = addLabTestToFormDirect(customTestName);
+        if (added) {
+            showLabTestMessage(`Added custom test: ${customTestName}`);
+        }
+    } else if (!customTestName) {
+        showLabTestMessage('Please enter a test name');
+    }
+}
+
+function updateSelectedLabTestsDisplay() {
+    console.log('Selected lab tests:', selectedLabTests);
+}
+
+function showLabTestMessage(message) {
+    // Try to use the main toast function first
+    if (typeof showToast === 'function') {
+        showToast(message, 'success');
+    } else {
+        // Fallback: create a simple notification
+        console.log('Lab Test:', message);
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #10B981;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            z-index: 1000;
+            font-size: 14px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        `;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 3000);
+    }
+}
+
+function applyLabTests() {
+    console.log('Apply lab tests button clicked');
+    
+    // Get the lab selection
+    const labSelection = document.getElementById('lab-selection')?.value || '';
+    console.log('Lab selection:', labSelection);
+    
+    // Count how many tests are currently in the form
+    const container = document.getElementById('lab-tests-container');
+    const existingTests = container ? container.querySelectorAll('.lab-test-card') : [];
+    const testCount = existingTests.length;
+    
+    console.log('Tests already in form:', testCount);
+    
+    // If there are tests in the selectedTests array that haven't been added yet, add them
+    if (selectedLabTests.length > 0) {
+        console.log('Adding remaining selected tests:', selectedLabTests);
+        selectedLabTests.forEach(test => {
+            addLabTestToFormDirect(test, labSelection);
+        });
+    }
+    
+    // Close the modal
+    if (typeof hideQuickAdd === 'function') {
+        hideQuickAdd();
+    } else {
+        // Fallback: hide the modal manually
+        const modal = document.getElementById('quick-add-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+    
+    // Show success message
+    const totalTests = container ? container.querySelectorAll('.lab-test-card').length : 0;
+    const message = `Lab tests added to prescription (${totalTests} total)`;
+    
+    if (typeof showToast === 'function') {
+        showToast(message, 'success');
+    } else {
+        showLabTestMessage(message);
+    }
+    
+    // Clear the selected tests array
+    selectedLabTests = [];
+    
+    console.log('Apply lab tests completed');
+}
+
+function addLabTestToFormDirect(testName, labSelection = '') {
+    const container = document.getElementById('lab-tests-container');
+    const noLabTests = document.getElementById('no-lab-tests');
+    
+    if (!container) {
+        console.error('Lab tests container not found');
+        showLabTestMessage('Error: Lab tests container not found');
+        return false;
+    }
+    
+    // Check if test already exists
+    const existingTests = container.querySelectorAll('input[readonly]');
+    for (let test of existingTests) {
+        if (test.value === testName) {
+            showLabTestMessage(`${testName} already added`);
+            return false;
+        }
+    }
+    
+    const labTestCard = document.createElement('div');
+    labTestCard.className = 'lab-test-card bg-gray-50 p-4 rounded-lg border';
+    
+    // Get current lab test count
+    const currentCount = container.querySelectorAll('.lab-test-card').length;
+    
+    labTestCard.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Test Name</label>
+                <input type="text" name="lab_tests[${currentCount}][name]" 
+                       value="${testName}"
+                       class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                       readonly>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Collection Type</label>
+                <select name="lab_tests[${currentCount}][collection_type]" 
+                        class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <option value="CLINIC">At Clinic</option>
+                    <option value="HOME">Home Collection</option>
+                    <option value="LAB">At Lab</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <input type="text" name="lab_tests[${currentCount}][description]" 
+                       class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="Special instructions...">
+                <button type="button" onclick="removeLabTest(this)" 
+                        class="mt-2 text-red-600 hover:text-red-800 text-sm">
+                    Remove
+                </button>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(labTestCard);
+    if (noLabTests) {
+        noLabTests.style.display = 'none';
+    }
+    
+    console.log(`Added lab test: ${testName}`);
+    return true;
+}
+
+function removeLabTest(button) {
+    const card = button.closest('.lab-test-card');
+    if (card) {
+        card.remove();
+        
+        // Show "no lab tests" message if no tests remain
+        const container = document.getElementById('lab-tests-container');
+        const noLabTests = document.getElementById('no-lab-tests');
+        if (container && noLabTests && container.querySelectorAll('.lab-test-card').length === 0) {
+            noLabTests.style.display = 'block';
+        }
+    }
+}
+
+function addLabTestToForm(testName, labSelection = '') {
+    return addLabTestToFormDirect(testName, labSelection);
+}
+
+// Template functions
+function loadCommonTemplate(templateKey) {
+    const commonTemplates = {
+        fever_cold: {
+            name: 'Fever & Cold',
+            diagnosis: 'Upper Respiratory Tract Infection',
+            medicines: [
+                { name: 'Paracetamol', dosage: '500mg', frequency: '1-0-1', duration: '5 days' },
+                { name: 'Amoxicillin', dosage: '500mg', frequency: '1-1-1', duration: '7 days' }
+            ],
+            advice: 'Rest well, drink plenty of fluids, avoid cold foods'
+        },
+        hypertension: {
+            name: 'Hypertension',
+            diagnosis: 'Essential Hypertension',
+            medicines: [
+                { name: 'Amlodipine', dosage: '5mg', frequency: '1-0-0', duration: 'Lifetime' },
+                { name: 'Losartan', dosage: '50mg', frequency: '1-0-0', duration: 'Lifetime' }
+            ],
+            advice: 'Low salt diet, regular exercise, monitor BP daily'
+        },
+        diabetes: {
+            name: 'Diabetes',
+            diagnosis: 'Type 2 Diabetes Mellitus',
+            medicines: [
+                { name: 'Metformin', dosage: '500mg', frequency: '1-0-1', duration: 'Lifetime' },
+                { name: 'Glimepiride', dosage: '1mg', frequency: '1-0-0', duration: 'Lifetime' }
+            ],
+            advice: 'Low carb diet, regular exercise, monitor blood sugar'
+        },
+        gastritis: {
+            name: 'Gastritis',
+            diagnosis: 'Acid Peptic Disease',
+            medicines: [
+                { name: 'Omeprazole', dosage: '20mg', frequency: '1-0-0', duration: '4 weeks' },
+                { name: 'Antacids', dosage: 'As needed', frequency: 'After meals', duration: '2 weeks' }
+            ],
+            advice: 'Avoid spicy foods, eat small frequent meals, no smoking'
+        },
+        pain_management: {
+            name: 'Pain Management',
+            diagnosis: 'Chronic Pain Syndrome',
+            medicines: [
+                { name: 'Ibuprofen', dosage: '400mg', frequency: '1-1-1', duration: '7 days' },
+                { name: 'Paracetamol', dosage: '500mg', frequency: '1-0-1', duration: '7 days' }
+            ],
+            advice: 'Rest the affected area, apply ice/heat as needed'
+        }
+    };
+    
+    const template = commonTemplates[templateKey];
+    if (!template) return;
+    
+    // Set diagnosis
+    document.querySelector('input[name="diagnosis"]').value = template.diagnosis;
+    
+    // Clear existing medicines
+    const medicinesContainer = document.getElementById('medicines-container');
+    medicinesContainer.innerHTML = '';
+    
+    // Reset medicine count
+    medicineCount = 0;
+    
+    // Add medicines from template
+    template.medicines.forEach((medicine) => {
+        addMedicineRow(medicine);
+    });
+    
+    // Set advice
+    document.querySelector('textarea[name="advice"]').value = template.advice;
+    
+    hideQuickAdd();
+    showToast(`Loaded template: ${template.name}`, 'success');
+}
+</script>
+{% endblock %} 

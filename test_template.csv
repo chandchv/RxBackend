@@ -1,0 +1,2 @@
+name,short_code,description,category,preparation_instructions,price,turnaround_time_hours,offers_home_collection,specific_instructions
+Complete Blood Count (CBC),CBC,"Measures various components of blood including red blood cells, white blood cells, and platelets",Hematology,Fasting not required,500,24,true,Sample should be collected in EDTA tube

@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from ..models import DoctorAvailability, Patient, Doctor, Appointment, Prescription, PatientVitals, LabTest, LabTestPrescription
 from notifications.models import Notification
-from ..forms import AppointmentForm, PatientForm, AppointmentForm_patient
+from ..forms import AppointmentForm, PatientForm, AppointmentForm_patient, VitalsForm
 from ..serializers import PatientSerializer
 from django.contrib import messages
 from ..models import Patient, UserProfile
@@ -117,7 +117,12 @@ def patient_detail(request, patient_id):
         prescriptions = Prescription.objects.filter(
             doctor=doctor,
             patient=patient
-        ).order_by('-date')
+        ).order_by('-created_at')
+        
+        # Get the latest patient vitals
+        patient_vitals = PatientVitals.objects.filter(
+            patient=patient
+        ).order_by('-created_at').first()
         
         context = {
             'patient': patient,
@@ -126,9 +131,119 @@ def patient_detail(request, patient_id):
             'doctor': doctor,
             'total_appointments': appointments.count(),
             'total_prescriptions': prescriptions.count(),
+            'patient_vitals': patient_vitals,
         }
         
         return render(request, 'doctor/patient_detail.html', context)
+        
+    except Doctor.DoesNotExist:
+        messages.error(request, 'Doctor profile not found')
+        return redirect('users:dashboard')
+    except Patient.DoesNotExist:
+        messages.error(request, 'Patient not found')
+        return redirect('users:patients_list')
+
+@login_required
+def patient_vitals_history(request, patient_id):
+    """View for displaying patient's historical vitals"""
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        patient = get_object_or_404(Patient, id=patient_id)
+        
+        # Get all vitals for this patient, ordered by most recent first
+        vitals_history = PatientVitals.objects.filter(
+            patient=patient
+        ).order_by('-created_at')
+        
+        # Get the latest vitals for comparison
+        latest_vitals = vitals_history.first()
+        
+        # Calculate trends (comparing with previous readings)
+        vitals_with_trends = []
+        for i, vitals in enumerate(vitals_history):
+            trend_data = {}
+            
+            # Get previous reading for comparison
+            if i < len(vitals_history) - 1:
+                prev_vitals = vitals_history[i + 1]
+                
+                # Calculate trends for each vital
+                if vitals.weight and prev_vitals.weight:
+                    weight_diff = vitals.weight - prev_vitals.weight
+                    trend_data['weight_trend'] = {
+                        'change': weight_diff,
+                        'direction': 'up' if weight_diff > 0 else 'down' if weight_diff < 0 else 'stable',
+                        'percentage': round((weight_diff / prev_vitals.weight) * 100, 1) if prev_vitals.weight != 0 else 0
+                    }
+                
+                if vitals.heart_rate and prev_vitals.heart_rate:
+                    hr_diff = vitals.heart_rate - prev_vitals.heart_rate
+                    trend_data['heart_rate_trend'] = {
+                        'change': hr_diff,
+                        'direction': 'up' if hr_diff > 0 else 'down' if hr_diff < 0 else 'stable'
+                    }
+                
+                if vitals.temperature and prev_vitals.temperature:
+                    temp_diff = vitals.temperature - prev_vitals.temperature
+                    trend_data['temperature_trend'] = {
+                        'change': temp_diff,
+                        'direction': 'up' if temp_diff > 0 else 'down' if temp_diff < 0 else 'stable'
+                    }
+                
+                if vitals.oxygen_saturation and prev_vitals.oxygen_saturation:
+                    o2_diff = vitals.oxygen_saturation - prev_vitals.oxygen_saturation
+                    trend_data['oxygen_trend'] = {
+                        'change': o2_diff,
+                        'direction': 'up' if o2_diff > 0 else 'down' if o2_diff < 0 else 'stable'
+                    }
+            
+            vitals_with_trends.append({
+                'vitals': vitals,
+                'trends': trend_data
+            })
+        
+        context = {
+            'patient': patient,
+            'vitals_history': vitals_with_trends,
+            'latest_vitals': latest_vitals,
+            'total_readings': vitals_history.count(),
+        }
+        
+        return render(request, 'doctor/patient_vitals_history.html', context)
+        
+    except Doctor.DoesNotExist:
+        messages.error(request, 'Doctor profile not found')
+        return redirect('users:dashboard')
+    except Patient.DoesNotExist:
+        messages.error(request, 'Patient not found')
+        return redirect('users:patients_list')
+
+@login_required
+def add_patient_vitals(request, patient_id):
+    """View for adding new patient vitals"""
+    try:
+        doctor = Doctor.objects.get(user=request.user)
+        patient = get_object_or_404(Patient, id=patient_id)
+        
+        if request.method == 'POST':
+            form = VitalsForm(request.POST)
+            if form.is_valid():
+                vitals = form.save(commit=False)
+                vitals.patient = patient
+                vitals.recorded_by = request.user
+                vitals.save()
+                
+                messages.success(request, 'Patient vitals recorded successfully!')
+                return redirect('users:patient_vitals_history', patient_id=patient.id)
+        else:
+            form = VitalsForm()
+        
+        context = {
+            'patient': patient,
+            'form': form,
+        }
+        
+        return render(request, 'doctor/add_patient_vitals.html', context)
         
     except Doctor.DoesNotExist:
         messages.error(request, 'Doctor profile not found')
@@ -320,7 +435,7 @@ def patient_dashboard(request):
         # Get recent prescriptions
         recent_prescriptions = Prescription.objects.filter(
             patient=patient
-        ).order_by('-date')[:5]
+        ).order_by('-created_at')[:5]
         
         # Get completed lab tests
         completed_lab_tests = LabTest.objects.filter(
@@ -461,7 +576,7 @@ def patient_medical_history(request):
         # Get all prescriptions
         prescriptions = Prescription.objects.filter(
             patient=patient
-        ).order_by('-date')
+        ).order_by('-created_at')
         
         context = {
             'patient': patient,

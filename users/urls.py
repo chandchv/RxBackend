@@ -8,6 +8,8 @@ from rest_framework_simplejwt.views import (
 
 from .views import create_prescription_view
 from .views.drugs_views import drug_suggestions
+from .views import prescription_htmx_views
+from .views import prescription_views
 
 from .views import doctor_views, staff_views, admin_views, lab_views
 from .views import auth_views
@@ -24,7 +26,6 @@ from .views import (
     patient_edit,
     create_appointment,
     patient_views,
-    prescription_views,
     api_views,
     admin_views,
     pdf_views,
@@ -81,7 +82,7 @@ from .views.patient_views import (
     
 )
 from .views.prescription_views import (
-    create_prescription,
+    prescription_selection,
     prescription_detail,
     patient_prescriptions,
     prescriptions_view,
@@ -253,6 +254,8 @@ urlpatterns = [
     path('doctor/patients/create/', patient_views.create_patient, name='create_patient'),
     path('doctor/patients/<int:patient_id>/', patient_views.patient_detail, name='patient_detail'),
     path('doctor/patients/<int:patient_id>/edit/', patient_views.patient_edit, name='patient_edit'),
+    path('doctor/patients/<int:patient_id>/vitals/', patient_views.patient_vitals_history, name='patient_vitals_history'),
+    path('doctor/patients/<int:patient_id>/vitals/add/', patient_views.add_patient_vitals, name='add_patient_vitals'),
     path('doctor/profile/', doctor_views.doctor_profile, name='doctor_profile'),
     path('doctor/patients/<int:patient_id>/prescriptions/create/', create_prescription_view.create_prescription, name='create_prescription'),
     path('doctor/prescriptions/<int:pk>/', prescription_views.prescription_detail, name='prescription_detail_view'),
@@ -270,7 +273,7 @@ urlpatterns = [
     path('doctor/calendar/', doctor_views.doctor_calendar, name='doctor_calendar'),
     path('doctor/calendar/events/', doctor_views.doctor_calendar_events, name='doctor_calendar_events'),
     path('doctor/lab-tests/', lab_views.doctor_lab_tests, name='doctor_lab_tests'),
-    path('doctor/lab-test/<int:pk>/', lab_views.doctor_lab_test_detail, name='doctor_lab_test_detail'),
+    path('doctor/lab-test/<int:pk>/', lab_views.doctor_lab_test_detail, name='doctor_lab_test_detail'), 
     path('doctor/billing/', billing_views.doctor_billing_summary, name='doctor_billing_summary'),
     path('doctor/billing/overview/', billing_views.doctor_billing_overview, name='doctor_billing_overview'),
     path('doctor/billing/create/', doctor_views.doctor_create_billing, name='doctor_create_billing'),
@@ -414,7 +417,7 @@ urlpatterns = [
     # Doctor API endpoints
     path('api/doctor/me/', api_views.doctor_me, name='doctor_me'),
     path('api/doctor-dashboard/appointments/', api_views.doctor_appointments, name='doctor_appointments'),
-    path('api/doctor/patients/', api_views.doctor_patients, name='doctor_patients'),
+    path('api/doctor/patients/', api_views.doctor_patients, name='doctor_patients'), 
     path('api/doctor/generate-slots/', doctor_views.generate_slots_api, name='generate_slots_api'),
     path('api/doctor/appointments/create/', doctor_views.api_create_appointment, name='api_create_appointment'),
 
@@ -510,7 +513,31 @@ urlpatterns = [
     path('api/patient/<int:patient_id>/records/', api_views.patient_records_api, name='patient_records_api'),
     path('api/test-results/<int:test_id>/', api_views.test_results_api, name='test_results_api'),
     #path('api/prescriptions/<int:prescription_id>/', api_views.prescription_detail_api, name='prescription_detail_api'),
-]
+    
+    # Add these new URL patterns for modern prescription features
+    path('api/diagnosis/suggestions/', prescription_htmx_views.diagnosis_suggestions, name='diagnosis_suggestions'),
+    path('api/medicine/suggestions/', prescription_htmx_views.medicine_suggestions, name='medicine_suggestions'),
+    path('api/medicine/details/', prescription_htmx_views.medicine_details, name='medicine_details'),
+    path('api/quick-add/content/', prescription_htmx_views.quick_add_content, name='quick_add_content'),
+    path('api/lab-test/panel/', prescription_htmx_views.lab_test_panel, name='lab_test_panel'),
+    path('api/templates/recent/', prescription_htmx_views.recent_templates, name='recent_templates'),
+    path('api/templates/save/', prescription_htmx_views.save_template, name='save_template'),
+    path('api/templates/<int:template_id>/', prescription_htmx_views.load_template, name='load_template'),
+    path('api/prescription/draft/save/', prescription_htmx_views.save_prescription_draft, name='save_prescription_draft'),
+    path('api/medicines/search/', prescription_htmx_views.search_medicines, name='search_medicines'),
+    path('api/patient/<int:patient_id>/history/', prescription_htmx_views.patient_history, name='patient_history'),
+    path('api/patient/<int:patient_id>/vitals/modal/', prescription_htmx_views.update_vitals_modal, name='update_vitals_modal'),
 
-# Register the router URLs
-urlpatterns += path('api/', include(router.urls)),
+    # New prescription creation routes
+    path('prescription/selection/<int:patient_id>/', prescription_views.prescription_selection, name='prescription_selection'),
+    path('prescription/create/modern/<int:patient_id>/', prescription_views.create_prescription_modern, name='create_prescription_modern'),
+
+    # Prescription item management routes
+    path('prescription/<int:prescription_id>/item/<int:item_id>/delete/', prescription_views.delete_prescription_item, name='delete_prescription_item'),
+    path('prescription/<int:prescription_id>/item/<int:item_id>/edit/', prescription_views.edit_prescription_item, name='edit_prescription_item'),
+    path('prescription/<int:prescription_id>/lab-test/<int:lab_test_id>/delete/', prescription_views.delete_lab_test, name='delete_lab_test'),
+    path('prescription/<int:prescription_id>/lab-test/<int:lab_test_id>/edit/', prescription_views.edit_lab_test, name='edit_lab_test'),
+
+    # Register the router URLs
+    path('api/', include(router.urls)),
+]

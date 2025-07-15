@@ -20,14 +20,53 @@
         </div>
     </div>
 
+    <!-- Filter and Search Section -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <form method="get" class="flex flex-col md:flex-row gap-4">
+            <div class="flex-1">
+                <input type="text" name="search" value="{{ current_search }}" placeholder="Search tests, descriptions, or codes..." 
+                       class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div class="flex gap-4">
+                <select name="category" class="border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">All Categories</option>
+                    {% for category in categories %}
+                        <option value="{{ category }}" {% if current_category == category %}selected{% endif %}>
+                            {{ category|title }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <select name="status" class="border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">All Status</option>
+                    <option value="active" {% if current_status == 'active' %}selected{% endif %}>Active</option>
+                    <option value="inactive" {% if current_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                </select>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded">
+                    Filter
+                </button>
+                <a href="{% url 'labs:manage_tests' %}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded">
+                    Clear
+                </a>
+            </div>
+        </form>
+        
+        <!-- Results Summary -->
+        <div class="mt-4 text-sm text-gray-600">
+            Found {{ tests.count }} test{{ tests.count|pluralize }} 
+            {% if current_search %}matching "{{ current_search }}"{% endif %}
+            {% if current_category %}in {{ current_category|title }}{% endif %}
+            {% if current_status %}({{ current_status|title }}){% endif %}
+        </div>
+    </div>
+
     <div class="bg-white rounded-lg shadow-md overflow-hidden">
         <table class="min-w-full">
             <thead class="bg-gray-100">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test Details</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turnaround Time</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price (₹)</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turnaround</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Home Collection</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -35,36 +74,114 @@
             </thead>
             <tbody class="divide-y divide-gray-200">
                 {% for test in tests %}
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-medium text-gray-900">{{ test.test }}</div>
-                        <div class="text-sm text-gray-500">{{ test.short_code }}</div>
+                <tr class="hover:bg-gray-50" id="test-row-{{ test.id }}">
+                    <td class="px-6 py-4">
+                        <div class="flex items-start">
+                            <div class="flex-1">
+                                <div class="text-sm font-medium text-gray-900">{{ test.test.name }}</div>
+                                {% if test.test.short_code %}
+                                    <div class="text-sm text-gray-500">Code: {{ test.test.short_code }}</div>
+                                {% endif %}
+                                {% if test.test.description %}
+                                    <div class="text-xs text-gray-600 mt-1">{{ test.test.description|truncatewords:20 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ test.category }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{{ test.price }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ test.turnaround_time_hours }} hours</td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 py-1 text-xs rounded-full
-                            {% if test.offers_home_collection %}bg-green-100 text-green-800
-                            {% else %}bg-gray-100 text-gray-800{% endif %}">
-                            {% if test.offers_home_collection %}Yes{% else %}No{% endif %}
+                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                            {{ test.test.category|default:"Uncategorized" }}
                         </span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 py-1 text-xs rounded-full
-                            {% if test.is_active %}bg-green-100 text-green-800
-                            {% else %}bg-red-100 text-red-800{% endif %}">
-                            {% if test.is_active %}Active{% else %}Inactive{% endif %}
-                        </span>
+                        <div class="edit-field">
+                            <span class="display-value text-sm text-gray-900 cursor-pointer hover:bg-yellow-100 px-2 py-1 rounded" 
+                                  data-field="price" data-value="{{ test.price }}" data-test-id="{{ test.id }}">
+                                ₹{{ test.price }}
+                            </span>
+                            <input type="number" class="edit-input hidden w-20 px-2 py-1 border rounded text-sm" 
+                                   step="0.01" min="0" value="{{ test.price }}">
+                        </div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <a href="{% url 'labs:edit_test_offering' test.id %}" class="text-blue-600 hover:text-blue-800">Edit</a>
-                        <a href="{% url 'labs:delete_test_offering' test.id %}" class="ml-2 text-red-600 hover:text-red-800">Delete</a>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="edit-field">
+                            <span class="display-value text-sm text-gray-900 cursor-pointer hover:bg-yellow-100 px-2 py-1 rounded" 
+                                  data-field="turnaround_time_hours" data-value="{{ test.turnaround_time_hours }}" data-test-id="{{ test.id }}">
+                                {{ test.turnaround_time_hours }}h
+                            </span>
+                            <input type="number" class="edit-input hidden w-16 px-2 py-1 border rounded text-sm" 
+                                   min="1" value="{{ test.turnaround_time_hours }}">
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="edit-field">
+                            <span class="display-value cursor-pointer hover:bg-yellow-100 px-2 py-1 rounded" 
+                                  data-field="offers_home_collection" data-value="{{ test.offers_home_collection|yesno:'true,false' }}" data-test-id="{{ test.id }}">
+                                <span class="px-2 py-1 text-xs rounded-full
+                                    {% if test.offers_home_collection %}bg-green-100 text-green-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {% if test.offers_home_collection %}Yes{% else %}No{% endif %}
+                                </span>
+                            </span>
+                            <select class="edit-input hidden px-2 py-1 border rounded text-sm">
+                                <option value="true" {% if test.offers_home_collection %}selected{% endif %}>Yes</option>
+                                <option value="false" {% if not test.offers_home_collection %}selected{% endif %}>No</option>
+                            </select>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="edit-field">
+                            <span class="display-value cursor-pointer hover:bg-yellow-100 px-2 py-1 rounded" 
+                                  data-field="is_active" data-value="{{ test.is_active|yesno:'true,false' }}" data-test-id="{{ test.id }}">
+                                <span class="px-2 py-1 text-xs rounded-full
+                                    {% if test.is_active %}bg-green-100 text-green-800
+                                    {% else %}bg-red-100 text-red-800{% endif %}">
+                                    {% if test.is_active %}Active{% else %}Inactive{% endif %}
+                                </span>
+                            </span>
+                            <select class="edit-input hidden px-2 py-1 border rounded text-sm">
+                                <option value="true" {% if test.is_active %}selected{% endif %}>Active</option>
+                                <option value="false" {% if not test.is_active %}selected{% endif %}>Inactive</option>
+                            </select>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                        <button class="edit-btn text-blue-600 hover:text-blue-800" data-test-id="{{ test.id }}">
+                            Edit
+                        </button>
+                        <button class="save-btn hidden text-green-600 hover:text-green-800" data-test-id="{{ test.id }}">
+                            Save
+                        </button>
+                        <button class="cancel-btn hidden text-gray-600 hover:text-gray-800" data-test-id="{{ test.id }}">
+                            Cancel
+                        </button>
+                        <a href="{% url 'labs:edit_test_offering' test.id %}" class="text-indigo-600 hover:text-indigo-800">Details</a>
+                        <a href="{% url 'labs:delete_test_offering' test.id %}" class="text-red-600 hover:text-red-800"
+                           onclick="return confirm('Are you sure you want to delete this test?')">Delete</a>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" class="px-6 py-4 text-center text-gray-500">No tests found</td>
+                    <td colspan="7" class="px-6 py-8 text-center">
+                        <div class="flex flex-col items-center">
+                            <svg class="h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">No tests found</h3>
+                            <p class="text-gray-500 mb-4">
+                                {% if current_search or current_category or current_status %}
+                                    No tests match your current filters. Try adjusting your search criteria.
+                                {% else %}
+                                    Get started by adding your first test offering.
+                                {% endif %}
+                            </p>
+                            {% if not current_search and not current_category and not current_status %}
+                                <a href="{% url 'labs:add_test_offering' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
+                                    Add Your First Test
+                                </a>
+                            {% endif %}
+                        </div>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -95,4 +212,153 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Inline editing functionality
+    const editButtons = document.querySelectorAll('.edit-btn');
+    const saveButtons = document.querySelectorAll('.save-btn');
+    const cancelButtons = document.querySelectorAll('.cancel-btn');
+
+    editButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const testId = this.dataset.testId;
+            enterEditMode(testId);
+        });
+    });
+
+    saveButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const testId = this.dataset.testId;
+            saveChanges(testId);
+        });
+    });
+
+    cancelButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const testId = this.dataset.testId;
+            exitEditMode(testId);
+        });
+    });
+
+    function enterEditMode(testId) {
+        const row = document.getElementById(`test-row-${testId}`);
+        const editFields = row.querySelectorAll('.edit-field');
+        
+        editFields.forEach(field => {
+            const displayValue = field.querySelector('.display-value');
+            const editInput = field.querySelector('.edit-input');
+            
+            displayValue.classList.add('hidden');
+            editInput.classList.remove('hidden');
+        });
+
+        // Toggle buttons
+        row.querySelector('.edit-btn').classList.add('hidden');
+        row.querySelector('.save-btn').classList.remove('hidden');
+        row.querySelector('.cancel-btn').classList.remove('hidden');
+    }
+
+    function exitEditMode(testId) {
+        const row = document.getElementById(`test-row-${testId}`);
+        const editFields = row.querySelectorAll('.edit-field');
+        
+        editFields.forEach(field => {
+            const displayValue = field.querySelector('.display-value');
+            const editInput = field.querySelector('.edit-input');
+            
+            displayValue.classList.remove('hidden');
+            editInput.classList.add('hidden');
+            
+            // Reset input value to original
+            const originalValue = displayValue.dataset.value;
+            if (editInput.type === 'number') {
+                editInput.value = originalValue;
+            } else {
+                editInput.value = originalValue;
+            }
+        });
+
+        // Toggle buttons
+        row.querySelector('.edit-btn').classList.remove('hidden');
+        row.querySelector('.save-btn').classList.add('hidden');
+        row.querySelector('.cancel-btn').classList.add('hidden');
+    }
+
+    async function saveChanges(testId) {
+        const row = document.getElementById(`test-row-${testId}`);
+        const editFields = row.querySelectorAll('.edit-field');
+        
+        const data = { test_id: testId };
+        
+        editFields.forEach(field => {
+            const displayValue = field.querySelector('.display-value');
+            const editInput = field.querySelector('.edit-input');
+            const fieldName = displayValue.dataset.field;
+            
+            data[fieldName] = editInput.value;
+        });
+
+        try {
+            const response = await fetch('{% url "labs:update_test_offering" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value || '{{ csrf_token }}'
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                
+                // Update display values
+                editFields.forEach(field => {
+                    const displayValue = field.querySelector('.display-value');
+                    const editInput = field.querySelector('.edit-input');
+                    const fieldName = displayValue.dataset.field;
+                    
+                    displayValue.dataset.value = editInput.value;
+                    
+                    // Update display text based on field type
+                    if (fieldName === 'price') {
+                        displayValue.innerHTML = `₹${editInput.value}`;
+                    } else if (fieldName === 'turnaround_time_hours') {
+                        displayValue.innerHTML = `${editInput.value}h`;
+                    } else if (fieldName === 'offers_home_collection' || fieldName === 'is_active') {
+                        const value = editInput.value === 'true';
+                        const text = value ? (fieldName === 'is_active' ? 'Active' : 'Yes') : (fieldName === 'is_active' ? 'Inactive' : 'No');
+                        const colorClass = value ? (fieldName === 'is_active' ? 'bg-green-100 text-green-800' : 'bg-green-100 text-green-800') : (fieldName === 'is_active' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800');
+                        displayValue.innerHTML = `<span class="px-2 py-1 text-xs rounded-full ${colorClass}">${text}</span>`;
+                    }
+                });
+                
+                exitEditMode(testId);
+                
+                // Show success message
+                showMessage('Test updated successfully!', 'success');
+            } else {
+                throw new Error('Failed to update test');
+            }
+        } catch (error) {
+            console.error('Error updating test:', error);
+            showMessage('Error updating test. Please try again.', 'error');
+        }
+    }
+
+    function showMessage(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `fixed top-4 right-4 px-4 py-2 rounded-md z-50 ${type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+        alertDiv.textContent = message;
+        document.body.appendChild(alertDiv);
+        
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 3000);
+    }
+});
+</script>
+
+<!-- Hidden CSRF token for AJAX -->
+{% csrf_token %}
 {% endblock %} 

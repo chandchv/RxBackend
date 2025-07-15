@@ -772,10 +772,11 @@ def doctor_patients(request):
 
         # Get all patients for this doctor using the appointments relationship
         patients = Patient.objects.filter(
-            appointments__doctor=doctor
+            doctor=doctor
         ).distinct()
         
         logger.info(f"Found {patients.count()} patients for doctor {doctor.name}")
+        
         
         patient_data = [{
             'id': patient.id,
